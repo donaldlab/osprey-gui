@@ -9,6 +9,7 @@ import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.WindowFeature
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.view.BallAndStick
+import edu.duke.cs.osprey.restypes.HardCodedResidueInfo
 import edu.duke.cs.osprey.structure.PDBIO
 import edu.duke.cs.ospreygui.prep.guessBonds
 import edu.duke.cs.osprey.structure.Molecule as OspreyMolecule
@@ -20,11 +21,11 @@ import java.util.*
 fun main() = autoCloser {
 
 	// use osprey to load a PDB file
-	val ospreyMol = PDBIO.readFile(File("/home/jeff/dlab/osprey3/test-resources/1CC8.ss.pdb"))
+	val ospreyMol = PDBIO.readFile(File("../osprey3/test-resources/1CC8.ss.pdb"))
 	println("loaded ${ospreyMol.residues.size} residues")
 
 	// convert the molecule to molscope format
-	val mol = ospreyMol.toMolscope("1CC8")
+	val mol = ospreyMol.toPolymer("1CC8")
 
 	// guess the bonds
 	for (bond in mol.guessBonds()) {
@@ -61,7 +62,7 @@ fun main() = autoCloser {
 	// prepare a slide for the molecule
 	win.slides.add(Slide(mol.name).apply {
 		lock { s ->
-			s.views.add(BallAndStick(mol))
+			s.views.add(BallAndStick(mol, MoleculeSelectors.mainchain))
 			s.camera.lookAtEverything()
 		}
 	})
@@ -71,8 +72,8 @@ fun main() = autoCloser {
 } // end of scope here cleans up all autoClose() resources
 
 
-fun OspreyMolecule.toMolscope(name: String) =
-	Molecule(name).apply {
+fun OspreyMolecule.toPolymer(name: String) =
+	Polymer(name).apply {
 
 		// convert the atoms
 		val atomMap = IdentityHashMap<OspreyAtom,Atom>()
@@ -99,5 +100,19 @@ fun OspreyMolecule.toMolscope(name: String) =
 					bonds.add(atom, bondedAtom)
 				}
 			}
+		}
+
+		// convert the residues
+		for (res in residues) {
+			val atoms = res.atoms.map { atomMap[it]!! }
+
+			// make a best guess for mainchain vs sidechain atoms
+			val mainchain = atoms.filter { it.name.toUpperCase() in HardCodedResidueInfo.possibleBBAtomsLookup }
+			val sidechain = atoms.filter { it !in mainchain }
+			chain.add(Residue(
+				res.pdbResNumber,
+				mainchain = mainchain,
+				sidechains = listOf(sidechain)
+			))
 		}
 	}
