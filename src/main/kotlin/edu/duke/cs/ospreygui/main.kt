@@ -11,6 +11,7 @@ import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.osprey.restypes.HardCodedResidueInfo
 import edu.duke.cs.osprey.structure.PDBIO
+import edu.duke.cs.ospreygui.features.slide.BondEditor
 import edu.duke.cs.ospreygui.prep.guessBonds
 import edu.duke.cs.osprey.structure.Molecule as OspreyMolecule
 import edu.duke.cs.osprey.structure.Atom as OspreyAtom
@@ -27,10 +28,12 @@ fun main() = autoCloser {
 	// convert the molecule to molscope format
 	val mol = ospreyMol.toPolymer("1CC8")
 
+	/* TEMP
 	// guess the bonds
 	for (bond in mol.guessBonds()) {
 		mol.bonds.add(bond.a1, bond.a2)
 	}
+	*/
 
 	// open a window
 	val win = Window(
@@ -62,8 +65,11 @@ fun main() = autoCloser {
 	// prepare a slide for the molecule
 	win.slides.add(Slide(mol.name).apply {
 		lock { s ->
-			s.views.add(BallAndStick(mol, MoleculeSelectors.mainchain))
+
+			s.views.add(BallAndStick(mol))
 			s.camera.lookAtEverything()
+
+			s.features.add(BondEditor())
 		}
 	})
 
