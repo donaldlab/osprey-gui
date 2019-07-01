@@ -14,9 +14,12 @@ repositories {
 }
 
 dependencies {
-	compile(kotlin("stdlib-jdk8"))
-	compile("edu.duke.cs:molscope")
-	compile("edu.duke.cs:osprey3")
+	
+	implementation(kotlin("stdlib-jdk8"))
+	implementation("edu.duke.cs:molscope")
+	implementation("edu.duke.cs:osprey3")
+
+	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.3.2")
 }
 
 configure<JavaPluginConvention> {

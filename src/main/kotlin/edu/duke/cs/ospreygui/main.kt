@@ -115,10 +115,13 @@ fun OspreyMolecule.toPolymer(name: String) =
 			// make a best guess for mainchain vs sidechain atoms
 			val mainchain = atoms.filter { it.name.toUpperCase() in HardCodedResidueInfo.possibleBBAtomsLookup }
 			val sidechain = atoms.filter { it !in mainchain }
-			chain.add(Residue(
-				res.pdbResNumber,
-				mainchain = mainchain,
-				sidechains = listOf(sidechain)
-			))
+			chains.add(Polymer.Chain("A").apply {
+				residues.add(Polymer.Residue(
+					res.pdbResNumber.substring(1),
+					res.type,
+					mainchain = mainchain,
+					sidechains = listOf(sidechain)
+				))
+			})
 		}
 	}
