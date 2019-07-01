@@ -5,6 +5,7 @@ import cuchaz.kludge.tools.*
 import cuchaz.kludge.vulkan.ColorRGBA
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
+import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
@@ -14,7 +15,9 @@ import edu.duke.cs.ospreygui.prep.guessBonds
 import edu.duke.cs.ospreygui.prep.toTree
 
 
-class BondEditor : SlideFeature("Edit", "Bonds") {
+class BondEditor : SlideFeature {
+
+	override val id = FeatureId("edit.bonds")
 
 	private val pOpen = Ref.of(false)
 	private var wasOpen = false
@@ -25,7 +28,7 @@ class BondEditor : SlideFeature("Edit", "Bonds") {
 
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
-		if (menuItem(name)) {
+		if (menuItem("Bonds")) {
 			pOpen.value = true
 		}
 	}
