@@ -41,14 +41,6 @@ class BondEditor : SlideFeature {
 
 		val molViews = slide.molViews()
 
-		// show hover effects while the window is open
-		// TODO: how do multiple features share hover effects?
-		slidewin.hoverEffect = if (pOpen.value) {
-			hoverEffect
-		} else {
-			null
-		}
-
 		// did we click anything?
 		if (slidewin.mouseLeftClick) {
 
@@ -66,6 +58,7 @@ class BondEditor : SlideFeature {
 		}
 
 		if (pOpen.value) {
+			wasOpen = true
 
 			// draw the window
 			begin("Bond Editor##${slide.name}", pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
@@ -140,13 +133,15 @@ class BondEditor : SlideFeature {
 
 			end()
 
-		} else {
+		} else if (wasOpen) {
+			wasOpen = false
+
+			// remove the hover effect
+			// TODO: how do multiple features share hover effects?
+			slidewin.hoverEffect = null
 
 			// clear any leftover selections when the window closes
-			if (!wasOpen) {
-				wasOpen = false
-				molViews.clearSelections()
-			}
+			molViews.clearSelections()
 		}
 	}
 
