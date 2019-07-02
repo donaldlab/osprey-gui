@@ -58,6 +58,11 @@ class BondEditor : SlideFeature {
 		}
 
 		if (pOpen.value) {
+			if (!wasOpen) {
+
+				// add the hover effect
+				slidewin.hoverEffects[id] = hoverEffect
+			}
 			wasOpen = true
 
 			// draw the window
@@ -137,8 +142,7 @@ class BondEditor : SlideFeature {
 			wasOpen = false
 
 			// remove the hover effect
-			// TODO: how do multiple features share hover effects?
-			slidewin.hoverEffect = null
+			slidewin.hoverEffects.remove(id)
 
 			// clear any leftover selections when the window closes
 			molViews.clearSelections()
