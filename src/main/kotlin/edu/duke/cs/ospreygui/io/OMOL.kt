@@ -68,18 +68,12 @@ fun Molecule.toOMOL(): String {
 		for (chain in chains) {
 			write("%s = [\n", chain.id.quote())
 			for (res in chain.residues) {
-				write("\t{ id=%7s, type=%6s, mainchain=[%s], sidechains=[%s] },\n",
+				write("\t{ id=%7s, type=%6s, atoms=[%s] },\n",
 					res.id.quote(),
 					res.type.quote(),
-					res.mainchain
+					res.atoms
 						.map { atom -> indicesByAtom[atom] }
-						.joinToString(", ") { it.toString() },
-					res.sidechains.joinToString(", ") { sidechain ->
-						"[${sidechain
-							.map { atom -> indicesByAtom[atom] }
-							.joinToString(", ") { it.toString() }
-						}]"
-					}
+						.joinToString(", ") { it.toString() }
 				)
 			}
 			write("]\n")
@@ -186,23 +180,12 @@ fun Molecule.Companion.fromOMOL(toml: String): Molecule {
 					chain.residues.add(Polymer.Residue(
 						residueTable.getStringOrThrow("id", resPos),
 						residueTable.getStringOrThrow("type", resPos),
-						mainchain =
-							residueTable.getArrayOrThrow("mainchain", resPos).let { mainchainArray ->
+						atoms =
+							residueTable.getArrayOrThrow("atoms", resPos).let { mainchainArray ->
 								if (!mainchainArray.containsLongs()) {
-									throw ParseException("field \"mainchain\" doesn't contain integers", resPos)
+									throw ParseException("field \"atoms\" doesn't contain integers", resPos)
 								}
 								(0 until mainchainArray.size()).map { getAtom(mainchainArray.getLong(it).toInt()) }
-							},
-						sidechains =
-							residueTable.getArrayOrThrow("sidechains", resPos).let { sidechainsArray ->
-								(0 until sidechainsArray.size()).map { i ->
-									sidechainsArray.getArray(i).let { sidechainArray ->
-										if (!sidechainArray.containsLongs()) {
-											throw ParseException("field \"sidechains\" doesn't contain integers", sidechainsArray.inputPositionOf(i))
-										}
-										(0 until sidechainArray.size()).map { getAtom(sidechainArray.getLong(it).toInt()) }
-									}
-								}
 							}
 					))
 				}

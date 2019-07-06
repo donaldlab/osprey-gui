@@ -9,6 +9,7 @@ import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.toOMOL
+import edu.duke.cs.ospreygui.io.write
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -47,7 +48,7 @@ class SaveOMOL : SlideFeature {
 		val mol = view.mol
 
 		// save the file
-		pathWithExt.toFile().writeText(mol.toOMOL(), Charsets.UTF_8)
+		mol.toOMOL().write(pathWithExt)
 
 		// TODO: feedback to the user that the save worked?
 	}

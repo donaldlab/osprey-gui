@@ -12,7 +12,7 @@ import io.kotlintest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotlintest.shouldBe
 
 
-class TestOMOL : SharedSpec({
+class TestMolIO : SharedSpec({
 
 	val dipeptide = Polymer("GLU-ILE Dipeptide").apply {
 
@@ -92,16 +92,37 @@ class TestOMOL : SharedSpec({
 			residues.add(Polymer.Residue(
 				"1",
 				"GLU",
-				mainchain = listOf(an, ah, aca, aha, ac, ao),
-				sidechains = listOf(listOf(acb, a2hb, a3hb, acg, a2hg, a3hg, acd, aoe1, aoe2))
+				listOf(an, ah, aca, aha, acb, a2hb, a3hb, acg, a2hg, a3hg, acd, aoe1, aoe2, ac, ao)
 			))
 			residues.add(Polymer.Residue(
 				"2",
 				"ILE",
-				mainchain = listOf(bh, bn, bca, bha, bc, bo),
-				sidechains = listOf(listOf(bcb, bhb, bcg2, b1hg2, b2hg2, b3hg2, bcg1, b2hg1, b3hg1, bcd1, b1hd1, b2hd1, b3hd1))
+				listOf(bn, bh, bca, bha, bcb, bhb, bcg2, b1hg2, b2hg2, b3hg2, bcg1, b2hg1, b3hg1, bcd1, b1hd1, b2hd1, b3hd1, bc, bo)
 			))
 		})
+	}
+
+	val benzamidine = Molecule("BEN").apply {
+
+		val c1 = atoms.add(Atom(Element.Carbon, "C1", 6.778, 10.510, 20.665))
+		val c2 = atoms.add(Atom(Element.Carbon, "C2", 5.994, 9.710, 19.842))
+		val c3 = atoms.add(Atom(Element.Carbon, "C3", 6.562, 9.055, 18.751))
+		val c4 = atoms.add(Atom(Element.Carbon, "C4", 7.916, 9.259, 18.444))
+		val c5 = atoms.add(Atom(Element.Carbon, "C5", 8.711, 10.120, 19.210))
+		val c6 = atoms.add(Atom(Element.Carbon, "C6", 8.128, 10.734, 20.335))
+		val c = atoms.add(Atom(Element.Carbon, "C", 6.244, 11.152, 21.851))
+		val n1 = atoms.add(Atom(Element.Nitrogen, "N1", 7.014, 11.257, 22.910))
+		val n2 = atoms.add(Atom(Element.Nitrogen, "N2", 4.965, 11.590, 21.821))
+
+		bonds.add(c1, c2)
+		bonds.add(c1, c6)
+		bonds.add(c1, c)
+		bonds.add(c2, c3)
+		bonds.add(c3, c4)
+		bonds.add(c4, c5)
+		bonds.add(c5, c6)
+		bonds.add(c, n1)
+		bonds.add(c, n2)
 	}
 
 	data class AtomData(
@@ -117,38 +138,65 @@ class TestOMOL : SharedSpec({
 	fun Molecule.Atoms.find(data: AtomData): Atom? =
 		find { atom -> atom.toData() == data }
 
-	test("roundtrip") {
+	infix fun Molecule.shouldBe(expected: Molecule) {
 
-		// do the roundtrip
-		val omol = dipeptide.toOMOL()
-		// TEMP
-		println(omol)
-		val mol2 = Molecule.fromOMOL(omol) as Polymer
+		val observed = this
 
 		// make sure the two molecules are the same
-		mol2.name shouldBe dipeptide.name
+		observed.name shouldBe expected.name
 
 		// check the atoms
-		mol2.atoms.toData() shouldContainExactlyInAnyOrder dipeptide.atoms.toData()
+		observed.atoms.toData() shouldContainExactlyInAnyOrder expected.atoms.toData()
 
 		// check the bonds
-		for (atom1 in dipeptide.atoms) {
-			val atom2 = mol2.atoms.find(atom1.toData())!!
-			mol2.bonds.bondedAtoms(atom2).toData() shouldContainExactlyInAnyOrder dipeptide.bonds.bondedAtoms(atom1).toData()
+		for (atom1 in expected.atoms) {
+			val atom2 = observed.atoms.find(atom1.toData())!!
+			observed.bonds.bondedAtoms(atom2).toData() shouldContainExactlyInAnyOrder expected.bonds.bondedAtoms(atom1).toData()
 		}
 
-		// check the polymer
-		mol2.chains.map { it.id } shouldContainExactlyInAnyOrder dipeptide.chains.map { it.id }
-		for (chain1 in dipeptide.chains) {
-			val chain2 = mol2.chains.find { it.id == chain1.id }!!
-			chain2.residues.map { it.id } shouldContainExactlyInAnyOrder chain1.residues.map { it.id }
-			for (res1 in chain1.residues) {
-				val res2 = chain2.residues.find { it.id == res1.id }!!
+		// check the polymer if needed
+		(observed is Polymer) shouldBe (expected is Polymer)
+		if (observed is Polymer && expected is Polymer) {
 
-				res2.type shouldBe res1.type
-				res2.mainchain.toData() shouldContainExactlyInAnyOrder res1.mainchain.toData()
-				res2.sidechains.map { it.toData() } shouldContainExactlyInAnyOrder  res1.sidechains.map { it.toData() }
+			observed.chains.map { it.id } shouldContainExactlyInAnyOrder expected.chains.map { it.id }
+			for (chain1 in expected.chains) {
+				val chain2 = observed.chains.find { it.id == chain1.id }!!
+				chain2.residues.map { it.id } shouldContainExactlyInAnyOrder chain1.residues.map { it.id }
+				for (res1 in chain1.residues) {
+					val res2 = chain2.residues.find { it.id == res1.id }!!
+
+					res2.type shouldBe res1.type
+					res2.atoms.toData() shouldContainExactlyInAnyOrder res1.atoms.toData()
+				}
 			}
+		}
+	}
+
+	context("OMOL roundtrip") {
+
+		fun roundtrip(mol: Molecule) {
+			Molecule.fromOMOL(mol.toOMOL()) shouldBe mol
+		}
+
+		test("dipeptide") {
+			roundtrip(dipeptide)
+		}
+		test("benzamidine") {
+			roundtrip(benzamidine)
+		}
+	}
+
+	context("OSPREY roundtrip") {
+
+		fun roundtrip(mol: Molecule) {
+			mol.toOspreyMol().toMolecule(mol.name) shouldBe mol
+		}
+
+		test("dipeptide") {
+			roundtrip(dipeptide)
+		}
+		test("benzamidine") {
+			roundtrip(benzamidine)
 		}
 	}
 })

@@ -1,6 +1,6 @@
 package edu.duke.cs.ospreygui
 
-import edu.duke.cs.molscope.Molscope
+import java.nio.charset.Charset
 import java.util.*
 
 
@@ -10,7 +10,7 @@ object OspreyGui {
 
 	private val properties =
 		Properties().apply {
-			Molscope.javaClass.getResourceAsStream("build.properties")
+			getResourceAsStream("build.properties")
 				?.use { load(it) }
 				?: throw Error("can't find build.properties")
 		}
@@ -20,4 +20,9 @@ object OspreyGui {
 
 	val version = string("version")
 	val dev = bool("dev")
+
+	fun getResourceAsStream(path: String) = OspreyGui.javaClass.getResourceAsStream(path)
+
+	fun getResourceAsString(path: String, charset: Charset = Charsets.UTF_8) =
+		getResourceAsStream(path).use { stream -> stream.reader(charset).readText() }
 }
