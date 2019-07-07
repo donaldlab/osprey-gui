@@ -7,6 +7,7 @@ import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.osprey.structure.OMOLIO
 import edu.duke.cs.ospreygui.SharedSpec
 import io.kotlintest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotlintest.shouldBe
@@ -102,7 +103,7 @@ class TestMolIO : SharedSpec({
 		})
 	}
 
-	val benzamidine = Molecule("BEN").apply {
+	val benzamidine = Molecule("Benzamidine", type = "BEN").apply {
 
 		val c1 = atoms.add(Atom(Element.Carbon, "C1", 6.778, 10.510, 20.665))
 		val c2 = atoms.add(Atom(Element.Carbon, "C2", 5.994, 9.710, 19.842))
@@ -144,6 +145,7 @@ class TestMolIO : SharedSpec({
 
 		// make sure the two molecules are the same
 		observed.name shouldBe expected.name
+		observed.type shouldBe expected.type
 
 		// check the atoms
 		observed.atoms.toData() shouldContainExactlyInAnyOrder expected.atoms.toData()
@@ -189,7 +191,21 @@ class TestMolIO : SharedSpec({
 	context("OSPREY roundtrip") {
 
 		fun roundtrip(mol: Molecule) {
-			mol.toOspreyMol().toMolecule(mol.name) shouldBe mol
+			mol.toOspreyMol().toMolecule() shouldBe mol
+		}
+
+		test("dipeptide") {
+			roundtrip(dipeptide)
+		}
+		test("benzamidine") {
+			roundtrip(benzamidine)
+		}
+	}
+
+	context("OSPREY OMOL roundtrip") {
+
+		fun roundtrip(mol: Molecule) {
+			OMOLIO.read(OMOLIO.write(mol.toOspreyMol())).toMolecule() shouldBe mol
 		}
 
 		test("dipeptide") {

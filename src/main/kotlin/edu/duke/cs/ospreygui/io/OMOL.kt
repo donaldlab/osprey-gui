@@ -1,8 +1,5 @@
 package edu.duke.cs.ospreygui.io
 
-import cuchaz.kludge.tools.x
-import cuchaz.kludge.tools.y
-import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
@@ -22,6 +19,11 @@ fun Molecule.toOMOL(): String {
 
 	// write the name
 	write("name = %s\n", name.quote())
+
+	// write the type, if any
+	type?.let { type ->
+		write("type = %s\n", type.quote())
+	}
 
 	write("\n")
 
@@ -103,11 +105,14 @@ fun Molecule.Companion.fromOMOL(toml: String): Molecule {
 	// read the name
 	val name = doc.getStringOrThrow("name")
 
+	// read the type, if any
+	val type = doc.getString("type")
+
 	// make the molecule instance
 	val mol = if (doc.contains("polymer")) {
 		Polymer(name)
 	} else {
-		Molecule(name)
+		Molecule(name, type)
 	}
 
 	val atoms = HashMap<Int,Atom>()

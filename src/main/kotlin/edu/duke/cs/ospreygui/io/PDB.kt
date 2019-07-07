@@ -1,8 +1,5 @@
 package edu.duke.cs.ospreygui.io
 
-import cuchaz.kludge.tools.x
-import cuchaz.kludge.tools.y
-import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
@@ -34,15 +31,15 @@ fun Molecule.Companion.fromPDB(pdb: String): Molecule {
 /**
  * Convert an OSPREY molecule to a Molscope molecule.
  */
-fun OspreyMolecule.toMolecule(name: String): Molecule {
+fun OspreyMolecule.toMolecule(name: String? = null): Molecule {
 
 	val omol = this
 
 	// if there's more than one residue, assume it's a polymer
 	val mol = if (omol.residues.size > 1) {
-		Polymer(name)
+		Polymer(name ?: omol.name)
 	} else {
-		Molecule(name)
+		Molecule(name ?: omol.name, omol.residues.firstOrNull()?.type)
 	}
 
 	// convert the atoms
@@ -101,10 +98,11 @@ fun OspreyMolecule.toMolecule(name: String): Molecule {
 /**
  * Convert a Molscope molecule to an OSPREY molecule.
  */
-fun Molecule.toOspreyMol(smallMolResType: String? = null): OspreyMolecule {
+fun Molecule.toOspreyMol(): OspreyMolecule {
 
 	val mol = this
 	val omol = OspreyMolecule()
+	omol.name = mol.name
 
 	val atomMap = IdentityHashMap<Atom,OspreyAtom>()
 
@@ -113,6 +111,16 @@ fun Molecule.toOspreyMol(smallMolResType: String? = null): OspreyMolecule {
 		atomMap[this] = oatom
 		return oatom to doubleArrayOf(pos.x, pos.y, pos.z)
 	}
+
+	fun String.first(len: Int) = substring(0, min(len, length))
+
+	// build the residue "full name", eg "ASN A  23"
+	fun fullName(chainId: String, resId: String, resType: String) =
+		"%3s%2s%4s".format(
+			resType.first(3),
+			chainId[0],
+			resId.first(4)
+		)
 
 	when (mol) {
 		is Polymer -> {
@@ -129,13 +137,7 @@ fun Molecule.toOspreyMol(smallMolResType: String? = null): OspreyMolecule {
 						coords.add(oatomCoords)
 					}
 
-					// build the residue "full name", eg "ASN A  23"
-					val fullName = "%3s%2s%4s".format(
-						res.type.substring(0, min(res.type.length, 3)),
-						chain.id[0],
-						res.id.substring(0, min(res.id.length, 4))
-					)
-					omol.residues.add(OspreyResidue(atoms, coords, fullName, omol))
+					omol.residues.add(OspreyResidue(atoms, coords, fullName(chain.id, res.id, res.type), omol))
 				}
 			}
 		}
@@ -150,15 +152,8 @@ fun Molecule.toOspreyMol(smallMolResType: String? = null): OspreyMolecule {
 				coords.add(oatomCoords)
 			}
 
-			// build the residue "full name", eg "ASN A  23"
-			val fullName = "%3s%2s%4s".format(
-				smallMolResType
-					?: omol.name?.substring(0, min(omol.name.length, 3))
-					?: "MOL",
-				'A',
-				"1"
-			)
-			omol.residues.add(OspreyResidue(atoms, coords, fullName, omol))
+			val resType = mol.type ?: mol.name.first(3).toUpperCase()
+			omol.residues.add(OspreyResidue(atoms, coords, fullName("A", "1", resType), omol))
 		}
 	}
 
