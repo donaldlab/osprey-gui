@@ -14,9 +14,9 @@ fun main() = autoCloser {
 
 	// open a window
 	val win = Window(
-		width = 800, // TODO: make this bigger?
-		height = 600,
-		title = "MolScope"
+		width = 1280, // TODO: make this bigger?
+		height = 720,
+		title = "OSPREY"
 	).autoClose()
 
 	// add window features

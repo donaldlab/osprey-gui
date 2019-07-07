@@ -3,18 +3,13 @@ package edu.duke.cs.ospreygui.features.win
 import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.window.FileDialog
 import cuchaz.kludge.window.FilterList
-import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.WindowFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
-import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
-import edu.duke.cs.molscope.gui.features.slide.NavigationTool
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.view.BallAndStick
-import edu.duke.cs.ospreygui.features.slide.BondEditor
-import edu.duke.cs.ospreygui.features.slide.SaveOMOL
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.io.read
+import edu.duke.cs.ospreygui.prep.MoleculePrep
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -37,28 +32,7 @@ class OpenOMOL : WindowFeature {
 
 	private fun open(win: WindowCommands, path: Path) = win.showExceptions {
 
-		// load the mol
-		val mol = Molecule.fromOMOL(path.read())
-
-		// TODO: share this with ImportPDB
-		// prepare a slide for the molecule
-		win.addSlide(Slide(mol.name).apply {
-			lock { s ->
-
-				s.views.add(BallAndStick(mol))
-				s.camera.lookAtEverything()
-
-				s.features.menu("File") {
-					add(SaveOMOL())
-				}
-				s.features.menu("View") {
-					add(NavigationTool())
-					add(MenuRenderSettings())
-				}
-				s.features.menu("Edit") {
-					add(BondEditor())
-				}
-			}
-		})
+		// resume a previous prep
+		MoleculePrep(win, Molecule.fromOMOL(path.read()))
 	}
 }
