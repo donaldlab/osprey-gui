@@ -4,3 +4,4 @@ out
 build
 gradle.properties
 imgui.ini
+.kotlintest

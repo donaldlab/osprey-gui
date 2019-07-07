@@ -274,18 +274,15 @@ class AmberTopology(
 		private val topToMol: HashMap<Int,Pair<Atom?,Polymer.Residue?>>
 	) {
 
-		private fun index(atom: Atom) =
-			molToTop[atom]
-			?: throw NoSuchElementException("atom is not in the topology")
-
-		fun charge(atom: Atom) = charges[index(atom)]
-
 		/**
 		 * Adds all the extra atoms defined by AMBER.
 		 *
 		 * Returns the number of atoms added.
 		 */
-		fun addMissingAtoms(coords: List<Vector3d>): Int {
+		fun addMissingAtoms(
+			coords: List<Vector3d>,
+			filter: (Atom, Polymer.Residue?) -> Boolean = { atom: Atom, residue: Polymer.Residue? -> true }
+		): Int {
 
 			var numAtomsAdded = 0
 
@@ -302,6 +299,11 @@ class AmberTopology(
 					atomNames[i],
 					Vector3d(coords[i])
 				)
+
+				// consult the filter
+				if (!filter(newAtom, res)) {
+					continue
+				}
 
 				// update the molecule (and residue if needed)
 				mol.atoms.add(newAtom)
@@ -351,6 +353,13 @@ class AmberTopology(
 
 			return numBondsAdded
 		}
+
+		private fun index(atom: Atom) = molToTop[atom]
+			?: throw NoSuchElementException("atom $atom is not in the topology")
+
+		fun charge(atom: Atom) = charges[index(atom)]
+
+		// TODO: vdW forcefield params
 	}
 }
 
