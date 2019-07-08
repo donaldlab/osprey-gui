@@ -94,12 +94,17 @@ enum class MoleculeType(val isPolymer: Boolean) {
 }
 
 /**
- * Partition a single Polymer into a list of Molecules
+ * Partition a single Molecule into a list of Molecules
  * based on AMBER rules for residue classification.
  *
  * Ignores all bonds.
  */
-fun Polymer.partition(): List<Pair<MoleculeType,Molecule>> {
+fun Molecule.partition(): List<Pair<MoleculeType,Molecule>> {
+
+	// for non-polymers, assume the whole molecule is a small molecule
+	if (this !is Polymer) {
+		return listOf(MoleculeType.SmallMolecule to this)
+	}
 
 	data class Partitioned(
 		val moltype: MoleculeType,
@@ -172,7 +177,16 @@ fun Polymer.partition(): List<Pair<MoleculeType,Molecule>> {
  *
  * Ignores all bonds.
  */
-fun Collection<Molecule>.combine(name: String): Polymer {
+fun Collection<Molecule>.combine(name: String): Molecule {
+
+	// if it's just one molecule that's not a polymer, just return a copy of that molecule
+	if (size == 1) {
+		firstOrNull()?.let { mol ->
+			if (mol !is Polymer) {
+				return mol.copy()
+			}
+		}
+	}
 
 	val out = Polymer(name)
 

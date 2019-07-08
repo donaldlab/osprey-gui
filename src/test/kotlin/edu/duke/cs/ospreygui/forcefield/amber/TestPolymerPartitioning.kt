@@ -88,6 +88,8 @@ class TestPolymerPartitioning : SharedSpec({
 				.combine("1CC8")
 				.apply {
 
+					this as Polymer
+
 					// the protein gets its own chain,
 					// and all the small molecules get combined into another chain
 					chains.size shouldBe 2
