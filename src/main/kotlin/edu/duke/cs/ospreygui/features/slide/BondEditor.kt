@@ -6,6 +6,7 @@ import cuchaz.kludge.vulkan.ColorRGBA
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
+import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
@@ -19,8 +20,7 @@ class BondEditor : SlideFeature {
 
 	override val id = FeatureId("edit.bonds")
 
-	private val pOpen = Ref.of(false)
-	private var wasOpen = false
+	private val winState = WindowState()
 
 	private val pMaxDist = Ref.of(3f)
 
@@ -29,7 +29,7 @@ class BondEditor : SlideFeature {
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Bonds")) {
-			pOpen.value = true
+			winState.isOpen = true
 		}
 	}
 
@@ -57,101 +57,100 @@ class BondEditor : SlideFeature {
 			}
 		}
 
-		if (pOpen.value) {
-			if (!wasOpen) {
-
+		winState.render(
+			onOpen = {
 				// add the hover effect
 				slidewin.hoverEffects[id] = hoverEffect
-			}
-			wasOpen = true
+			},
+			whenOpen = {
 
-			// draw the window
-			begin("Bond Editor##${slide.name}", pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				// draw the window
+				begin("Bond Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
 
-			text("Tools:")
-			indent(10f)
+				text("Tools:")
+				indent(10f)
 
-			if (button("Clear all bonds")) {
-				clearBonds(molViews)
-			}
+				if (button("Clear all bonds")) {
+					clearBonds(molViews)
+				}
 
-			if (button("Add bonds automatically")) {
-				guessBonds(molViews)
-			}
-			sameLine()
-			infoTip {
-				pushTextWrapPos(200f)
-				textWrapped("""
-					|This tool guesses where the bonds should be based on
-					|element valences and ranges on colvalent bond lengths.
-					|This tool can yield wrong bond guesses for some structures
-					|(particularly structures containing clashes), so be sure to
-					|double-check the results and make corrections where necessary.
-				""".trimMargin().replace("\n"," "))
-				popTextWrapPos()
-			}
+				if (button("Add bonds automatically")) {
+					guessBonds(molViews)
+				}
+				sameLine()
+				infoTip {
+					pushTextWrapPos(200f)
+					textWrapped("""
+						|This tool guesses where the bonds should be based on
+						|element valences and ranges on colvalent bond lengths.
+						|This tool can yield wrong bond guesses for some structures
+						|(particularly structures containing clashes), so be sure to
+						|double-check the results and make corrections where necessary.
+					""".trimMargin().replace("\n"," "))
+					popTextWrapPos()
+				}
 
-			unindent(10f)
+				unindent(10f)
 
-			val selection = selection
+				val selection = selection
 
-			// show the selected atom
-			text("Selected:")
-			beginChild("selected", 300f, 30f, true)
-			if (selection != null) {
-				text(selection.atom.name)
-			} else {
-				text("(Click an atom to show bonding options.)")
-			}
-			endChild()
+				// show the selected atom
+				text("Selected:")
+				beginChild("selected", 300f, 30f, true)
+				if (selection != null) {
+					text(selection.atom.name)
+				} else {
+					text("(Click an atom to show bonding options.)")
+				}
+				endChild()
 
-			// show the nearby atoms
-			text("Nearby Atoms:")
-			beginChild("nearby", 300f, 300f, true)
-			if (selection != null) {
+				// show the nearby atoms
+				text("Nearby Atoms:")
+				beginChild("nearby", 300f, 300f, true)
+				if (selection != null) {
 
-				columns(2)
-				for (info in selection.nearbyAtoms) {
+					columns(2)
+					for (info in selection.nearbyAtoms) {
 
-					// show a checkbox to toggle the bond on/off
-					val isCheckHovered = renderBondCheck(imgui, info)
-					nextColumn()
-					renderBondLabel(imgui, info)
-					nextColumn()
+						// show a checkbox to toggle the bond on/off
+						val isCheckHovered = renderBondCheck(imgui, info)
+						nextColumn()
+						renderBondLabel(imgui, info)
+						nextColumn()
 
-					// update atom selections
-					selection.view.renderEffects[info.atom] = if (isCheckHovered) {
-						// highlight the atom when we mouseover the checkbox
-						hoverEffect
-					} else {
-						// otherwise, color by range
-						if (info.dist in info.covalentRange) {
-							inRangeEffect
+						// update atom selections
+						selection.view.renderEffects[info.atom] = if (isCheckHovered) {
+							// highlight the atom when we mouseover the checkbox
+							hoverEffect
 						} else {
-							outOfRangeEffect
+							// otherwise, color by range
+							if (info.dist in info.covalentRange) {
+								inRangeEffect
+							} else {
+								outOfRangeEffect
+							}
 						}
 					}
+					columns(1)
 				}
-				columns(1)
+				endChild()
+
+				end()
+			},
+			onClose = {
+
+				// remove the hover effect
+				slidewin.hoverEffects.remove(id)
+
+				// clear any leftover selections when the window closes
+				molViews.clearSelections()
 			}
-			endChild()
-
-			end()
-
-		} else if (wasOpen) {
-			wasOpen = false
-
-			// remove the hover effect
-			slidewin.hoverEffects.remove(id)
-
-			// clear any leftover selections when the window closes
-			molViews.clearSelections()
-		}
+		)
 	}
 
 	override fun contextMenu(contextMenu: ContextMenu, slide: Slide.Locked, slidewin: SlideCommands, target: ViewIndexed) {
 
-		if (!pOpen.value) {
+		if (!winState.isOpen) {
 			return
 		}
 
