@@ -8,11 +8,14 @@ import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
 import edu.duke.cs.molscope.gui.features.slide.NavigationTool
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.view.BallAndStick
+import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.slide.AssembleTool
 import edu.duke.cs.ospreygui.features.slide.SaveOMOL
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.forcefield.amber.combine
 import edu.duke.cs.ospreygui.forcefield.amber.partition
+import java.util.*
+import kotlin.NoSuchElementException
 
 
 class MoleculePrep(
@@ -33,29 +36,62 @@ class MoleculePrep(
 			.toMutableList() + listOf(MoleculeType.Solvent to combinedSolvent)
 	}
 
-	inner class Included {
+	private val isIncluded = IdentityHashMap<Molecule,Boolean>()
+		.apply {
+			partition
+				.map { (_, mol) -> mol }
+				.forEach { mol -> this[mol] = true }
+		}
 
-		private val mols = partition
-			.map { (_, mol) -> mol }
-			.associateWith { true }
-			.toMutableMap()
+	private val assembledMols = IdentityHashMap<Molecule,Molecule>()
 
-		val toList: List<Molecule> get() = mols
-			.filter { (_, isIncluded) -> isIncluded }
-			.map { (mol, _) -> mol }
+	fun isIncluded(mol: Molecule) =
+		isIncluded[mol] ?: throw NoSuchElementException("mol was not found in this prep")
 
-		operator fun get(mol: Molecule) = mols[mol] ?: throw NoSuchElementException("mol was not found in this prep")
-		operator fun set(mol: Molecule, isIncluded: Boolean) {
-			mols[mol] = isIncluded
+	fun setIncluded(mol: Molecule, isIncluded: Boolean, slide: Slide.Locked) {
+		this.isIncluded[mol] = isIncluded
+		if (isIncluded) {
+			addRenderView(slide, mol)
+		} else {
+			removeRenderView(slide, mol)
 		}
 	}
-	val included = Included()
+
+	fun getIncludedMols(): List<Molecule> =
+		partition
+			.filter { (_, mol) -> isIncluded[mol] == true }
+			.map { (_, mol) -> mol }
+
+	fun isAssembled(mol: Molecule) =
+		assembledMols[mol] != null
+
+	fun setAssembled(baseMol: Molecule, assembledMol: Molecule?, slide: Slide.Locked) {
+		removeRenderView(slide, baseMol)
+		if (assembledMol != null) {
+			assembledMols[baseMol] = assembledMol
+		} else {
+			assembledMols.remove(baseMol)
+		}
+		addRenderView(slide, baseMol)
+	}
+
+	private fun removeRenderView(slide: Slide.Locked, baseMol: Molecule) {
+		// remove whichever is present, the base mol, or the assembled mol
+		val assembledMol = assembledMols[baseMol]
+		slide.views.removeIf { it is MoleculeRenderView && (it.mol == baseMol || it.mol == assembledMol) }
+	}
+
+	private fun addRenderView(slide: Slide.Locked, baseMol: Molecule) {
+		// use the assembled mol if available, otherwise the base mol
+		slide.views.add(BallAndStick(assembledMols[baseMol] ?: baseMol))
+	}
 
 	// make the slide last, since the AssembleTool needs properties from the prep
 	val slide = Slide(mol.name, initialSize = Extent2D(640, 480)).apply {
 		lock { s ->
 
-			for (mol in included.toList) {
+			// make a render view for each molecule in the partition
+			for (mol in getIncludedMols()) {
 				s.views.add(BallAndStick(mol))
 			}
 			s.camera.lookAtEverything()

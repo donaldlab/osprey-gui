@@ -78,17 +78,13 @@ class BondEditor : SlideFeature {
 					guessBonds(molViews)
 				}
 				sameLine()
-				infoTip {
-					pushTextWrapPos(200f)
-					textWrapped("""
-						|This tool guesses where the bonds should be based on
-						|element valences and ranges on colvalent bond lengths.
-						|This tool can yield wrong bond guesses for some structures
-						|(particularly structures containing clashes), so be sure to
-						|double-check the results and make corrections where necessary.
-					""".trimMargin().replace("\n"," "))
-					popTextWrapPos()
-				}
+				infoTip("""
+					|This tool guesses where the bonds should be based on
+					|element valences and ranges on colvalent bond lengths.
+					|This tool can yield wrong bond guesses for some structures
+					|(particularly structures containing clashes), so be sure to
+					|double-check the results and make corrections where necessary.
+				""".trimMargin())
 
 				unindent(10f)
 
