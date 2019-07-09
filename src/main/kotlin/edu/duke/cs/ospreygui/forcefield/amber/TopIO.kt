@@ -338,13 +338,22 @@ class AmberTopology(
 			val numBonds = bonds.size/3
 			for (i in 0 until numBonds) {
 
-				// lookup the atoms
-				val (a1, _) = topToMol[bonds[i*3]] ?: continue
-				val (a2, _) = topToMol[bonds[i*3 + 1]] ?: continue
+				// for some reason, the atom indices are 3x too large. No idea why...
+				val i1 = bonds[i*3]/3
+				val i2 = bonds[i*3 + 1]/3
+
+				// lookup the atoms for the bond
+				// if the atoms haven't been added yet, skip that bond
+				val (a1, _) = topToMol[i1] ?: continue
+				val (a2, _) = topToMol[i2] ?: continue
 				a1 ?: continue
 				a2 ?: continue
 
-				// make the bond
+				// make sure the atom names match, just in case
+				assert(atomNames[i1] == a1.name)
+				assert(atomNames[i2] == a2.name)
+
+				// add the bond
 				val wasAdded = mol.bonds.add(a1, a2)
 				if (wasAdded) {
 					numBondsAdded += 1
