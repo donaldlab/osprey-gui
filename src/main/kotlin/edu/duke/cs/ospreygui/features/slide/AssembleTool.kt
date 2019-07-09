@@ -45,6 +45,11 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 		.map { (_, mol) -> mol }
 		.associateWith { Ref.of(true) }
 
+	private var leapThread: Thread? = null
+	private val leapErrors = ArrayList<Leap.Results>()
+	private val leapWinState = WindowState()
+	private var leapErrorsTextBuf: Commands.TextBuffer? = null
+
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Assemble")) {
 			winState.isOpen = true
@@ -52,6 +57,8 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 	}
 
 	override fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
+
+		// render the main window
 		winState.render(
 			whenOpen = {
 
@@ -112,9 +119,14 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 				val selection = selection
 				if (selection == null) {
 					text("Make a selection above to enable assembly tools")
-					pushStyleDisabled()
 				} else {
 					text("Selected: ${selection.mol}")
+				}
+
+				// disable the controls if we have no selection, or leap is already running
+				val isEnabled = selection != null && leapThread == null
+				if (!isEnabled) {
+					pushStyleDisabled()
 				}
 				indent(10f)
 				if (selection != null) {
@@ -125,7 +137,9 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 				}
 
 				if (button("Assemble")) {
-					selection?.mol?.let { assemble(it, slide) }
+					if (isEnabled) {
+						selection?.mol?.let { assemble(it, slide) }
+					}
 				}
 				sameLine()
 				infoTip("""
@@ -134,7 +148,9 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 				""".trimMargin())
 
 				if (button("Reset")) {
-					selection?.mol?.let { reset(it, slide) }
+					if (isEnabled) {
+						selection?.mol?.let { reset(it, slide) }
+					}
 				}
 				sameLine()
 				infoTip("""
@@ -143,7 +159,7 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 				""".trimMargin())
 
 				unindent(10f)
-				if (selection == null) {
+				if (!isEnabled) {
 					popStyleDisabled()
 				}
 
@@ -156,6 +172,35 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 				slide.views
 					.filterIsInstance<MoleculeRenderView>()
 					.forEach { it.renderEffects.clear() }
+			}
+		)
+
+		// render a window for LEaP errors, if any
+		leapWinState.render(
+			whenOpen = {
+
+				begin("LEaP Errors", leapWinState.pOpen, IntFlags.of(Commands.BeginFlags.NoResize))
+
+				val buf = leapErrorsTextBuf
+				if (buf != null) {
+					inputTextMultiline(
+						"",
+						buf,
+						600f, 400f,
+						IntFlags.of(Commands.InputTextFlags.ReadOnly)
+					)
+					// yes, the horizontal scroll bar doesn't appear automatically for multiline input text widgets
+					// this is an ongoing enhancement in ImGUI, but I wouldn't wait for it
+				} else {
+					text("No errors")
+				}
+
+				if (button("Clear")) {
+					clearLeapErrors()
+					leapWinState.isOpen = false
+				}
+
+				end()
 			}
 		)
 	}
@@ -214,50 +259,96 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 
 	private fun assemble(mol: Molecule, slide: Slide.Locked) {
 
-		// TODO: call this in a separate thread?
+		// if leap is already running, ignore the assemble call
+		if (leapThread != null) {
+			return
+		}
 
-		// call LEaP to get the missing atoms and bonds
-		val results = tempFolder("leap") { cwd ->
-			Leap.run(
-				cwd,
-				filesToWrite = mapOf(
-					"mol.pdb" to mol.toPDB()
-				),
-				// TODO: allow choosing forcefield?
-				commands = """
+		// this could take a while, so launch it in a separate thread
+		leapThread = Thread {
+
+			// call LEaP to get the missing atoms and bonds
+			val results = tempFolder("leap") { cwd ->
+				Leap.run(
+					cwd,
+					filesToWrite = mapOf(
+						"mol.pdb" to mol.toPDB()
+					),
+					// TODO: allow choosing forcefield?
+					commands = """
 					|source leaprc.ff96
 					|mol = loadPdb mol.pdb
 					|saveamberparm mol mol.top mol.crd
 				""".trimMargin(),
-				filesToRead = listOf("mol.top", "mol.crd")
-			)
+					filesToRead = listOf("mol.top", "mol.crd", "leap.log")
+				)
+			}
+
+			// did leap return something useful?
+			val topFile = results.files["mol.top"]?.takeIf { it.isNotBlank() }
+			val crdFile = results.files["mol.crd"]?.takeIf { it.isNotBlank() }
+			if (topFile == null || crdFile == null) {
+
+				// nope, show the error info
+				addLeapError(mol, results)
+
+			} else {
+
+				// parse the results from LEaP
+				val top = TopIO.read(topFile)
+				val crd = CrdIO.read(crdFile)
+
+				// create a new mol with the new atoms and bonds
+				val assembledMol = mol.copy()
+				top.mapTo(assembledMol).apply {
+					addMissingAtoms(crd)
+					setBonds()
+				}
+
+				// save the assembled mol
+				// (but lock the slide again, since we're on a different thread now)
+				slide.unlocked.lock { slide ->
+					prep.setAssembled(mol, assembledMol, slide)
+				}
+				selection = Selection(mol)
+			}
+
+			// finally, clear the thread variable when we're done
+			leapThread = null
+
+		}.apply {
+			name = "leap"
+			start()
 		}
+	}
 
-		// TEMP: what happened?
-		println("LEaP exit code: ${results.exitCode}")
-		results.stdout.forEach { println("LEaP out: $it") }
-		results.stderr.forEach { println("LEaP err: $it") }
-
-		// parse the results from LEaP
-		val top = TopIO.read(results.files["mol.top"] ?: throw NoSuchElementException("missing toplogy file"))
-		val crd = CrdIO.read(results.files["mol.crd"] ?: throw NoSuchElementException("missing coords file"))
-
-		// create a new mol with the new atoms and bonds
-		val assembledMol = mol.copy()
-		top.mapTo(assembledMol).apply {
-			val numAtomsAdded = addMissingAtoms(crd)
-			val numBondsAdded = setBonds()
-			println("added $numAtomsAdded atoms, $numBondsAdded bonds")
-		}
-
-		// save the assembled mol
-		prep.setAssembled(mol, assembledMol, slide)
+	private fun reset(mol: Molecule, slide: Slide.Locked) {
+		prep.setAssembled(mol, null, slide)
 		selection = Selection(mol)
 	}
 
-	fun reset(mol: Molecule, slide: Slide.Locked) {
-		prep.setAssembled(mol, null, slide)
-		selection = Selection(mol)
+	private fun addLeapError(mol: Molecule, results: Leap.Results) {
+
+		leapErrors.add(results)
+
+		// update the text buffer
+		leapErrorsTextBuf = Commands.TextBuffer.of(leapErrors.joinToString("\n\n\n") {
+			StringBuilder().apply {
+
+				append("LEaP could not assemble the molecule: $mol\n")
+				append("Here's the raw log from the leap run:\n")
+				append(results.files["leap.log"])
+
+			}.toString()
+		})
+
+		// show the leap errors window
+		leapWinState.isOpen = true
+	}
+
+	private fun clearLeapErrors() {
+		leapErrors.clear()
+		leapErrorsTextBuf = null
 	}
 }
 
