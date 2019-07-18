@@ -8,26 +8,26 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.ospreygui.forcefield.amber.combine
-import edu.duke.cs.ospreygui.io.toOMOL
+import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.io.write
 import edu.duke.cs.ospreygui.prep.MoleculePrep
 import java.nio.file.Path
 import java.nio.file.Paths
 
 
-class SaveOMOL(val prep: MoleculePrep) : SlideFeature {
+class SavePDB(val prep: MoleculePrep) : SlideFeature {
 
-	override val id = FeatureId("save.omol")
+	override val id = FeatureId("save.pdb")
 
 	companion object {
-		const val extension = "omol.toml"
+		const val extension = "pdb"
 	}
 
 	val filterList = FilterList(listOf(extension))
 	var dir = Paths.get(".")
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
-		if (menuItem("Save OMOL")) {
+		if (menuItem("Save PDB")) {
 			FileDialog.saveFile(filterList, dir)?.let { path ->
 				dir = path.parent
 				save(slide, slidewin, path)
@@ -47,7 +47,7 @@ class SaveOMOL(val prep: MoleculePrep) : SlideFeature {
 		// combine the included assembled mols and save the file
 		prep.getIncludedActiveMols()
 			.combine(prep.mol.name)
-			.toOMOL()
+			.toPDB()
 			.write(pathWithExt)
 
 		// TODO: feedback to the user that the save worked?

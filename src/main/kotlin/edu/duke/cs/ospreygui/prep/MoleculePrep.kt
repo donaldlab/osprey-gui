@@ -11,6 +11,7 @@ import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.slide.AssembleTool
 import edu.duke.cs.ospreygui.features.slide.SaveOMOL
+import edu.duke.cs.ospreygui.features.slide.SavePDB
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.forcefield.amber.combine
 import edu.duke.cs.ospreygui.forcefield.amber.partition
@@ -57,10 +58,23 @@ class MoleculePrep(
 		}
 	}
 
+	/** the base molecules */
 	fun getIncludedMols(): List<Molecule> =
 		partition
 			.filter { (_, mol) -> isIncluded[mol] == true }
 			.map { (_, mol) -> mol }
+
+	/** the assembled molecules if any, otherwise null */
+	fun getIncludedAssembledMols(): List<Molecule?> =
+		partition
+			.filter { (_, mol) -> isIncluded[mol] == true }
+			.map { (_, mol) -> assembledMols[mol] }
+
+	/** the assembled molecules if any, otherwise the base molecules */
+	fun getIncludedActiveMols(): List<Molecule> =
+		partition
+			.filter { (_, mol) -> isIncluded[mol] == true }
+			.map { (_, mol) -> assembledMols[mol] ?: mol }
 
 	fun isAssembled(mol: Molecule) =
 		assembledMols[mol] != null
@@ -99,7 +113,8 @@ class MoleculePrep(
 			s.camera.lookAtEverything()
 
 			s.features.menu("File") {
-				add(SaveOMOL())
+				add(SaveOMOL(this@MoleculePrep))
+				add(SavePDB(this@MoleculePrep))
 				addSeparator()
 				add(CloseSlide(win))
 			}
