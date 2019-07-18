@@ -75,6 +75,8 @@ class MoleculePrep(
 		addRenderView(slide, baseMol)
 	}
 
+	fun getAssembled(baseMol: Molecule) = assembledMols[baseMol]
+
 	private fun removeRenderView(slide: Slide.Locked, baseMol: Molecule) {
 		// remove whichever is present, the base mol, or the assembled mol
 		val assembledMol = assembledMols[baseMol]

@@ -33,9 +33,11 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 
 	private inner class Selection(val mol: Molecule) {
 
-		val numHeavyAtoms = mol.atoms.count { it.element != Element.Hydrogen }
-		val numHydrogens = mol.atoms.size - numHeavyAtoms
-		val numBonds = mol.bonds.count()
+		private val activeMol = prep.getAssembled(mol) ?: mol
+
+		val numHeavyAtoms = activeMol.atoms.count { it.element != Element.Hydrogen }
+		val numHydrogens = activeMol.atoms.size - numHeavyAtoms
+		val numBonds = activeMol.bonds.count()
 
 		val isAssembled get() = prep.isAssembled(mol)
 	}
