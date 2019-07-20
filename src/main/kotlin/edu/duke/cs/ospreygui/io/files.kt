@@ -17,7 +17,7 @@ val Path.exists get() = Files.exists(this)
 
 
 inline fun <R> tempFolder(name: String, block: (Path) -> R): R {
-	val dir = Files.createTempDirectory("foo")
+	val dir = Files.createTempDirectory(name)
 	try {
 		return block(dir)
 	} finally {

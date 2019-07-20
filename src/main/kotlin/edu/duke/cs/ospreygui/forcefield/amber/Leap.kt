@@ -8,24 +8,20 @@ import java.nio.file.Paths
 
 object Leap {
 
-	// TODO: detect this for other os/arch combos?
-	private val platform = "linux/amd64"
-
-	private val leapPath = Paths.get("bin/$platform/teLeap").toAbsolutePath()
-	private val datPath = Paths.get("bin/dat/leap").toAbsolutePath()
+	private val leapPath = Paths.get("ambertools/bin/teLeap").toAbsolutePath()
+	private val datPath = Paths.get("ambertools/dat/leap").toAbsolutePath()
 
 	data class Results(
 		val exitCode: Int,
-		val stdout: List<String>,
-		val stderr: List<String>,
+		val console: List<String>,
 		val files: Map<String,String?>
 	)
 
 	fun run(cwd: Path, filesToWrite: Map<String,String>, commands: String, filesToRead: List<String> = emptyList()): Results {
 
-		// make sure leap is available for this platform?
+		// make sure leap is available for this platform
 		if (!leapPath.exists) {
-			throw UnsupportedOperationException("LEaP is not yet available for $platform")
+			throw UnsupportedOperationException("LEaP is not yet available for ${Platform.get()}")
 		}
 
 		// write the files
@@ -51,16 +47,13 @@ object Leap {
 				"-f", commandsPath.toAbsolutePath().toString()
 			)
 			.directory(cwd.toFile())
-			.start()
-
-		// wait for it to finish
-		val streamer = process.stream().waitFor()
+			.stream()
+			.waitFor()
 
 		// return the results
 		return Results(
-			process.exitValue(),
-			streamer.stdout.toList(),
-			streamer.stderr.toList(),
+			process.exitCode,
+			process.console.toList(),
 			filesToRead.associateWith {
 				try {
 					cwd.resolve(it).read()
