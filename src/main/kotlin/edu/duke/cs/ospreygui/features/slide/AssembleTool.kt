@@ -17,7 +17,6 @@ import edu.duke.cs.ospreygui.forcefield.amber.CrdIO
 import edu.duke.cs.ospreygui.forcefield.amber.Leap
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.forcefield.amber.TopIO
-import edu.duke.cs.ospreygui.io.tempFolder
 import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.prep.MoleculePrep
 
@@ -270,21 +269,18 @@ class AssembleTool(val prep: MoleculePrep) : SlideFeature {
 		leapThread = Thread {
 
 			// call LEaP to get the missing atoms and bonds
-			val results = tempFolder("leap") { cwd ->
-				Leap.run(
-					cwd,
-					filesToWrite = mapOf(
-						"mol.pdb" to mol.toPDB()
-					),
-					// TODO: allow choosing forcefield?
-					commands = """
+			val results = Leap.run(
+				filesToWrite = mapOf(
+					"mol.pdb" to mol.toPDB()
+				),
+				// TODO: allow choosing forcefield?
+				commands = """
 					|source leaprc.ff96
 					|mol = loadPdb mol.pdb
 					|saveamberparm mol mol.top mol.crd
 				""".trimMargin(),
-					filesToRead = listOf("mol.top", "mol.crd", "leap.log")
-				)
-			}
+				filesToRead = listOf("mol.top", "mol.crd", "leap.log")
+			)
 
 			// did leap return something useful?
 			val topFile = results.files["mol.top"]?.takeIf { it.isNotBlank() }

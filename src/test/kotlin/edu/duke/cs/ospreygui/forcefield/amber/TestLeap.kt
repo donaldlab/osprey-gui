@@ -5,7 +5,6 @@ import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.io.fromPDB
-import edu.duke.cs.ospreygui.io.tempFolder
 import edu.duke.cs.ospreygui.io.toPDB
 import io.kotlintest.shouldBe
 
@@ -27,27 +26,23 @@ class TestLeap : SharedSpec({
 				.map { (_, mol) -> mol }
 				.combine("1CC8")
 
-			tempFolder("leap") { cwd ->
+			// run LEaP
+			val results = Leap.run(
+				filesToWrite = mapOf(
+					"mol.pdb" to molFiltered.toPDB()
+				),
+				commands = """
+					|source leaprc.ff96
+					|mol = loadPdb mol.pdb
+					|saveamberparm mol mol.top mol.crd
+				""".trimMargin(),
+				filesToRead = listOf("mol.top", "mol.crd")
+			)
 
-				// run LEaP
-				val results = Leap.run(
-					cwd,
-					filesToWrite = mapOf(
-						"mol.pdb" to molFiltered.toPDB()
-					),
-					commands = """
-						|source leaprc.ff96
-						|mol = loadPdb mol.pdb
-						|saveamberparm mol mol.top mol.crd
-					""".trimMargin(),
-					filesToRead = listOf("mol.top", "mol.crd")
-				)
-
-				// make sure the results still match what we expect
-				// (skip the first line of the topology file, since it has a timestamp)
-				results.files["mol.top"]?.skipFirstLine() shouldBe OspreyGui.getResourceAsString("1cc8.top").skipFirstLine()
-				results.files["mol.crd"] shouldBe OspreyGui.getResourceAsString("1cc8.crd")
-			}
+			// make sure the results still match what we expect
+			// (skip the first line of the topology file, since it has a timestamp)
+			results.files["mol.top"]?.skipFirstLine() shouldBe OspreyGui.getResourceAsString("1cc8.top").skipFirstLine()
+			results.files["mol.crd"] shouldBe OspreyGui.getResourceAsString("1cc8.crd")
 		}
 	}
 })
