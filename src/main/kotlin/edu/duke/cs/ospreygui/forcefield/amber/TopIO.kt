@@ -53,7 +53,7 @@ object TopIO {
 
 				// grab the lines for this flag
 				val flagLines = ArrayList<String>()
-				while (!peek().startsWith("%")) {
+				while (i < lines.size && !peek().startsWith("%")) {
 					next()
 						.takeUnless { it.isBlank() }
 						?.let { flagLines.add(it) }

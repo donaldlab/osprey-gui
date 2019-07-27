@@ -1,8 +1,5 @@
 package edu.duke.cs.ospreygui.io
 
-import cuchaz.kludge.tools.x
-import cuchaz.kludge.tools.y
-import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
@@ -206,6 +203,22 @@ class TestMolIO : SharedSpec({
 
 		fun roundtrip(mol: Molecule) {
 			OMOLIO.read(OMOLIO.write(mol.toOspreyMol())).toMolecule() shouldBe mol
+		}
+
+		test("dipeptide") {
+			roundtrip(dipeptide)
+		}
+		test("benzamidine") {
+			roundtrip(benzamidine)
+		}
+	}
+
+	context("Mol2 roundtrip") {
+
+		fun roundtrip(mol: Molecule) {
+			// NOTE: the Mol2 format doesn't have a place to put the molecule type,
+			// so just explicitly pass it along to pass this test
+			Molecule.fromMol2(mol.toMol2()) shouldBe mol
 		}
 
 		test("dipeptide") {
