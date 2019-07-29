@@ -13,7 +13,7 @@ import org.joml.Vector3d
 
 class TestPolymerPartitioning : SharedSpec({
 
-	context("1CC8") {
+	group("1CC8") {
 
 		val mol = Molecule.fromPDB(OspreyGui.getResourceAsString("1cc8.pdb")) as Polymer
 

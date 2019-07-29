@@ -171,7 +171,7 @@ class TestMolIO : SharedSpec({
 		}
 	}
 
-	context("OMOL roundtrip") {
+	group("OMOL roundtrip") {
 
 		fun roundtrip(mol: Molecule) {
 			Molecule.fromOMOL(mol.toOMOL()) shouldBe mol
@@ -185,7 +185,7 @@ class TestMolIO : SharedSpec({
 		}
 	}
 
-	context("OSPREY roundtrip") {
+	group("OSPREY roundtrip") {
 
 		fun roundtrip(mol: Molecule) {
 			mol.toOspreyMol().toMolecule() shouldBe mol
@@ -199,7 +199,7 @@ class TestMolIO : SharedSpec({
 		}
 	}
 
-	context("OSPREY OMOL roundtrip") {
+	group("OSPREY OMOL roundtrip") {
 
 		fun roundtrip(mol: Molecule) {
 			OMOLIO.read(OMOLIO.write(mol.toOspreyMol())).toMolecule() shouldBe mol
@@ -213,7 +213,7 @@ class TestMolIO : SharedSpec({
 		}
 	}
 
-	context("Mol2 roundtrip") {
+	group("Mol2 roundtrip") {
 
 		fun roundtrip(mol: Molecule) {
 			// NOTE: the Mol2 format doesn't have a place to put the molecule type,

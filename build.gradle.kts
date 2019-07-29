@@ -19,7 +19,7 @@ dependencies {
 	implementation("edu.duke.cs:molscope")
 	implementation("edu.duke.cs:osprey3")
 
-	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.3.2")
+	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.0")
 }
 
 configure<JavaPluginConvention> {

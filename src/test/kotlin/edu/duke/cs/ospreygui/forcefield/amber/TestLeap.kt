@@ -13,7 +13,7 @@ class TestLeap : SharedSpec({
 
 	fun String.skipFirstLine() = substring(indexOf('\n') + 1)
 
-	context("1CC8") {
+	group("1CC8") {
 
 		// load our favorite testing protein structure
 		val mol = Molecule.fromPDB(OspreyGui.getResourceAsString("1cc8.pdb")) as Polymer
