@@ -29,11 +29,11 @@ fun Molecule.toMol2(): String {
 
 	// assign an id to each residue
 	val resIds = HashMap<Polymer.Residue,Int>().apply {
-		var resi = 0
+		var i = 1
 		for (chain in chains) {
 			for (res in chain.residues) {
-				put(res, resi)
-				resi += 1
+				put(res, i)
+				i += 1
 			}
 		}
 	}
@@ -52,13 +52,13 @@ fun Molecule.toMol2(): String {
 	// get all the atom indices
 	val indicesByAtom = HashMap<Atom,Int>()
 	mol.atoms.forEachIndexed { i, atom ->
-		indicesByAtom[atom] = i
+		indicesByAtom[atom] = i + 1
 	}
 
 	// flatten the bonds to a list
 	data class Bond(val i: Int, val i1: Int, val i2: Int)
 	val bonds = ArrayList<Bond>().apply {
-		var i = 0
+		var i = 1
 		for (a1 in atoms) {
 			val i1 = indicesByAtom[a1]!!
 			for (a2 in bonds.bondedAtoms(a1)) {
@@ -74,7 +74,7 @@ fun Molecule.toMol2(): String {
 	// write the molecule section
 	write("@<TRIPOS>MOLECULE\n")
 	write(mol.name.replace("\n", " ") + "\n")
-	write("${mol.atoms.size} ${bonds.size} ${chains.sumBy { it.residues.size }}\n")
+	write("  ${mol.atoms.size} ${bonds.size} ${chains.sumBy { it.residues.size }}\n")
 	when (this) {
 		is Polymer -> write("BIOPOLYMER\n")
 		else -> write("SMALL\n")
@@ -87,7 +87,7 @@ fun Molecule.toMol2(): String {
 	write("@<TRIPOS>ATOM\n")
 	for (atom in atoms) {
 		val res = residuesByAtom[atom]!!
-		write("%d %s %.6f %.6f %.6f %s %s %s %f\n".format(
+		write("  %d %s %.6f %.6f %.6f %s %s %s %f\n".format(
 			indicesByAtom[atom],
 			atom.name,
 			atom.pos.x, atom.pos.y, atom.pos.z,
@@ -102,7 +102,7 @@ fun Molecule.toMol2(): String {
 	// write the bond section
 	write("@<TRIPOS>BOND\n")
 	for (bond in bonds) {
-		write("%d %d %d %d\n".format(
+		write("  %d %d %d %d\n".format(
 			bond.i,
 			bond.i1,
 			bond.i2,
@@ -115,7 +115,7 @@ fun Molecule.toMol2(): String {
 	write("@<TRIPOS>SUBSTRUCTURE\n")
 	for (chain in chains) {
 		for (res in chain.residues) {
-			write("%d %s %d %s %d %s %s\n".format(
+			write("  %d %s %d %s %d %s %s\n".format(
 				resIds[res],
 				res.id,
 				indicesByAtom[res.atoms.first()],

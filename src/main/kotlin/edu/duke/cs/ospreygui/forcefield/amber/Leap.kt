@@ -16,7 +16,12 @@ object Leap {
 		val files: Map<String,String?>
 	)
 
-	fun run(filesToWrite: Map<String,String>, commands: String, filesToRead: List<String> = emptyList()): Results {
+	fun run(
+		filesToWrite: Map<String,String>,
+		commands: String,
+		filesToRead: List<String> = emptyList(),
+		debugFiles: List<String> = emptyList()
+	): Results {
 
 		// make sure leap is available for this platform
 		if (!leapPath.exists) {
@@ -37,7 +42,11 @@ object Leap {
 			// start leap
 			val process = ProcessBuilder()
 				.command(
-					leapPath.toString(),
+					if (debugFiles.isEmpty()) {
+						leapPath.toString()
+					} else {
+						"$leapPath.debug"
+					},
 					"-I", datPath.resolve("prep").toString(),
 					"-I", datPath.resolve("prep/oldff").toString(),
 					"-I", datPath.resolve("lib").toString(),
@@ -47,6 +56,11 @@ object Leap {
 					"-I", datPath.resolve("cmd/oldff").toString(),
 					"-f", commandsPath.toAbsolutePath().toString()
 				)
+				.apply {
+					if (debugFiles.isNotEmpty()) {
+						environment()["MESSAGEON"] = debugFiles.joinToString(" ")
+					}
+				}
 				.directory(cwd.toFile())
 				.stream()
 				.waitFor()
