@@ -39,7 +39,8 @@ object Antechamber {
 					"-fi", "pdb",
 					"-o", "mol.mol2",
 					"-fo", "mol2",
-					"-dr", "n" // turn off "acdoctor" mode
+					"-at", "sybyl", // use SYBYL atom types, so we can parse elements for the atoms
+					"-dr", "n" // turn off "acdoctor" mode, there's no user looking at the output anyway
 				)
 				.apply {
 					environment().apply {
