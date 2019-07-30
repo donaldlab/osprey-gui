@@ -8,6 +8,9 @@ import edu.duke.cs.ospreygui.io.fromMol2
 import edu.duke.cs.ospreygui.io.toMol2
 
 
+/**
+ * Get all the supported protonation states for the specified atom.
+ */
 fun Molecule.protonations(atom: Atom): List<Protonation> {
 
 	// get the number of bonded heavy atoms
@@ -63,7 +66,7 @@ fun Molecule.protonate(atom: Atom, protonation: Protonation) {
 
 		// load the generalized amber forcefield (for small molecules)
 		// TODO: let caller pick the forcefield? (will have to have AmberTypes for each possible choice)
-		add("source leaprc.gaff")
+		add("source leaprc.${MoleculeType.SmallMolecule.defaultForcefieldName!!}")
 
 		// read our molecule fragment
 		add("mol = loadMol2 in.mol2")
@@ -149,10 +152,10 @@ fun Molecule.protonate(atom: Atom, protonation: Protonation) {
 
 	// read the output mol2 and copy the new hydrogens
 	val hmol = Molecule.fromMol2(results.files["out.mol2"]
-		?: throw LeapException("LEaP didn't produce an output molecule", smol, results))
-	mol.deprotonate(atom)
+		?: throw Leap.Exception("LEaP didn't produce an output molecule", smol, results))
 	val centerAtom = hmol.atoms.find { it.name == atom.name }
 		?: throw Error("can't find central atom in LEaP output molecule")
+	mol.deprotonate(atom)
 	hmol.bonds.bondedAtoms(centerAtom)
 		.filter { it.element == Element.Hydrogen }
 		.forEach {
@@ -278,16 +281,3 @@ enum class Hybridization {
 	Sp2,
 	Sp3
 }
-
-class LeapException(val msg: String, val mol2: String, val results: Leap.Results) : RuntimeException(StringBuilder().apply {
-	append(msg)
-	append("\n\n")
-	append("mol2:\n")
-	append(mol2)
-	append("\n\n")
-	append("console:\n")
-	results.console.forEach {
-		append(it)
-		append("\n")
-	}
-}.toString())
