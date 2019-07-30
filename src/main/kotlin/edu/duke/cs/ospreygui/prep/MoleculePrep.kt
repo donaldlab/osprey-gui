@@ -9,11 +9,7 @@ import edu.duke.cs.molscope.gui.features.slide.NavigationTool
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
-import edu.duke.cs.ospreygui.features.slide.AssembleTool
-import edu.duke.cs.ospreygui.features.slide.SaveOMOL
-import edu.duke.cs.ospreygui.features.slide.SavePDB
-import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
-import edu.duke.cs.ospreygui.forcefield.amber.combine
+import edu.duke.cs.ospreygui.features.slide.*
 import edu.duke.cs.ospreygui.forcefield.amber.partition
 import java.util.*
 import kotlin.NoSuchElementException
@@ -26,16 +22,7 @@ class MoleculePrep(
 
 	// partition the molecule into pieces AMBER can understand
 	// except, combine all the solvent molecules into one "molecule"
-	val partition = run {
-		val partition = mol.partition()
-		val combinedSolvent = partition
-			.filter { (type, _) -> type == MoleculeType.Solvent }
-			.map { (_, mol) -> mol }
-			.combine(MoleculeType.Solvent.name)
-		return@run partition
-			.filter { (type, _) -> type != MoleculeType.Solvent }
-			.toMutableList() + listOf(MoleculeType.Solvent to combinedSolvent)
-	}
+	val partition = mol.partition(combineSolvent = true)
 
 	private val isIncluded = IdentityHashMap<Molecule,Boolean>()
 		.apply {
@@ -123,6 +110,8 @@ class MoleculePrep(
 				add(MenuRenderSettings())
 			}
 			s.features.menu("Prepare") {
+				add(BondEditor())
+				add(ProtonationEditor())
 				add(AssembleTool(this@MoleculePrep))
 			}
 		}

@@ -31,7 +31,7 @@ fun Molecule.guessBonds(
 
 		// find the closest neighbors, up to the number allowed by the max valence
 		val nearbyAtoms = tree.nearest(atom1)
-		while (bonds.bondedAtoms(atom1).size < props1.maxValence) {
+		while (bonds.bondedAtoms(atom1).size < props1.maxValence && nearbyAtoms.hasNext()) {
 
 			val (atom2, distSq) = nearbyAtoms.next()
 			val props2 = atom2.props()

@@ -79,4 +79,17 @@ object Leap {
 			)
 		}
 	}
+
+	class Exception(val msg: String, val inMol: String, val results: Results) : RuntimeException(StringBuilder().apply {
+		append(msg)
+		append("\n\n")
+		append("input PDB or Mol2:\n")
+		append(inMol)
+		append("\n\n")
+		append("console:\n")
+		results.console.forEach {
+			append(it)
+			append("\n")
+		}
+	}.toString())
 }

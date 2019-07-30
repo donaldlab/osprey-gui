@@ -19,7 +19,15 @@ object Antechamber {
 		val mol2: String?
 	)
 
-	fun run(pdb: String): Results {
+	enum class AtomTypes(val id: String) {
+		Gaff("gaff"),
+		Gaff2("gaff2"),
+		Amber("amber"),
+		BCC("bcc"),
+		SYBYL("sybyl")
+	}
+
+	fun run(pdb: String, atomTypes: AtomTypes = AtomTypes.SYBYL): Results {
 
 		// make sure antechamber is available for this platform
 		if (!antechamberPath.exists) {
@@ -39,8 +47,7 @@ object Antechamber {
 					"-fi", "pdb",
 					"-o", "mol.mol2",
 					"-fo", "mol2",
-					"-at", "sybyl", // use SYBYL atom types, so we can parse elements for the atoms
-					"-dr", "n" // turn off "acdoctor" mode, there's no user looking at the output anyway
+					"-at", atomTypes.id
 				)
 				.apply {
 					environment().apply {
@@ -63,4 +70,17 @@ object Antechamber {
 			)
 		}
 	}
+
+	class Exception(val msg: String, val pdb: String, val results: Results) : RuntimeException(StringBuilder().apply {
+		append(msg)
+		append("\n\n")
+		append("PDB:\n")
+		append(pdb)
+		append("\n\n")
+		append("console:\n")
+		results.console.forEach {
+			append(it)
+			append("\n")
+		}
+	}.toString())
 }

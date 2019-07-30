@@ -32,7 +32,7 @@ class TestPolymerPartitioning : SharedSpec({
 			partition[MoleculeType.Solvent]!!.size shouldBe 117
 			partition shouldNotContainKey MoleculeType.DNA
 			partition shouldNotContainKey MoleculeType.RNA
-			partition shouldNotContainKey MoleculeType.Ion
+			partition shouldNotContainKey MoleculeType.AtomicIon
 			partition shouldNotContainKey MoleculeType.Synthetic
 
 			// check the protein

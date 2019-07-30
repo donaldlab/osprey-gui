@@ -51,7 +51,7 @@ private val solventResTypes = setOf(
 	"WAT", "HOH", "TIP3", "TIP4", "TIP5", "SPCE", "SPC", "SOL"
 )
 
-private val ionResTypes = setOf(
+private val atomicIonResTypes = setOf(
 	"Na+", "Li+", "Mg+", "Rb+", "MG", "Cs+", "POT", "SOD", "MG2",
 	"CAL", "RUB", "LIT", "ZN2", "CD2", "NA", "K+", "K", "NA+",
 	"Cl-", "Br-", "F-", "I-", "CLA", "CL", "BR", "CL-"
@@ -63,15 +63,39 @@ private val syntheticResTypes = setOf(
 	"EP", "LP"
 )
 
-enum class MoleculeType(val isPolymer: Boolean) {
+enum class MoleculeType(val isPolymer: Boolean, val forcefieldNames: List<String>) {
 
-	Protein(true),
-	DNA(true),
-	RNA(true),
-	Solvent(false),
-	Ion(false),
-	Synthetic(false),
-	SmallMolecule(false);
+	Protein(true, listOf(
+		"ff96", // dlab's favorite and time-tested protein forecfield
+		"protein.ff14SB" // currently recommended by AmberTools19
+	)),
+
+	DNA(true, listOf(
+		"DNA.OL15" // currently recommended by AmberTools19
+	)),
+
+	RNA(true, listOf(
+		"RNA.OL3" // currently recommended by AmberTools19
+	)),
+
+	Solvent(false, listOf(
+		"water.tip3p" // currently recommended by AmberTools19
+	)),
+
+	AtomicIon(false, listOf(
+		"water.tip3p" // currently recommended by AmberTools19
+	)),
+
+	Synthetic(false, listOf(
+		// not real molecules, no forcefield needed
+	)),
+
+	SmallMolecule(false, listOf(
+		"gaff2" // currently recommended by AmberTools19
+	));
+
+
+	val defaultForcefieldName get() = forcefieldNames.firstOrNull()
 
 	companion object {
 		operator fun get(resType: String) =
@@ -82,7 +106,7 @@ enum class MoleculeType(val isPolymer: Boolean) {
 				dnaResTypes.contains(resType) -> DNA
 				rnaResTypes.contains(resType) -> RNA
 				solventResTypes.contains(resType) -> Solvent
-				ionResTypes.contains(resType) -> Ion
+				atomicIonResTypes.contains(resType) -> AtomicIon
 
 				// we can typically ignore these, since they don't represent real molecules
 				syntheticResTypes.contains(resType) -> Synthetic
@@ -99,7 +123,7 @@ enum class MoleculeType(val isPolymer: Boolean) {
  *
  * Ignores all bonds.
  */
-fun Molecule.partition(): List<Pair<MoleculeType,Molecule>> {
+fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,Molecule>> {
 
 	// for non-polymers, assume the whole molecule is a small molecule
 	if (this !is Polymer) {
@@ -141,7 +165,7 @@ fun Molecule.partition(): List<Pair<MoleculeType,Molecule>> {
 	}
 
 	// create a molecule for each item in the partition
-	return partition.flatMap { (moltype, chainId, residues) ->
+	var mols = partition.flatMap { (moltype, chainId, residues) ->
 		if (moltype.isPolymer) {
 
 			// map all the residues to a new polymer
@@ -169,6 +193,23 @@ fun Molecule.partition(): List<Pair<MoleculeType,Molecule>> {
 			}
 		}
 	}
+
+	if (combineSolvent) {
+
+		mols
+			.filter { (type, _) -> type == MoleculeType.Solvent }
+			.map { (_, mol) -> mol }
+			.takeIf { it.isNotEmpty() }
+			?.combine(MoleculeType.Solvent.name)
+			?.let { combinedSolvent ->
+
+				mols = mols
+					.filter { (type, _) -> type != MoleculeType.Solvent }
+					.toMutableList() + listOf(MoleculeType.Solvent to combinedSolvent)
+			}
+	}
+
+	return mols
 }
 
 /**

@@ -10,9 +10,9 @@ import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
+import edu.duke.cs.ospreygui.forcefield.amber.inferBondsAmber
 import edu.duke.cs.ospreygui.prep.BondGuesser
 import edu.duke.cs.ospreygui.prep.covalentRange
-import edu.duke.cs.ospreygui.prep.guessBonds
 import edu.duke.cs.ospreygui.prep.toTree
 
 
@@ -79,11 +79,10 @@ class BondEditor : SlideFeature {
 				}
 				sameLine()
 				infoTip("""
-					|This tool guesses where the bonds should be based on
-					|element valences and ranges on colvalent bond lengths.
-					|This tool can yield wrong bond guesses for some structures
-					|(particularly structures containing clashes), so be sure to
-					|double-check the results and make corrections where necessary.
+					|This tool infers atom connectivity using a molecular mechanics forcefield.
+					|After bonds have been added automatically, feel free to use
+					|the fine-grained editing tools to add any missing bonds, or
+					|remove any extraneous bonds.
 				""".trimMargin())
 
 				unindent(10f)
@@ -239,8 +238,8 @@ class BondEditor : SlideFeature {
 
 	private fun guessBonds(views: List<MoleculeRenderView>) {
 		for (view in views) {
-			for (bond in view.mol.guessBonds()) {
-				view.mol.bonds.add(bond.a1, bond.a2)
+			for ((a1, a2) in view.mol.inferBondsAmber()) {
+				view.mol.bonds.add(a1, a2)
 			}
 			view.moleculeChanged()
 		}
