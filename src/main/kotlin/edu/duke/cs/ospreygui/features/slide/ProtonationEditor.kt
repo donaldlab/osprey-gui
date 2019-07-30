@@ -4,6 +4,7 @@ import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.tools.ByteFlags
 import cuchaz.kludge.tools.IntFlags
 import edu.duke.cs.molscope.Slide
+import edu.duke.cs.molscope.gui.ClickTracker
 import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
@@ -23,6 +24,7 @@ class ProtonationEditor : SlideFeature {
 	override val id = FeatureId("edit.protonation")
 
 	private val winState = WindowState()
+	private val clickTracker = ClickTracker()
 	private var selection: Selection? = null
 
 	private fun Slide.Locked.molViews() = views.mapNotNull { it as? MoleculeRenderView }
@@ -39,31 +41,31 @@ class ProtonationEditor : SlideFeature {
 
 		val molViews = slide.molViews()
 
-		// did we click anything?
-		if (slidewin.mouseLeftClick) {
-
-			// clear any previous selection
-			molViews.clearSelections()
-			selection = null
-
-			// select the heavy atom from the click, if any
-			slidewin.mouseTarget?.let { target ->
-				(target.view as? MoleculeRenderView)?.let { view ->
-					(target.target as? Atom)?.let { atom ->
-						if (atom.element != Element.Hydrogen) {
-							selection = Selection(view, atom)
-						}
-					}
-				}
-			}
-		}
-
 		winState.render(
 			onOpen = {
 				// add the hover effect
 				slidewin.hoverEffects[id] = hoverEffect
 			},
 			whenOpen = {
+
+				// did we click anything?
+				if (clickTracker.clicked(slidewin)) {
+
+					// clear any previous selection
+					molViews.clearSelections()
+					selection = null
+
+					// select the heavy atom from the click, if any
+					slidewin.mouseTarget?.let { target ->
+						(target.view as? MoleculeRenderView)?.let { view ->
+							(target.target as? Atom)?.let { atom ->
+								if (atom.element != Element.Hydrogen) {
+									selection = Selection(view, atom)
+								}
+							}
+						}
+					}
+				}
 
 				// draw the window
 				begin("Protonation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))

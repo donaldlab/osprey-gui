@@ -21,6 +21,7 @@ class BondEditor : SlideFeature {
 	override val id = FeatureId("edit.bonds")
 
 	private val winState = WindowState()
+	private val clickTracker = ClickTracker()
 
 	private val pMaxDist = Ref.of(3f)
 
@@ -41,28 +42,28 @@ class BondEditor : SlideFeature {
 
 		val molViews = slide.molViews()
 
-		// did we click anything?
-		if (slidewin.mouseLeftClick) {
-
-			selection = null
-			molViews.clearSelections()
-
-			// select the atom from the click, if any
-			slidewin.mouseTarget?.let { target ->
-				(target.view as? MoleculeRenderView)?.let { view ->
-					(target.target as? Atom)?.let { atom ->
-						selectAtom(view, atom)
-					}
-				}
-			}
-		}
-
 		winState.render(
 			onOpen = {
 				// add the hover effect
 				slidewin.hoverEffects[id] = hoverEffect
 			},
 			whenOpen = {
+
+				// did we click anything?
+				if (clickTracker.clicked(slidewin)) {
+
+					selection = null
+					molViews.clearSelections()
+
+					// select the atom from the click, if any
+					slidewin.mouseTarget?.let { target ->
+						(target.view as? MoleculeRenderView)?.let { view ->
+							(target.target as? Atom)?.let { atom ->
+								selectAtom(view, atom)
+							}
+						}
+					}
+				}
 
 				// draw the window
 				begin("Bond Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
