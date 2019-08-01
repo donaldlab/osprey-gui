@@ -1,8 +1,7 @@
 package edu.duke.cs.ospreygui.features.slide
 
 import cuchaz.kludge.imgui.Commands
-import cuchaz.kludge.tools.ByteFlags
-import cuchaz.kludge.tools.IntFlags
+import cuchaz.kludge.tools.*
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.ClickTracker
 import edu.duke.cs.molscope.gui.SlideCommands
@@ -14,7 +13,12 @@ import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
+import edu.duke.cs.osprey.dof.DihedralRotation
+import edu.duke.cs.osprey.tools.Protractor
 import edu.duke.cs.ospreygui.forcefield.amber.*
+import org.joml.Vector3d
+import kotlin.math.cos
+import kotlin.math.sin
 
 
 class ProtonationEditor : SlideFeature {
@@ -108,6 +112,7 @@ class ProtonationEditor : SlideFeature {
 				// show the nearby atoms
 				if (selection != null) {
 
+					// show a list box to pick the protonation state
 					text("Protonation states:")
 
 					val numItems = selection.protonations.size + 1
@@ -125,6 +130,31 @@ class ProtonationEditor : SlideFeature {
 						}
 
 						listBoxFooter()
+					}
+
+					// if hydrogens are rotatable, show a slider to pick the dihedral angle
+					if (selection.rotator?.rotationH != null) {
+						val rotator = selection.rotator
+
+						spacing()
+
+						text("Rotation")
+						if (sliderFloat("Dihedral angle", rotator.pDihedral, -180f, 180f, "%.1f")) {
+							rotator.set()
+						}
+						sameLine()
+						infoTip("Ctrl-click to type angle exactly")
+
+						if (rotator.rotationHeavies.size > 1) {
+							if (listBoxHeader("Anchor Heavy Atom", rotator.rotationHeavies.size)) {
+								for (atom in rotator.rotationHeavies) {
+									if (selectable(atom.name, rotator.rotationHeavy == atom)) {
+										rotator.rotationHeavy = atom
+									}
+								}
+								listBoxFooter()
+							}
+						}
 					}
 				}
 
@@ -180,9 +210,111 @@ class ProtonationEditor : SlideFeature {
 				?.first()
 		}
 
+		inner class Rotator(val bondedHeavy: Atom, val rotationHeavies: List<Atom>) {
+
+			var rotationHeavy: Atom = rotationHeavies.first()
+				set(value) {
+					field = value
+					update()
+					updateSelectionEffects()
+				}
+
+			var rotationH: Atom? = pickHydrogen()
+
+			// pick the hydrogen atom to define the dihedral angle
+			private fun pickHydrogen() =
+				view.mol.bonds.bondedAtoms(atom)
+					.filter { it.element == Element.Hydrogen }
+					.minBy { it.toInt() }
+
+			val pDihedral = Ref.of(measureDihedral())
+
+			private fun measureDihedral(): Float {
+				val rotationH = rotationH ?: return 0f
+				return measureDihedral(
+					rotationHeavy,
+					bondedHeavy,
+					atom,
+					rotationH
+				).toFloat()
+			}
+
+			fun Atom.toInt() = name.filter { it.isDigit() }.toInt()
+
+			fun Vector3d.toArray() = doubleArrayOf(x, y, z)
+			fun Vector3d.fromArray(array: DoubleArray) = set(array[0], array[1], array[2])
+
+			fun measureDihedral(a: Atom, b: Atom, c: Atom, d: Atom) =
+				Protractor.measureDihedral(arrayOf(
+					a.pos.toArray(),
+					b.pos.toArray(),
+					c.pos.toArray(),
+					d.pos.toArray()
+				))
+
+			fun update() {
+
+				// update the rotation hydrogen
+				rotationH = pickHydrogen()
+
+				// measure the current dihedral angle
+				pDihedral.value = measureDihedral()
+			}
+
+			fun set() {
+
+				// compute the target dihedral
+				val (targetSin, targetCos) = pDihedral.value.toDouble().toRadians()
+					.let { sin(it) to cos(it) }
+
+				// measure the current dihedral
+				val (currentSin, currentCos) = measureDihedral().toDouble().toRadians()
+					.let { sin(it) to cos(it) }
+
+				// calc the dihedral rotation as a rigid body transformation relative to the current pose
+				val dsin = targetSin*currentCos - targetCos*currentSin
+				val dcos = targetCos*currentCos + targetSin*currentSin
+				val rotation = DihedralRotation(
+					bondedHeavy.pos.toArray(),
+					atom.pos.toArray(),
+					dsin, dcos
+				)
+
+				// rotate all the hydrogens
+				view.mol.bonds.bondedAtoms(atom)
+					.filter { it.element == Element.Hydrogen }
+					.forEach { h ->
+						val coords = h.pos.toArray()
+						rotation.transform(coords, 0)
+						h.pos.fromArray(coords)
+					}
+
+				view.moleculeChanged()
+			}
+		}
+
+		// if the atom has only one bonded heavy atom,
+		// and that heavy atom has at least one other bonded heavy atom,
+		// then the hydrogens are rotatable
+		val rotator: Rotator? = run {
+
+			val bondedHeavies = view.mol.bonds.bondedAtoms(atom)
+				.filter { it.element != Element.Hydrogen }
+			if (bondedHeavies.size == 1) {
+				val bondedHeavy = bondedHeavies.first()
+
+				val rotationHeavies = view.mol.bonds.bondedAtoms(bondedHeavy)
+					.filter { it.element != Element.Hydrogen && it != atom }
+				if (rotationHeavies.isNotEmpty()) {
+					return@run Rotator(bondedHeavy, rotationHeavies)
+				}
+			}
+
+			return@run null
+		}
+
 		init {
-			// add the selection effect
-			view.renderEffects[atom] = selectedEffect
+			updateSelectionEffects()
 		}
 
 		fun set(protonation: Protonation?) {
@@ -200,6 +332,30 @@ class ProtonationEditor : SlideFeature {
 				view.mol.deprotonate(atom)
 			}
 			view.moleculeChanged()
+
+			if (rotator != null) {
+				rotator.update()
+			}
+
+			updateSelectionEffects()
+		}
+
+		private fun updateSelectionEffects() {
+
+			view.renderEffects.clear()
+
+			// add the selection effect
+			view.renderEffects[atom] = selectedEffect
+
+			// highlight the dihedral atoms if needed
+			rotator?.rotationH?.let { rotationH ->
+				view.renderEffects[listOf(
+					rotator.rotationHeavy,
+					rotator.bondedHeavy,
+					atom,
+					rotationH
+				)] = rotationEffect
+			}
 		}
 	}
 }
@@ -212,4 +368,8 @@ private val hoverEffect = RenderEffect(
 private val selectedEffect = RenderEffect(
 	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
 	255u, 255u, 255u
+)
+private val rotationEffect = RenderEffect(
+	ByteFlags.of(RenderEffect.Flags.Inset),
+	100u, 200u, 100u
 )
