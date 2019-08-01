@@ -102,43 +102,14 @@ private fun Molecule.translateBonds(dst: Molecule): List<Pair<Atom,Atom>> {
 
 	val src: Molecule = this
 
-	// LEaP doesn't preserve chain ids or residue ids in the mol2 files,
-	// so we need to translate based on residue order rather than id
-	val srcResidues = (src as? Polymer)?.chains?.flatMap { it.residues }
-	val dstResidues = (dst as? Polymer)?.chains?.flatMap { it.residues }
-	fun Polymer.Residue.translate(): Polymer.Residue {
-		val srcRes = this
+	val mapper = src.mapTo(dst)
 
-		srcResidues!!
-		dstResidues!!
-
-		if (srcResidues.size != dstResidues.size) {
-			throw Error("Amber didn't preserve residue list")
-		}
-
-		return dstResidues[srcResidues.indexOf(srcRes)]
-	}
-
-	fun Atom.translate(): Atom? {
-		val srcAtom = this
-
-		return if (src is Polymer) {
-			val srcRes = src.findResidueOrThrow(srcAtom)
-			val dstRes = srcRes.translate()
-			dstRes.atoms.find { it.name == srcAtom.name }
-		} else {
-			dst.atoms.find { it.name == srcAtom.name }
-		}
-	}
-
-	// TODO: could speed this up by caching translations
-
-	// translate the bonds from src to dst
+	// map the bonds from src to dst
 	return src.bonds
 		.toSet()
 		.mapNotNull { (srcA1, srcA2) ->
-			val dstA1 = srcA1.translate() ?: return@mapNotNull null
-			val dstA2 = srcA2.translate() ?: return@mapNotNull null
+			val dstA1 = mapper.mapAtom(srcA1) ?: return@mapNotNull null
+			val dstA2 = mapper.mapAtom(srcA2) ?: return@mapNotNull null
 			dstA1 to dstA2
 		}
 }

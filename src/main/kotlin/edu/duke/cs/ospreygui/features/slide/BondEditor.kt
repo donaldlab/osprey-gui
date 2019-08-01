@@ -76,7 +76,9 @@ class BondEditor : SlideFeature {
 				}
 
 				if (button("Add bonds automatically")) {
-					guessBonds(molViews)
+					slidewin.showExceptions {
+						guessBonds(molViews)
+					}
 				}
 				sameLine()
 				infoTip("""

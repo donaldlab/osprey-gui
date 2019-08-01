@@ -9,14 +9,12 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
+import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
-import edu.duke.cs.ospreygui.forcefield.amber.Protonation
-import edu.duke.cs.ospreygui.forcefield.amber.deprotonate
-import edu.duke.cs.ospreygui.forcefield.amber.protonate
-import edu.duke.cs.ospreygui.forcefield.amber.protonations
+import edu.duke.cs.ospreygui.forcefield.amber.*
 
 
 class ProtonationEditor : SlideFeature {
@@ -77,6 +75,22 @@ class ProtonationEditor : SlideFeature {
 					clearAll(molViews)
 				}
 
+				// TODO: Reduce
+
+				if (button("Add Hydrogens automatically")) {
+					slidewin.showExceptions {
+						autoProtonate(molViews)
+					}
+				}
+				sameLine()
+				infoTip("""
+					|This tool adds Hydrogen atoms to heavy atoms based on inferred
+					|forcefield atom types and bond types. Atom and bond type inference
+					|on unprotonated molecules is very error-prone, so feel free to use
+					|the fine-grained editing tools to add any missing Hydrogen atoms,
+					|removea any extraneous Hydrogen atoms, or change hybridizations and geometry.
+				""".trimMargin())
+
 				unindent(10f)
 
 				val selection = selection
@@ -134,6 +148,18 @@ class ProtonationEditor : SlideFeature {
 				.filter { it.element != Element.Hydrogen }
 				.forEach { view.mol.deprotonate(it) }
 			view.moleculeChanged()
+		}
+	}
+
+	private fun autoProtonate(views: List<MoleculeRenderView>) {
+		for (view in views) {
+			for ((heavyAtom, hAtom) in view.mol.inferProtonation()) {
+				view.mol.apply {
+					atoms.add(hAtom)
+					bonds.add(heavyAtom, hAtom)
+				}
+				view.moleculeChanged()
+			}
 		}
 	}
 

@@ -6,6 +6,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.ospreygui.io.fromMol2
 import edu.duke.cs.ospreygui.io.toMol2
+import edu.duke.cs.ospreygui.io.toPDB
 
 
 /**
@@ -161,6 +162,137 @@ fun Molecule.protonate(atom: Atom, protonation: Protonation) {
 		.forEach {
 			mol.atoms.add(it)
 			mol.bonds.add(atom, it)
+		}
+}
+
+/**
+ * Returns a list of heavy-hydrogen atom pairs based on inferred
+ * forcefield atom and bond types.
+ */
+fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
+
+	val dst = this
+	val dstAtoms = ArrayList<Pair<Atom,Atom>>()
+
+	// treat each molecule in the partition with the appropriate protocol
+	partition@for ((type, src) in partition(combineSolvent = true)) {
+
+		// TODO: allow user to pick the forcefields?
+		val srcAtoms = when (type) {
+
+			// treat molecules with either leap or antechamber
+			MoleculeType.Protein,
+			MoleculeType.DNA,
+			MoleculeType.RNA,
+			MoleculeType.Solvent -> inferProtonationLeap(src, type.defaultForcefieldName!!)
+
+			MoleculeType.SmallMolecule -> inferProtonationAntechamberThenLeap(src, type.defaultForcefieldName!!)
+
+			// atomic ions don't have protonation
+			MoleculeType.AtomicIon -> continue@partition
+
+			// synthetics aren't real molecules, just ignore them
+			MoleculeType.Synthetic -> continue@partition
+		}
+
+		fun Polymer.Residue.translate(): Polymer.Residue {
+			val srcRes = this
+			val srcChain = (src as Polymer).chains.find { srcRes in it.residues }!!
+
+			return (dst as Polymer).chains.find { it.id == srcChain.id }!!
+				.residues.find { it.id == srcRes.id }!!
+		}
+
+		fun Atom.translate(): Atom {
+			val srcAtom = this
+
+			return if (src is Polymer) {
+				val srcRes = src.findResidueOrThrow(srcAtom)
+				val dstRes = srcRes.translate()
+				dstRes.atoms.find { it.name == srcAtom.name }!!
+			} else {
+				dst.atoms.find { it.name == srcAtom.name }!!
+			}
+		}
+
+		// translate the bonds to the input mol
+		for ((srcHeavy, srcH) in srcAtoms) {
+			dstAtoms.add(srcHeavy.translate() to srcH.copy())
+		}
+	}
+
+	return dstAtoms
+}
+
+private fun inferProtonationLeap(mol: Molecule, ffname: String): List<Pair<Atom, Atom>> {
+
+	// run LEaP to add the hydrogens
+	val pdb = mol.toPDB()
+	val results = Leap.run(
+		filesToWrite = mapOf("in.pdb" to pdb),
+		commands = """
+			|verbosity 2
+			|source leaprc.$ffname
+			|mol = loadPDB in.pdb
+			|addH mol
+			|saveMol2 mol out.mol2 0
+		""".trimMargin(),
+		filesToRead = listOf("out.mol2")
+	)
+
+	val protonatedMol = Molecule.fromMol2(results.files["out.mol2"]
+		?: throw Leap.Exception("LEaP didn't produce an output molecule", pdb, results))
+
+	return protonatedMol.translateHydrogens(mol)
+}
+
+private fun inferProtonationAntechamberThenLeap(mol: Molecule, ffname: String): List<Pair<Atom, Atom>> {
+
+	// run antechamber to infer all the atom and bond types
+	val pdb = mol.toPDB()
+	val antechamberResults = Antechamber.run(pdb, Antechamber.AtomTypes.SYBYL)
+	val mol2 = antechamberResults.mol2
+		?: throw Antechamber.Exception("Antechamber didn't produce an output molecule", pdb, antechamberResults)
+
+	// run LEaP to add the hydrogens
+	val results = Leap.run(
+		filesToWrite = mapOf("in.mol2" to mol2),
+		commands = """
+			|verbosity 2
+			|source leaprc.$ffname
+			|mol = loadMol2 in.mol2
+			|addH mol
+			|saveMol2 mol out.mol2 0
+		""".trimMargin(),
+		filesToRead = listOf("out.mol2")
+	)
+
+	val protonatedMol = Molecule.fromMol2(results.files["out.mol2"]
+		?: throw Leap.Exception("LEaP didn't produce an output molecule", pdb, results))
+
+	return protonatedMol.translateHydrogens(mol)
+}
+
+private fun Molecule.translateHydrogens(dst: Molecule): List<Pair<Atom,Atom>> {
+
+	val src: Molecule = this
+
+	val mapper = src.mapTo(dst)
+
+	// map the heavy,hydrogen pairs from src to dst
+	return src.atoms
+		.filter { it.element == Element.Hydrogen }
+		.mapNotNull { srcH ->
+
+			// get the bonded heavy atom
+			val srcHeavy = src.bonds
+				.bondedAtoms(srcH)
+				.firstOrNull { it.element != Element.Hydrogen }
+				?: return@mapNotNull null
+
+			val dstHeavy = mapper.mapAtom(srcHeavy) ?: return@mapNotNull null
+
+			return@mapNotNull dstHeavy to srcH.copy()
 		}
 }
 
