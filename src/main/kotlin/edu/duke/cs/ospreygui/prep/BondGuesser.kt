@@ -127,7 +127,7 @@ class BondGuesser(
 			Covalent radii revisited
 			Beatriz Cordero, et al
 			Dalton Transactions, 2008
-			http://dx.doi.org/10.1039/b801115j
+			https://doi.org/10.1039/b801115j
 		*/
 		val defaultElementProps =
 			EnumMap<Element,ElementProps>(Element::class.java).apply {
