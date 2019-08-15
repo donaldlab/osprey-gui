@@ -110,6 +110,7 @@ class MoleculePrep(
 				add(MenuRenderSettings())
 			}
 			s.features.menu("Prepare") {
+				add(MissingAtomsEditor())
 				add(BondEditor())
 				add(ProtonationEditor())
 				add(AssembleTool(this@MoleculePrep))
