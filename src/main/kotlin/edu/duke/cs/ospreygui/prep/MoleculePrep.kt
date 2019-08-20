@@ -108,6 +108,7 @@ class MoleculePrep(
 			s.features.menu("View") {
 				add(NavigationTool())
 				add(MenuRenderSettings())
+				add(ClashViewer())
 			}
 			s.features.menu("Prepare") {
 				add(MissingAtomsEditor())
