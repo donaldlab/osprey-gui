@@ -45,7 +45,7 @@ class SavePDB(val prep: MoleculePrep) : SlideFeature {
 		val pathWithExt = path.parent.resolve(filename)
 
 		// combine the included assembled mols and save the file
-		prep.getIncludedActiveMols()
+		prep.getIncludedMols()
 			.combine(prep.mol.name)
 			.toPDB()
 			.write(pathWithExt)

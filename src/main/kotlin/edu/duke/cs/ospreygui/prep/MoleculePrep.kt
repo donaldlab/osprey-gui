@@ -7,6 +7,7 @@ import edu.duke.cs.molscope.gui.features.slide.CloseSlide
 import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
 import edu.duke.cs.molscope.gui.features.slide.NavigationTool
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.render.RenderSettings
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.slide.*
@@ -24,6 +25,7 @@ class MoleculePrep(
 	// except, combine all the solvent molecules into one "molecule"
 	val partition = mol.partition(combineSolvent = true)
 
+	// include all molecules by default
 	private val isIncluded = IdentityHashMap<Molecule,Boolean>()
 		.apply {
 			partition
@@ -51,33 +53,6 @@ class MoleculePrep(
 			.filter { (_, mol) -> isIncluded[mol] == true }
 			.map { (_, mol) -> mol }
 
-	/** the assembled molecules if any, otherwise null */
-	fun getIncludedAssembledMols(): List<Molecule?> =
-		partition
-			.filter { (_, mol) -> isIncluded[mol] == true }
-			.map { (_, mol) -> assembledMols[mol] }
-
-	/** the assembled molecules if any, otherwise the base molecules */
-	fun getIncludedActiveMols(): List<Molecule> =
-		partition
-			.filter { (_, mol) -> isIncluded[mol] == true }
-			.map { (_, mol) -> assembledMols[mol] ?: mol }
-
-	fun isAssembled(mol: Molecule) =
-		assembledMols[mol] != null
-
-	fun setAssembled(baseMol: Molecule, assembledMol: Molecule?, slide: Slide.Locked) {
-		removeRenderView(slide, baseMol)
-		if (assembledMol != null) {
-			assembledMols[baseMol] = assembledMol
-		} else {
-			assembledMols.remove(baseMol)
-		}
-		addRenderView(slide, baseMol)
-	}
-
-	fun getAssembled(baseMol: Molecule) = assembledMols[baseMol]
-
 	private fun removeRenderView(slide: Slide.Locked, baseMol: Molecule) {
 		// remove whichever is present, the base mol, or the assembled mol
 		val assembledMol = assembledMols[baseMol]
@@ -89,7 +64,7 @@ class MoleculePrep(
 		slide.views.add(BallAndStick(assembledMols[baseMol] ?: baseMol))
 	}
 
-	// make the slide last, since the AssembleTool needs properties from the prep
+	// make the slide last, since the FilterTool needs properties from the prep
 	val slide = Slide(mol.name, initialSize = Extent2D(640, 480)).apply {
 		lock { s ->
 
@@ -107,14 +82,19 @@ class MoleculePrep(
 			}
 			s.features.menu("View") {
 				add(NavigationTool())
-				add(MenuRenderSettings())
+				add(MenuRenderSettings(RenderSettings().apply {
+					// these settings looked nice on a small protein
+					shadingWeight = 1.4f
+					lightWeight = 1.4f
+					depthWeight = 1.0f
+				}))
 				add(ClashViewer())
 			}
 			s.features.menu("Prepare") {
+				add(FilterTool(this@MoleculePrep))
 				add(MissingAtomsEditor())
 				add(BondEditor())
 				add(ProtonationEditor())
-				add(AssembleTool(this@MoleculePrep))
 			}
 		}
 		win.addSlide(this)
