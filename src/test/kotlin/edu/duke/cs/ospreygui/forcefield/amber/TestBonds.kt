@@ -10,6 +10,8 @@ import io.kotlintest.shouldBe
 
 class TestBonds : SharedSpec({
 
+	fun Molecule.Bonds.toContentSet() = toSet().map { it.toContent() }.toSet()
+
 	test("benzamidine") {
 
 		val mol = Molecule.fromPDB(OspreyGui.getResourceAsString("benzamidine.pdb"))
@@ -19,7 +21,7 @@ class TestBonds : SharedSpec({
 		}
 
 		val bondedMol = Molecule.fromMol2(OspreyGui.getResourceAsString("benzamidine.mol2"))
-		mol.bonds.toSet() shouldBe bondedMol.bonds.toSet()
+		mol.bonds.toContentSet() shouldBe bondedMol.bonds.toContentSet()
 	}
 
 	test("1cc8") {
@@ -31,6 +33,6 @@ class TestBonds : SharedSpec({
 		}
 
 		val bondedMol = Molecule.fromMol2(OspreyGui.getResourceAsString("1cc8.protein.mol2"))
-		mol.bonds.toSet() shouldBe bondedMol.bonds.toSet()
+		mol.bonds.toContentSet() shouldBe bondedMol.bonds.toContentSet()
 	}
 })

@@ -57,18 +57,8 @@ fun Molecule.toMol2(): String {
 
 	// flatten the bonds to a list
 	data class Bond(val i: Int, val i1: Int, val i2: Int)
-	val bonds = ArrayList<Bond>().apply {
-		var i = 1
-		for (a1 in atoms) {
-			val i1 = indicesByAtom[a1]!!
-			for (a2 in bonds.bondedAtoms(a1)) {
-				val i2 = indicesByAtom[a2] ?: throw IllegalArgumentException("molecule is bonded to atoms not in this molecule")
-				if (i1 < i2) {
-					add(Bond(i, i1, i2))
-					i += 1
-				}
-			}
-		}
+	val bonds = mol.bonds.toSet().mapIndexed { i, bond ->
+		Bond(i, indicesByAtom.getValue(bond.a), indicesByAtom.getValue(bond.b))
 	}
 
 	// write the molecule section
