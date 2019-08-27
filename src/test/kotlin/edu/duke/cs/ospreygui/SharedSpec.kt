@@ -18,12 +18,6 @@ open class SharedSpec(body: SharedSpec.() -> Unit = {}) : IntelliMarker, Abstrac
 	private val testCases = ArrayList<TestCase>()
 	override fun testCases(): List<TestCase> = testCases
 
-	private fun addTestCase(testCase: TestCase) {
-		if (testCases.any { it.name == testCase.name })
-			throw IllegalArgumentException("Cannot add test with duplicate name ${testCase.name}")
-		testCases.add(testCase)
-	}
-
 	private var hasFocus = false
 
 	private fun makeConfig(enabled: Boolean? = null, vararg tags: Tag) =
@@ -42,7 +36,7 @@ open class SharedSpec(body: SharedSpec.() -> Unit = {}) : IntelliMarker, Abstrac
 			hasFocus = true
 		}
 
-		addTestCase(TestCase(
+		testCases.add(TestCase(
 			Description.spec(this::class).append(name),
 			this,
 			test,
@@ -67,7 +61,7 @@ open class SharedSpec(body: SharedSpec.() -> Unit = {}) : IntelliMarker, Abstrac
 				TestType.Container,
 				makeConfig(null, tagGroup)
 			)
-		addTestCase(testCase)
+		testCases.add(testCase)
 
 		// run the group code now, at config time
 		Group(testCase).init()
@@ -82,7 +76,7 @@ open class SharedSpec(body: SharedSpec.() -> Unit = {}) : IntelliMarker, Abstrac
 				hasFocus = true
 			}
 
-			addTestCase(TestCase(
+			testCases.add(TestCase(
 				testCase.description.append(name),
 				this@SharedSpec,
 				test,
@@ -107,7 +101,7 @@ open class SharedSpec(body: SharedSpec.() -> Unit = {}) : IntelliMarker, Abstrac
 					TestType.Container,
 					makeConfig(null, tagGroup)
 				)
-			addTestCase(testCase)
+			testCases.add(testCase)
 
 			// run the group code now, at config time
 			Group(testCase).init()
