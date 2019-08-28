@@ -2,7 +2,6 @@ package edu.duke.cs.ospreygui.forcefield.amber
 
 import edu.duke.cs.ospreygui.io.*
 import java.io.IOException
-import java.nio.file.Path
 import java.nio.file.Paths
 
 
@@ -17,7 +16,26 @@ object Parmchk {
 		val frcmod: String?
 	)
 
-	fun run(mol2: String): Results {
+	enum class AtomTypes(val id: String) {
+
+		Gaff("gaff"),
+		Gaff2("gaff2");
+
+		companion object {
+
+			fun from(ffname: ForcefieldName) =
+				when (ffname.atomTypes) {
+					Antechamber.AtomTypes.Gaff -> Gaff
+					Antechamber.AtomTypes.Gaff2 -> Gaff2
+					else -> null
+				}
+
+			fun fromOrThrow(ffname: ForcefieldName) =
+				from(ffname) ?: throw IllegalArgumentException("forcefield $ffname is not supported by Parmchk")
+		}
+	}
+
+	fun run(mol2: String, atomTypes: AtomTypes): Results {
 
 		// make sure parmchk is available for this platform
 		if (!parmchkPath.exists) {
@@ -35,6 +53,7 @@ object Parmchk {
 					parmchkPath.toString(),
 					"-i", "mol.mol2",
 					"-f", "mol2",
+					"-s", atomTypes.id,
 					"-o", "frcmod"
 				)
 				.apply {

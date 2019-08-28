@@ -5,10 +5,13 @@ import edu.duke.cs.ospreygui.SharedSpec
 import io.kotlintest.shouldBe
 
 
-class TestFrcmod : SharedSpec({
+class TestParmchk : SharedSpec({
 
 	test("benzamidine") {
-		val results = Parmchk.run(OspreyGui.getResourceAsString("benzamidine.mol2"))
+		val results = Parmchk.run(
+			OspreyGui.getResourceAsString("benzamidine.gaff2.mol2"),
+			Parmchk.AtomTypes.Gaff2
+		)
 		results.frcmod shouldBe OspreyGui.getResourceAsString("benzamidine.frcmod")
 	}
 })

@@ -20,7 +20,7 @@ class TestBonds : SharedSpec({
 			mol.bonds.add(a1, a2)
 		}
 
-		val bondedMol = Molecule.fromMol2(OspreyGui.getResourceAsString("benzamidine.mol2"))
+		val bondedMol = Molecule.fromMol2(OspreyGui.getResourceAsString("benzamidine.sybyl.mol2"))
 		mol.bonds.toContentSet() shouldBe bondedMol.bonds.toContentSet()
 	}
 
