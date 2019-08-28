@@ -67,7 +67,7 @@ fun Molecule.protonate(atom: Atom, protonation: Protonation) {
 
 		// load the generalized amber forcefield (for small molecules)
 		// TODO: let caller pick the forcefield? (will have to have AmberTypes for each possible choice)
-		add("source leaprc.${MoleculeType.SmallMolecule.defaultForcefieldName!!}")
+		add("source leaprc.${MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow.name}")
 
 		// read our molecule fragment
 		add("mol = loadMol2 in.mol2")
@@ -184,9 +184,9 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 			MoleculeType.Protein,
 			MoleculeType.DNA,
 			MoleculeType.RNA,
-			MoleculeType.Solvent -> inferProtonationLeap(src, type.defaultForcefieldName!!)
+			MoleculeType.Solvent -> inferProtonationLeap(src, type.defaultForcefieldNameOrThrow)
 
-			MoleculeType.SmallMolecule -> inferProtonationAntechamberThenLeap(src, type.defaultForcefieldName!!)
+			MoleculeType.SmallMolecule -> inferProtonationAntechamberThenLeap(src, type.defaultForcefieldNameOrThrow)
 
 			// atomic ions don't have protonation
 			MoleculeType.AtomicIon -> continue@partition
@@ -224,7 +224,7 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 	return dstAtoms
 }
 
-private fun inferProtonationLeap(mol: Molecule, ffname: String): List<Pair<Atom, Atom>> {
+private fun inferProtonationLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom, Atom>> {
 
 	// run LEaP to add the hydrogens
 	val pdb = mol.toPDB()
@@ -232,7 +232,7 @@ private fun inferProtonationLeap(mol: Molecule, ffname: String): List<Pair<Atom,
 		filesToWrite = mapOf("in.pdb" to pdb),
 		commands = """
 			|verbosity 2
-			|source leaprc.$ffname
+			|source leaprc.${ffname.name}
 			|mol = loadPDB in.pdb
 			|addH mol
 			|saveMol2 mol out.mol2 0
@@ -246,11 +246,11 @@ private fun inferProtonationLeap(mol: Molecule, ffname: String): List<Pair<Atom,
 	return protonatedMol.translateHydrogens(mol)
 }
 
-private fun inferProtonationAntechamberThenLeap(mol: Molecule, ffname: String): List<Pair<Atom, Atom>> {
+private fun inferProtonationAntechamberThenLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom, Atom>> {
 
 	// run antechamber to infer all the atom and bond types
 	val pdb = mol.toPDB()
-	val antechamberResults = Antechamber.run(pdb, Antechamber.AtomTypes.SYBYL)
+	val antechamberResults = Antechamber.run(pdb, Antechamber.InType.Pdb, ffname.atomTypesOrThrow)
 	val mol2 = antechamberResults.mol2
 		?: throw Antechamber.Exception("Antechamber didn't produce an output molecule", pdb, antechamberResults)
 
@@ -259,7 +259,7 @@ private fun inferProtonationAntechamberThenLeap(mol: Molecule, ffname: String): 
 		filesToWrite = mapOf("in.mol2" to mol2),
 		commands = """
 			|verbosity 2
-			|source leaprc.$ffname
+			|source leaprc.${ffname.name}
 			|mol = loadMol2 in.mol2
 			|addH mol
 			|saveMol2 mol out.mol2 0
@@ -304,7 +304,7 @@ data class Protonation(
 	val hybridization: Hybridization
 )
 
-private data class AmberTypes(
+private data class ProtonationTypes(
 	val heavy: String,
 	val hydrogen: String,
 	val heavyBond: String? = null,
@@ -317,10 +317,10 @@ private val protonations = mapOf(
 	// they really only matter for Nitrogen though, when multiple protonations have the same number of hydrogen atoms
 	// and the only way to distinguish them is with different hybridizations
 
-	Protonation(Element.Carbon, 0, 2, Hybridization.Sp2) to AmberTypes("c1", "hc"), // eg methylene
-	Protonation(Element.Carbon, 0, 3, Hybridization.Sp2) to AmberTypes("c2", "hc"), // eg methyl cation
-	Protonation(Element.Carbon, 0, 4, Hybridization.Sp3) to AmberTypes("c3", "hc"), // eg methane
-	Protonation(Element.Carbon, 1, 1, Hybridization.Sp) to AmberTypes("c1", "hc",
+	Protonation(Element.Carbon, 0, 2, Hybridization.Sp2) to ProtonationTypes("c1", "hc"), // eg methylene
+	Protonation(Element.Carbon, 0, 3, Hybridization.Sp2) to ProtonationTypes("c2", "hc"), // eg methyl cation
+	Protonation(Element.Carbon, 0, 4, Hybridization.Sp3) to ProtonationTypes("c3", "hc"), // eg methane
+	Protonation(Element.Carbon, 1, 1, Hybridization.Sp) to ProtonationTypes("c1", "hc",
 		"T", // triple bond
 		mapOf(
 			Element.Carbon to "c1", // eg ethyne
@@ -328,7 +328,7 @@ private val protonations = mapOf(
 			Element.Phosphorus to "p2" // TODO methylidynephosphane?
 		)
 	),
-	Protonation(Element.Carbon, 1, 2, Hybridization.Sp2) to AmberTypes("c2", "hc",
+	Protonation(Element.Carbon, 1, 2, Hybridization.Sp2) to ProtonationTypes("c2", "hc",
 		"D", // double bond
 		mapOf(
 			Element.Carbon to "c2", // eg ethene
@@ -337,15 +337,15 @@ private val protonations = mapOf(
 			Element.Oxygen to "o" // TODO ???
 		)
 	),
-	Protonation(Element.Carbon, 1, 3, Hybridization.Sp3) to AmberTypes("c3", "hc"), // eg ethane
-	Protonation(Element.Carbon, 2, 1, Hybridization.Sp2) to AmberTypes("c2", "hc"), // eg benzene
-	Protonation(Element.Carbon, 2, 2, Hybridization.Sp3) to AmberTypes("c3", "hc"), // eg cyclohexane
-	Protonation(Element.Carbon, 3, 1, Hybridization.Sp3) to AmberTypes("c3", "hc"), // eg isobutane
+	Protonation(Element.Carbon, 1, 3, Hybridization.Sp3) to ProtonationTypes("c3", "hc"), // eg ethane
+	Protonation(Element.Carbon, 2, 1, Hybridization.Sp2) to ProtonationTypes("c2", "hc"), // eg benzene
+	Protonation(Element.Carbon, 2, 2, Hybridization.Sp3) to ProtonationTypes("c3", "hc"), // eg cyclohexane
+	Protonation(Element.Carbon, 3, 1, Hybridization.Sp3) to ProtonationTypes("c3", "hc"), // eg isobutane
 
-	Protonation(Element.Nitrogen, 0, 2, Hybridization.Sp2) to AmberTypes("n2", "hn"), // eg azanide anion
-	Protonation(Element.Nitrogen, 0, 3, Hybridization.Sp3) to AmberTypes("n3", "hn"), // eg ammonia
-	Protonation(Element.Nitrogen, 0, 4, Hybridization.Sp3) to AmberTypes("n4", "hn"), // eg ammonium cation
-	Protonation(Element.Nitrogen, 1, 1, Hybridization.Sp) to AmberTypes("n1", "hn",
+	Protonation(Element.Nitrogen, 0, 2, Hybridization.Sp2) to ProtonationTypes("n2", "hn"), // eg azanide anion
+	Protonation(Element.Nitrogen, 0, 3, Hybridization.Sp3) to ProtonationTypes("n3", "hn"), // eg ammonia
+	Protonation(Element.Nitrogen, 0, 4, Hybridization.Sp3) to ProtonationTypes("n4", "hn"), // eg ammonium cation
+	Protonation(Element.Nitrogen, 1, 1, Hybridization.Sp) to ProtonationTypes("n1", "hn",
 		"T", // triple bond
 		mapOf(
 			Element.Carbon to "c1", // TODO ???
@@ -353,25 +353,25 @@ private val protonations = mapOf(
 			Element.Phosphorus to "p2" // TODO ???
 		)
 	),
-	Protonation(Element.Nitrogen, 1, 1, Hybridization.Sp2) to AmberTypes("n2", "hn"), // eg diazene
-	Protonation(Element.Nitrogen, 1, 2, Hybridization.Sp2) to AmberTypes("na", "hn"), // eg formamide
-	Protonation(Element.Nitrogen, 1, 2, Hybridization.Sp3) to AmberTypes("n3", "hn"), // eg hydrazine
-	Protonation(Element.Nitrogen, 1, 3, Hybridization.Sp3) to AmberTypes("n4", "hn"), // eg diazanediium
-	Protonation(Element.Nitrogen, 2, 1, Hybridization.Sp2) to AmberTypes("na", "hn"), // eg N-methylformamide
-	Protonation(Element.Nitrogen, 2, 1, Hybridization.Sp3) to AmberTypes("n3", "hn"), // eg dimethylamine
-	Protonation(Element.Nitrogen, 2, 2, Hybridization.Sp3) to AmberTypes("n4", "hn"), // eg dimethylammonium cation
-	Protonation(Element.Nitrogen, 3, 1, Hybridization.Sp3) to AmberTypes("n4", "hn"), // eg trimethylammonium
+	Protonation(Element.Nitrogen, 1, 1, Hybridization.Sp2) to ProtonationTypes("n2", "hn"), // eg diazene
+	Protonation(Element.Nitrogen, 1, 2, Hybridization.Sp2) to ProtonationTypes("na", "hn"), // eg formamide
+	Protonation(Element.Nitrogen, 1, 2, Hybridization.Sp3) to ProtonationTypes("n3", "hn"), // eg hydrazine
+	Protonation(Element.Nitrogen, 1, 3, Hybridization.Sp3) to ProtonationTypes("n4", "hn"), // eg diazanediium
+	Protonation(Element.Nitrogen, 2, 1, Hybridization.Sp2) to ProtonationTypes("na", "hn"), // eg N-methylformamide
+	Protonation(Element.Nitrogen, 2, 1, Hybridization.Sp3) to ProtonationTypes("n3", "hn"), // eg dimethylamine
+	Protonation(Element.Nitrogen, 2, 2, Hybridization.Sp3) to ProtonationTypes("n4", "hn"), // eg dimethylammonium cation
+	Protonation(Element.Nitrogen, 3, 1, Hybridization.Sp3) to ProtonationTypes("n4", "hn"), // eg trimethylammonium
 
-	Protonation(Element.Oxygen, 0, 1, Hybridization.Sp2) to AmberTypes("o", "hw"), // eg hydroxide anion
-	Protonation(Element.Oxygen, 0, 2, Hybridization.Sp3) to AmberTypes("ow", "hw"), // eg water (oxidane)
-	Protonation(Element.Oxygen, 0, 3, Hybridization.Sp3) to AmberTypes("ow", "hw"), // eg hydronium cation
-	Protonation(Element.Oxygen, 1, 1, Hybridization.Sp3) to AmberTypes("oh", "ho"), // eg hydrogen peroxide
-	Protonation(Element.Oxygen, 1, 2, Hybridization.Sp3) to AmberTypes("oh", "ho"), // eg methyloxonium cation
+	Protonation(Element.Oxygen, 0, 1, Hybridization.Sp2) to ProtonationTypes("o", "hw"), // eg hydroxide anion
+	Protonation(Element.Oxygen, 0, 2, Hybridization.Sp3) to ProtonationTypes("ow", "hw"), // eg water (oxidane)
+	Protonation(Element.Oxygen, 0, 3, Hybridization.Sp3) to ProtonationTypes("ow", "hw"), // eg hydronium cation
+	Protonation(Element.Oxygen, 1, 1, Hybridization.Sp3) to ProtonationTypes("oh", "ho"), // eg hydrogen peroxide
+	Protonation(Element.Oxygen, 1, 2, Hybridization.Sp3) to ProtonationTypes("oh", "ho"), // eg methyloxonium cation
 
-	Protonation(Element.Phosphorus, 0, 2, Hybridization.Sp2) to AmberTypes("p2", "hp"), // eg phosphanide anion
-	Protonation(Element.Phosphorus, 0, 3, Hybridization.Sp3) to AmberTypes("p3", "hp"), // eg phosphine
-	Protonation(Element.Phosphorus, 0, 4, Hybridization.Sp3) to AmberTypes("p5", "hp"), // eg phosphonium cation
-	Protonation(Element.Phosphorus, 1, 1, Hybridization.Sp2) to AmberTypes("p2", "hp",
+	Protonation(Element.Phosphorus, 0, 2, Hybridization.Sp2) to ProtonationTypes("p2", "hp"), // eg phosphanide anion
+	Protonation(Element.Phosphorus, 0, 3, Hybridization.Sp3) to ProtonationTypes("p3", "hp"), // eg phosphine
+	Protonation(Element.Phosphorus, 0, 4, Hybridization.Sp3) to ProtonationTypes("p5", "hp"), // eg phosphonium cation
+	Protonation(Element.Phosphorus, 1, 1, Hybridization.Sp2) to ProtonationTypes("p2", "hp",
 		"D", // double bond
 		mapOf(
 			Element.Carbon to "c2", // eg methylenephosphine
@@ -382,7 +382,7 @@ private val protonations = mapOf(
 	),
 	/* TODO: can't seem to get PH2+ to be planar here? can't find amber types that work ...
 	      let's just not support this protonation for now
-	Protonation(Element.Phosphorus, 1, 2, Hybridization.Sp2) to AmberTypes("p4", "hp",
+	Protonation(Element.Phosphorus, 1, 2, Hybridization.Sp2) to ProtonationTypes("p4", "hp",
 		"D", // double bond
 		mapOf(
 			Element.Carbon to "c2", // eg methylenephosphonium cation
@@ -392,18 +392,18 @@ private val protonations = mapOf(
 		)
 	),
 	*/
-	Protonation(Element.Phosphorus, 1, 2, Hybridization.Sp3) to AmberTypes("p3", "hp"), // eg diphosphane
-	Protonation(Element.Phosphorus, 1, 3, Hybridization.Sp3) to AmberTypes("p5", "hp"), // eg methylphosphonium cation
+	Protonation(Element.Phosphorus, 1, 2, Hybridization.Sp3) to ProtonationTypes("p3", "hp"), // eg diphosphane
+	Protonation(Element.Phosphorus, 1, 3, Hybridization.Sp3) to ProtonationTypes("p5", "hp"), // eg methylphosphonium cation
 	// TODO: Protonation(Element.Phosphorus, 2, 1, Hybridization.Sp2) ???
-	Protonation(Element.Phosphorus, 2, 1, Hybridization.Sp3) to AmberTypes("p3", "hp"), // eg dimethylphosphine
-	Protonation(Element.Phosphorus, 2, 2, Hybridization.Sp3) to AmberTypes("p5", "hp"), // eg dimethylphosphonium
-	Protonation(Element.Phosphorus, 3, 1, Hybridization.Sp3) to AmberTypes("p5", "hp"), // eg trimethylphosphonium
+	Protonation(Element.Phosphorus, 2, 1, Hybridization.Sp3) to ProtonationTypes("p3", "hp"), // eg dimethylphosphine
+	Protonation(Element.Phosphorus, 2, 2, Hybridization.Sp3) to ProtonationTypes("p5", "hp"), // eg dimethylphosphonium
+	Protonation(Element.Phosphorus, 3, 1, Hybridization.Sp3) to ProtonationTypes("p5", "hp"), // eg trimethylphosphonium
 
-	Protonation(Element.Sulfur, 0, 1, Hybridization.Sp2) to AmberTypes("s", "hs"), // eg bisulfide anion
-	Protonation(Element.Sulfur, 0, 2, Hybridization.Sp3) to AmberTypes("sh", "hs"), // eg hydrogen sulfide
-	Protonation(Element.Sulfur, 0, 3, Hybridization.Sp3) to AmberTypes("sh", "hs"), // eg sulfonium cation
-	Protonation(Element.Sulfur, 1, 1, Hybridization.Sp3) to AmberTypes("sh", "hs"), // eg hydrogen disulfide
-	Protonation(Element.Sulfur, 1, 2, Hybridization.Sp3) to AmberTypes("sh", "hs") // eg methylsulfonium cation
+	Protonation(Element.Sulfur, 0, 1, Hybridization.Sp2) to ProtonationTypes("s", "hs"), // eg bisulfide anion
+	Protonation(Element.Sulfur, 0, 2, Hybridization.Sp3) to ProtonationTypes("sh", "hs"), // eg hydrogen sulfide
+	Protonation(Element.Sulfur, 0, 3, Hybridization.Sp3) to ProtonationTypes("sh", "hs"), // eg sulfonium cation
+	Protonation(Element.Sulfur, 1, 1, Hybridization.Sp3) to ProtonationTypes("sh", "hs"), // eg hydrogen disulfide
+	Protonation(Element.Sulfur, 1, 2, Hybridization.Sp3) to ProtonationTypes("sh", "hs") // eg methylsulfonium cation
 	// don't think any of the positive oxidation states of sulfur can be protonated, right?
 	// wouldn't highly electronegative ligands (eg Oxygen) steal all the protons (ie tautomerization)?
 )

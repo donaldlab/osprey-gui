@@ -19,6 +19,11 @@ object Antechamber {
 		val mol2: String?
 	)
 
+	enum class InType(val id: String) {
+		Pdb("pdb"),
+		Mol2("mol2")
+	}
+
 	enum class AtomTypes(val id: String) {
 		Gaff("gaff"),
 		Gaff2("gaff2"),
@@ -27,7 +32,7 @@ object Antechamber {
 		SYBYL("sybyl")
 	}
 
-	fun run(pdb: String, atomTypes: AtomTypes = AtomTypes.SYBYL): Results {
+	fun run(inmol: String, inType: InType, atomTypes: AtomTypes, useACDoctor: Boolean = true): Results {
 
 		// make sure antechamber is available for this platform
 		if (!antechamberPath.exists) {
@@ -37,17 +42,18 @@ object Antechamber {
 		tempFolder("antechamber") { cwd ->
 
 			// write the input files
-			pdb.write(cwd.resolve("mol.pdb"))
+			inmol.write(cwd.resolve("mol.in"))
 
 			// start antechamber
 			val process = ProcessBuilder()
 				.command(
 					antechamberPath.toString(),
-					"-i", "mol.pdb",
-					"-fi", "pdb",
+					"-i", "mol.in",
+					"-fi", inType.id,
 					"-o", "mol.mol2",
 					"-fo", "mol2",
-					"-at", atomTypes.id
+					"-at", atomTypes.id,
+					"-dr", if (useACDoctor) "y" else "n"
 				)
 				.apply {
 					environment().apply {
@@ -74,7 +80,7 @@ object Antechamber {
 	class Exception(val msg: String, val pdb: String, val results: Results) : RuntimeException(StringBuilder().apply {
 		append(msg)
 		append("\n\n")
-		append("PDB:\n")
+		append("Input:\n")
 		append(pdb)
 		append("\n\n")
 		append("console:\n")

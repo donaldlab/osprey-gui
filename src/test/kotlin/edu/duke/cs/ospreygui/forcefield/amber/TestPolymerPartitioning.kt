@@ -20,7 +20,7 @@ class TestPolymerPartitioning : SharedSpec({
 		test("partition") {
 
 			val partition = mol
-				.partition()
+				.partition(combineSolvent = false)
 				.groupBy(
 					keySelector = { (type, _) -> type },
 					valueTransform = { (_, mol) -> mol }

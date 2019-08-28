@@ -39,6 +39,9 @@ class MoleculeMapper(val src: Molecule, val dst: Molecule) {
 			dst.atoms.find { it.name == srcAtom.name }
 		}
 	}
+
+	fun mapAtomOrThrow(srcAtom: Atom) =
+		mapAtom(srcAtom) ?: throw NoSuchElementException("can't match atom $srcAtom")
 }
 
 fun Molecule.mapTo(dst: Molecule) = MoleculeMapper(this, dst)

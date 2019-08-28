@@ -26,7 +26,7 @@ fun Molecule.inferBondsAmber(): List<Pair<Atom,Atom>> {
 			MoleculeType.Protein,
 			MoleculeType.DNA,
 			MoleculeType.RNA,
-			MoleculeType.Solvent -> runLeap(src, type.defaultForcefieldName!!)
+			MoleculeType.Solvent -> runLeap(src, type.defaultForcefieldNameOrThrow)
 
 			MoleculeType.SmallMolecule -> runAntechamber(src)
 
@@ -66,7 +66,7 @@ fun Molecule.inferBondsAmber(): List<Pair<Atom,Atom>> {
 	return dstBonds
 }
 
-private fun runLeap(mol: Molecule, ffname: String): List<Pair<Atom,Atom>> {
+private fun runLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom,Atom>> {
 
 	// run LEaP to infer all the bonds
 	val pdb = mol.toPDB()
@@ -74,7 +74,7 @@ private fun runLeap(mol: Molecule, ffname: String): List<Pair<Atom,Atom>> {
 		filesToWrite = mapOf("in.pdb" to pdb),
 		commands = """
 			|verbosity 2
-			|source leaprc.$ffname
+			|source leaprc.${ffname.name}
 			|mol = loadPDB in.pdb
 			|saveMol2 mol out.mol2 0
 		""".trimMargin(),
@@ -91,7 +91,7 @@ private fun runAntechamber(mol: Molecule): List<Pair<Atom,Atom>> {
 
 	// run antechamber to infer all the bonds
 	val pdb = mol.toPDB()
-	val results = Antechamber.run(pdb, Antechamber.AtomTypes.SYBYL)
+	val results = Antechamber.run(pdb, Antechamber.InType.Pdb, Antechamber.AtomTypes.SYBYL)
 	val bondedMol = Molecule.fromMol2(results.mol2
 		?: throw Antechamber.Exception("Antechamber didn't produce an output molecule", pdb, results))
 

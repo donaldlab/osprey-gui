@@ -25,7 +25,7 @@ fun Molecule.inferMissingAtomsAmber(): List<Pair<Atom,Polymer.Residue?>> {
 			// treat regular molecules with leap
 			MoleculeType.Protein,
 			MoleculeType.DNA,
-			MoleculeType.RNA -> runLeap(src, type.defaultForcefieldName!!)
+			MoleculeType.RNA -> runLeap(src, type.defaultForcefieldNameOrThrow)
 
 			// ignore everything else
 			else -> continue@partition
@@ -49,7 +49,7 @@ fun Molecule.inferMissingAtomsAmber(): List<Pair<Atom,Polymer.Residue?>> {
 }
 
 
-private fun runLeap(mol: Molecule, ffname: String): List<Pair<Atom,Polymer.Residue?>> {
+private fun runLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom,Polymer.Residue?>> {
 
 	// run LEaP to infer all the missing atoms
 	val pdb = mol.toPDB()
@@ -57,7 +57,7 @@ private fun runLeap(mol: Molecule, ffname: String): List<Pair<Atom,Polymer.Resid
 		filesToWrite = mapOf("in.pdb" to pdb),
 		commands = """
 			|verbosity 2
-			|source leaprc.$ffname
+			|source leaprc.${ffname.name}
 			|mol = loadPDB in.pdb
 			|saveMol2 mol out.mol2 0
 		""".trimMargin(),

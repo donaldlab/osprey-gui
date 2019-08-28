@@ -63,27 +63,39 @@ private val syntheticResTypes = setOf(
 	"EP", "LP"
 )
 
-enum class MoleculeType(val isPolymer: Boolean, val forcefieldNames: List<String>) {
+data class ForcefieldName(
+	val name: String,
+	val atomTypes: Antechamber.AtomTypes? = null
+) {
+
+	val atomTypesOrThrow get() =
+		atomTypes ?: throw NoSuchElementException("forcefield $name doesn't have atom types for Antechamber")
+}
+
+enum class MoleculeType(
+	val isPolymer: Boolean,
+	val forcefieldNames: List<ForcefieldName>
+) {
 
 	Protein(true, listOf(
-		"ff96", // dlab's favorite and time-tested protein forecfield
-		"protein.ff14SB" // currently recommended by AmberTools19
+		ForcefieldName("ff96", Antechamber.AtomTypes.Amber), // dlab's favorite and time-tested protein forecfield
+		ForcefieldName("protein.ff14SB", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
 	)),
 
 	DNA(true, listOf(
-		"DNA.OL15" // currently recommended by AmberTools19
+		ForcefieldName("DNA.OL15", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
 	)),
 
 	RNA(true, listOf(
-		"RNA.OL3" // currently recommended by AmberTools19
+		ForcefieldName("RNA.OL3", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
 	)),
 
 	Solvent(false, listOf(
-		"water.tip3p" // currently recommended by AmberTools19
+		ForcefieldName("water.tip3p", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
 	)),
 
 	AtomicIon(false, listOf(
-		"water.tip3p" // currently recommended by AmberTools19
+		ForcefieldName("water.tip3p", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
 	)),
 
 	Synthetic(false, listOf(
@@ -91,11 +103,16 @@ enum class MoleculeType(val isPolymer: Boolean, val forcefieldNames: List<String
 	)),
 
 	SmallMolecule(false, listOf(
-		"gaff2" // currently recommended by AmberTools19
+		ForcefieldName("gaff2", Antechamber.AtomTypes.Gaff2), // currently recommended by AmberTools19
+		ForcefieldName("gaff", Antechamber.AtomTypes.Gaff)
 	));
 
 
+	// the default option is the first in the list
 	val defaultForcefieldName get() = forcefieldNames.firstOrNull()
+
+	val defaultForcefieldNameOrThrow get() =
+		defaultForcefieldName ?: throw NoSuchElementException("molecule type $this has no default forcefield")
 
 	companion object {
 		operator fun get(resType: String) =

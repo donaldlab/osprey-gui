@@ -28,8 +28,8 @@ class TestAmberIO : SharedSpec({
 		mol.bonds.count() shouldBe 0
 
 		// get the accompanying amber info
-		val top = TopIO.read(OspreyGui.getResourceAsString("1cc8.top"))
-		val crd = CrdIO.read(OspreyGui.getResourceAsString("1cc8.crd"))
+		val top = TopIO.read(OspreyGui.getResourceAsString("1cc8.protein.top"))
+		val crd = CrdIO.read(OspreyGui.getResourceAsString("1cc8.protein.crd"))
 
 		val numAtomsBefore = mol.atoms.size
 
