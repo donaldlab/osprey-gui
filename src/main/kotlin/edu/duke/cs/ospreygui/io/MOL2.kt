@@ -1,20 +1,36 @@
 package edu.duke.cs.ospreygui.io
 
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Element
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.*
 import org.joml.Vector3d
+import java.util.*
+import kotlin.NoSuchElementException
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 
 // this file handles IO with the Mol2 format:
 // http://chemyang.ccnu.edu.cn/ccb/server/AIMMS/mol2.pdf
 
 
+class Mol2Metadata {
+	val atomTypes: MutableMap<Atom,String> = IdentityHashMap()
+	val atomCharges: MutableMap<Atom,String> = IdentityHashMap()
+	val bondTypes: MutableMap<AtomPair,String> = HashMap()
+	val dictionaryTypes: MutableMap<Polymer.Residue,String> = IdentityHashMap()
+
+	companion object {
+
+		const val defaultCharge = "0.0"
+		const val defaultBondType = "1" // 1 is single bond
+		const val defaultDictionaryType = "1" // 1 is protein
+	}
+}
+
+
 /**
  * Save the molecule to the Mol2 format.
  */
-fun Molecule.toMol2(): String {
+fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 
 	val mol = this
 
@@ -49,17 +65,14 @@ fun Molecule.toMol2(): String {
 		}
 	}
 
-	// get all the atom indices
+	// get all the atom indices (1-based)
 	val indicesByAtom = HashMap<Atom,Int>()
 	mol.atoms.forEachIndexed { i, atom ->
 		indicesByAtom[atom] = i + 1
 	}
 
 	// flatten the bonds to a list
-	data class Bond(val i: Int, val i1: Int, val i2: Int)
-	val bonds = mol.bonds.toSet().mapIndexed { i, bond ->
-		Bond(i, indicesByAtom.getValue(bond.a), indicesByAtom.getValue(bond.b))
-	}
+	val bonds = mol.bonds.toSet().toList()
 
 	// write the molecule section
 	write("@<TRIPOS>MOLECULE\n")
@@ -77,27 +90,25 @@ fun Molecule.toMol2(): String {
 	write("@<TRIPOS>ATOM\n")
 	for (atom in atoms) {
 		val res = residuesByAtom[atom]!!
-		write("  %d %s %.6f %.6f %.6f %s %s %s %f\n".format(
+		write("  %d %s %.6f %.6f %.6f %s %s %s %s\n".format(
 			indicesByAtom[atom],
 			atom.name,
 			atom.pos.x, atom.pos.y, atom.pos.z,
-			atom.element.symbol, // atom type, required by LEaP
-			// TODO: is the element symbol good enough here?
+			metadata?.atomTypes?.getValue(atom) ?: atom.element.symbol,
 			resIds[res],
 			res.type,
-			0.0 // charge, required by LEaP
+			metadata?.atomCharges?.getValue(atom) ?: Mol2Metadata.defaultCharge
 		))
 	}
 
 	// write the bond section
 	write("@<TRIPOS>BOND\n")
-	for (bond in bonds) {
-		write("  %d %d %d %d\n".format(
-			bond.i,
-			bond.i1,
-			bond.i2,
-			1 // bond type, required by LEaP
-			// TODO: is single bond good enough here?
+	bonds.forEachIndexed { i, bond ->
+		write("  %d %d %d %s\n".format(
+			i + 1,
+			indicesByAtom.getValue(bond.a),
+			indicesByAtom.getValue(bond.b),
+			metadata?.bondTypes?.getValue(bond) ?: Mol2Metadata.defaultBondType
 		))
 	}
 
@@ -105,13 +116,12 @@ fun Molecule.toMol2(): String {
 	write("@<TRIPOS>SUBSTRUCTURE\n")
 	for (chain in chains) {
 		for (res in chain.residues) {
-			write("  %d %s %d %s %d %s %s\n".format(
+			write("  %d %s %d %s %s %s %s\n".format(
 				resIds[res],
 				res.id,
 				indicesByAtom[res.atoms.first()],
 				"RESIDUE",
-				1, // dictionary type, 1 is protein
-				// TODO: what dictionary type(s) to use in general?
+				metadata?.dictionaryTypes?.getValue(res) ?: Mol2Metadata.defaultDictionaryType,
 				chain.id,
 				res.type
 			))
@@ -124,7 +134,9 @@ fun Molecule.toMol2(): String {
 /**
  * Read a molecule in MOL2 format.
  */
-fun Molecule.Companion.fromMol2(mol2: String): Molecule {
+fun Molecule.Companion.fromMol2(mol2: String): Molecule = fromMol2WithMetadata(mol2).first
+
+fun Molecule.Companion.fromMol2WithMetadata(mol2: String): Pair<Molecule,Mol2Metadata> {
 
 	// parse a few sections from the mol2 file
 	val lines = mol2.lines()
@@ -157,6 +169,8 @@ fun Molecule.Companion.fromMol2(mol2: String): Molecule {
 		}
 	}
 
+	val metadata = Mol2Metadata()
+
 	// build a molecule from the sections
 	val sectionMol = sections[Section.TRIPOS_MOLECULE]
 		?: throw NoSuchElementException("missing MOLECULE section")
@@ -187,14 +201,18 @@ fun Molecule.Companion.fromMol2(mol2: String): Molecule {
 		val id = parts[0]
 		val name = parts[1]
 		val pos = Vector3d(
-			parts[2].toDouble(),
-			parts[3].toDouble(),
-			parts[4].toDouble()
+			parts[2].toDoubleOrNull() ?: throw Mol2ParseException(line, "\"${parts[2]}\" doesn't seem to be a number"),
+			parts[3].toDoubleOrNull() ?: throw Mol2ParseException(line, "\"${parts[3]}\" doesn't seem to be a number"),
+			parts[4].toDoubleOrNull() ?: throw Mol2ParseException(line, "\"${parts[4]}\" doesn't seem to be a number")
 		)
 		val type = parts[5]
 		val subId = parts.getOrNull(6)
+		val charge = parts.getOrNull(8)
 
-		val element = Element[type.split(".").first()]
+		val element = Element.findByPrefixMatch(type)
+			?: Element.findByPrefixMatch(name)
+			?: throw NoSuchElementException("can't determine element for atom $name $type")
+			// haha, this exception seems aptly named =P
 
 		val atom = Atom(element, name, pos)
 		atomsById[id] = atom
@@ -203,6 +221,12 @@ fun Molecule.Companion.fromMol2(mol2: String): Molecule {
 		// track the substructure, if needed
 		if (subId != null) {
 			atomsBySub.computeIfAbsent(subId) { ArrayList() }.add(atom)
+		}
+
+		// update metadata
+		metadata.atomTypes[atom] = type
+		if (charge != null) {
+			metadata.atomCharges[atom] = charge
 		}
 	}
 
@@ -215,11 +239,16 @@ fun Molecule.Companion.fromMol2(mol2: String): Molecule {
 
 		val i1 = parts[1]
 		val i2 = parts[2]
+		val type = parts[3]
 
 		val a1 = atomsById[i1] ?: throw NoSuchElementException("no atom with id $i1")
 		val a2 = atomsById[i2] ?: throw NoSuchElementException("no atom with id $i2")
 
-		mol.bonds.add(a1, a2)
+		val bond = AtomPair(a1, a2)
+		mol.bonds.add(bond)
+
+		// update the metadata
+		metadata.bondTypes[bond] = type
 	}
 
 	// read the polmyer, if any
@@ -230,6 +259,7 @@ fun Molecule.Companion.fromMol2(mol2: String): Molecule {
 
 			val id = parts[0]
 			val name = parts[1]
+			val dictionaryType = parts.getOrNull(4)
 			val chainId = parts.getOrNull(5) ?: "A"
 			val subType = parts.getOrNull(6) ?: "MOL"
 
@@ -241,11 +271,17 @@ fun Molecule.Companion.fromMol2(mol2: String): Molecule {
 
 			val atoms = atomsBySub[id] ?: ArrayList()
 
-			chain.residues.add(Polymer.Residue(name, subType, atoms))
+			val res = Polymer.Residue(name, subType, atoms)
+			chain.residues.add(res)
+
+			// update the metadata
+			if (dictionaryType != null) {
+				metadata.dictionaryTypes[res] = dictionaryType
+			}
 		}
 	}
 
-	return mol
+	return mol to metadata
 }
 
 
@@ -265,3 +301,6 @@ private enum class Section {
 			values().find { it.name == name }
 	}
 }
+
+
+class Mol2ParseException(line: String, msg: String) : RuntimeException("$msg\nin line:\n$line")
