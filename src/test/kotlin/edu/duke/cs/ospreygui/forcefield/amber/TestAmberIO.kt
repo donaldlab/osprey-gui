@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.forcefield.amber
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.combine
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.io.fromPDB
@@ -21,7 +22,7 @@ class TestAmberIO : SharedSpec({
 			.partition()
 			.filter { (type, _) -> type in setOf(MoleculeType.Protein) }
 			.map { (_, mol) -> mol }
-			.combine("1CC8")
+			.combine("1CC8").first
 
 		// verify initial sizes
 		mol.atoms.size shouldBe 567

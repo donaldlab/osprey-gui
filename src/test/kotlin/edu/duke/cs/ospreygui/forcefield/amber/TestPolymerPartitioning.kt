@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.forcefield.amber
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.combine
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.io.fromPDB
@@ -85,50 +86,33 @@ class TestPolymerPartitioning : SharedSpec({
 			mol.partition()
 				.filter { (type, _) -> type in setOf(MoleculeType.Protein, MoleculeType.SmallMolecule) }
 				.map { (_, mol) -> mol }
-				.combine("1CC8")
+				.combine("1CC8").first
 				.apply {
 
 					this as Polymer
 
 					// the protein gets its own chain,
-					// and all the small molecules get combined into another chain
-					chains.size shouldBe 2
+					// and all the small molecules don't get any chains
+					chains.size shouldBe 1
 
 					// check the protein
 					chains.find { it.id == "A" }!!.apply {
-
 						residues.size shouldBe 72
 					}
 
-					// check the small molecules
-					chains.find { it.id == "B" }!!.apply {
+					// check the mercury atom
+					atoms.find { it.name == "HG" }!!.apply {
+						element shouldBe Element.Mercury
+					}
 
-						residues.size shouldBe 3
-
-						// check the mercury atom
-						residues.find { it.type == "HG" }!!.apply {
-							atoms.size shouldBe 1
-							atoms[0].apply {
-								name shouldBe "HG"
-								element shouldBe Element.Mercury
-							}
-						}
-
-						// check one of the benzamidines
-						residues.find { it.type == "BEN" }!!.apply {
-
-							atoms.size shouldBe 9
-
-							// spot check a couple atoms
-							atoms.find { it.name == "C1" }!!.apply {
-								element shouldBe Element.Carbon
-								pos shouldBe Vector3d(6.778, 10.510, 20.665)
-							}
-							atoms.find { it.name == "N2" }!!.apply {
-								element shouldBe Element.Nitrogen
-								pos shouldBe Vector3d(4.965, 11.590, 21.821)
-							}
-						}
+					// spot check a couple atoms in one of the benzamidines
+					atoms.find { it.name == "C1" && it.pos.x == 6.778 }!!.apply {
+						element shouldBe Element.Carbon
+						pos shouldBe Vector3d(6.778, 10.510, 20.665)
+					}
+					atoms.find { it.name == "N2" && it.pos.x == 4.965 }!!.apply {
+						element shouldBe Element.Nitrogen
+						pos shouldBe Vector3d(4.965, 11.590, 21.821)
 					}
 
 					atoms.size shouldBe 567 + 1 + 9 + 9

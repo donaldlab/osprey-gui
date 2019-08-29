@@ -7,7 +7,7 @@ import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
-import edu.duke.cs.ospreygui.forcefield.amber.combine
+import edu.duke.cs.molscope.molecule.combine
 import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.io.write
 import edu.duke.cs.ospreygui.prep.MoleculePrep
@@ -46,7 +46,7 @@ class SavePDB(val prep: MoleculePrep) : SlideFeature {
 
 		// combine the included assembled mols and save the file
 		prep.getIncludedMols()
-			.combine(prep.mol.name)
+			.combine(prep.mol.name).first
 			.toPDB()
 			.write(pathWithExt)
 

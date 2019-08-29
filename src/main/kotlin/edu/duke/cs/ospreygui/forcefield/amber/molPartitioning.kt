@@ -2,8 +2,8 @@ package edu.duke.cs.ospreygui.forcefield.amber
 
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.combine
 import kotlin.collections.ArrayList
-import kotlin.math.min
 
 
 // these residue types match the residue types used in AmberTools19 pdb4amber
@@ -218,7 +218,7 @@ fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,M
 			.map { (_, mol) -> mol }
 			.takeIf { it.isNotEmpty() }
 			?.combine(MoleculeType.Solvent.name)
-			?.let { combinedSolvent ->
+			?.let { (combinedSolvent, _) ->
 
 				mols = mols
 					.filter { (type, _) -> type != MoleculeType.Solvent }
@@ -227,72 +227,4 @@ fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,M
 	}
 
 	return mols
-}
-
-/**
- * Combine multiple Molecules into a single Molecule,
- * taking care to assign each Polymer in the list a unique chain id.
- *
- * Ignores all bonds.
- */
-fun Collection<Molecule>.combine(name: String): Molecule {
-
-	// if it's just one molecule that's not a polymer, just return a copy of that molecule
-	if (size == 1) {
-		firstOrNull()?.let { mol ->
-			if (mol !is Polymer) {
-				return mol.copy()
-			}
-		}
-	}
-
-	val out = Polymer(name)
-
-	// figure out all the chain ids
-	var nextChainId = 'A'
-	fun getNextChainId() = "${nextChainId++}"
-	val chainIds = this
-		.filterIsInstance<Polymer>()
-		.flatMap { it.chains }
-		.associateWith { getNextChainId() }
-
-	val nonPolymerChain = Polymer.Chain(getNextChainId())
-
-	fun String.first(len: Int) = substring(0, min(len, length))
-
-	// combine the molecules
-	var nextResId = 1
-	for (mol in this) {
-		if (mol is Polymer) {
-
-			// copy over each chain from the polymer
-			for (chain in mol.chains) {
-				val outChain = Polymer.Chain(chainIds.getValue(chain))
-				for (res in chain.residues) {
-					val outAtoms = res.atoms.map { it.copy() }
-					outChain.residues.add(Polymer.Residue(
-						res.id,
-						res.type,
-						outAtoms
-					))
-					out.atoms.addAll(outAtoms)
-				}
-				out.chains.add(outChain)
-			}
-
-		} else {
-
-			// convert the molecule into a chain
-			val outRes = Polymer.Residue(
-				"${nextResId++}",
-				mol.type ?: mol.name.first(3).toUpperCase(),
-				mol.atoms.map { it.copy() }
-			)
-			nonPolymerChain.residues.add(outRes)
-			out.atoms.addAll(outRes.atoms)
-		}
-	}
-
-	out.chains.add(nonPolymerChain)
-	return out
 }
