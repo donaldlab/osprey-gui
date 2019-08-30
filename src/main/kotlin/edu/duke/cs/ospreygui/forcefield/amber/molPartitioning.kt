@@ -70,6 +70,19 @@ data class ForcefieldName(
 
 	val atomTypesOrThrow get() =
 		atomTypes ?: throw NoSuchElementException("forcefield $name doesn't have atom types for Antechamber")
+
+	companion object {
+
+		val ff96 = ForcefieldName("ff96", Antechamber.AtomTypes.Amber)
+		val ff14SB = ForcefieldName("protein.ff14SB", Antechamber.AtomTypes.Amber)
+
+		val DNAOL15 = ForcefieldName("DNA.OL15", Antechamber.AtomTypes.Amber)
+		val RNAOL15 = ForcefieldName("RNA.OL3", Antechamber.AtomTypes.Amber)
+		val tip3p = ForcefieldName("water.tip3p", Antechamber.AtomTypes.Amber)
+
+		val gaff = ForcefieldName("gaff", Antechamber.AtomTypes.Gaff)
+		val gaff2 = ForcefieldName("gaff2", Antechamber.AtomTypes.Gaff2)
+	}
 }
 
 enum class MoleculeType(
@@ -78,24 +91,24 @@ enum class MoleculeType(
 ) {
 
 	Protein(true, listOf(
-		ForcefieldName("ff96", Antechamber.AtomTypes.Amber), // dlab's favorite and time-tested protein forecfield
-		ForcefieldName("protein.ff14SB", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
+		ForcefieldName.ff96, // dlab's favorite and time-tested protein forecfield
+		ForcefieldName.ff14SB // currently recommended by AmberTools19
 	)),
 
 	DNA(true, listOf(
-		ForcefieldName("DNA.OL15", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
+		ForcefieldName.DNAOL15 // currently recommended by AmberTools19
 	)),
 
 	RNA(true, listOf(
-		ForcefieldName("RNA.OL3", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
+		ForcefieldName.RNAOL15 // currently recommended by AmberTools19
 	)),
 
 	Solvent(false, listOf(
-		ForcefieldName("water.tip3p", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
+		ForcefieldName.tip3p // currently recommended by AmberTools19
 	)),
 
 	AtomicIon(false, listOf(
-		ForcefieldName("water.tip3p", Antechamber.AtomTypes.Amber) // currently recommended by AmberTools19
+		ForcefieldName.tip3p // currently recommended by AmberTools19
 	)),
 
 	Synthetic(false, listOf(
@@ -103,8 +116,8 @@ enum class MoleculeType(
 	)),
 
 	SmallMolecule(false, listOf(
-		ForcefieldName("gaff2", Antechamber.AtomTypes.Gaff2), // currently recommended by AmberTools19
-		ForcefieldName("gaff", Antechamber.AtomTypes.Gaff)
+		ForcefieldName.gaff2, // currently recommended by AmberTools19
+		ForcefieldName.gaff
 	));
 
 

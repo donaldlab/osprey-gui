@@ -17,12 +17,14 @@ class Mol2Metadata {
 	val atomCharges: MutableMap<Atom,String> = IdentityHashMap()
 	val bondTypes: MutableMap<AtomPair,String> = HashMap()
 	val dictionaryTypes: MutableMap<Polymer.Residue,String> = IdentityHashMap()
+	var smallMoleculeDictionaryType: String = defaultSmallMoleculeDictionaryType
 
 	companion object {
 
 		const val defaultCharge = "0.0"
 		const val defaultBondType = "1" // 1 is single bond
 		const val defaultDictionaryType = "1" // 1 is protein
+		const val defaultSmallMoleculeDictionaryType = "0" // ??? no idea, hopefully it's nothing bad
 	}
 }
 
@@ -38,13 +40,20 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 	fun write(str: String, vararg args: Any) = buf.append(String.format(str, *args))
 
 	// get the chains (either from the polymer, or if a small molecule, make a dummy chain)
-	val chains = (mol as? Polymer)?.chains
-		?: listOf(Polymer.Chain("A").apply {
-			residues.add(Polymer.Residue("1", mol.type ?: "MOL", mol.atoms))
+	val smallMoleculeRes: Polymer.Residue?
+	val chains: List<Polymer.Chain>
+	if (mol is Polymer) {
+		smallMoleculeRes = null
+		chains = mol.chains
+	} else {
+		smallMoleculeRes = Polymer.Residue("1", mol.type ?: "MOL", mol.atoms)
+		chains = listOf(Polymer.Chain("A").apply {
+			residues.add(smallMoleculeRes)
 		})
+	}
 
 	// assign an id to each residue
-	val resIds = HashMap<Polymer.Residue,Int>().apply {
+	val resIds = IdentityHashMap<Polymer.Residue,Int>().apply {
 		var i = 1
 		for (chain in chains) {
 			for (res in chain.residues) {
@@ -55,7 +64,7 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 	}
 
 	// get the residue for each atom
-	val residuesByAtom = HashMap<Atom,Polymer.Residue>().apply {
+	val residuesByAtom = IdentityHashMap<Atom,Polymer.Residue>().apply {
 		for (chain in chains) {
 			for (res in chain.residues) {
 				for (atom in res.atoms) {
@@ -66,7 +75,7 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 	}
 
 	// get all the atom indices (1-based)
-	val indicesByAtom = HashMap<Atom,Int>()
+	val indicesByAtom = IdentityHashMap<Atom,Int>()
 	mol.atoms.forEachIndexed { i, atom ->
 		indicesByAtom[atom] = i + 1
 	}
@@ -89,7 +98,7 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 	// write the atom section
 	write("@<TRIPOS>ATOM\n")
 	for (atom in atoms) {
-		val res = residuesByAtom[atom]!!
+		val res = residuesByAtom.getValue(atom)
 		write("  %d %s %.6f %.6f %.6f %s %s %s %s\n".format(
 			indicesByAtom[atom],
 			atom.name,
@@ -121,7 +130,11 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 				res.id,
 				indicesByAtom[res.atoms.first()],
 				"RESIDUE",
-				metadata?.dictionaryTypes?.getValue(res) ?: Mol2Metadata.defaultDictionaryType,
+				if (res == smallMoleculeRes) {
+					metadata?.smallMoleculeDictionaryType ?: Mol2Metadata.defaultSmallMoleculeDictionaryType
+				} else {
+					metadata?.dictionaryTypes?.getValue(res) ?: Mol2Metadata.defaultDictionaryType
+				},
 				chain.id,
 				res.type
 			))

@@ -1,9 +1,6 @@
 package edu.duke.cs.ospreygui.forcefield.amber
 
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.AtomPair
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.ospreygui.io.Mol2Metadata
 import edu.duke.cs.ospreygui.io.fromMol2WithMetadata
 import edu.duke.cs.ospreygui.io.toMol2
@@ -11,7 +8,7 @@ import java.util.*
 
 
 data class AmberTypes(
-	val ffname: ForcefieldName,
+	val ffnames: List<ForcefieldName>,
 	val atomTypes: Map<Atom,String>,
 	val bondTypes: Map<AtomPair,String>
 ) {
@@ -60,28 +57,6 @@ fun Molecule.calcTypesAmber(ffname: ForcefieldName): AmberTypes {
 
 	val (src, srcMetadata) = Molecule.fromMol2WithMetadata(outMol2)
 
-	// Tragically, we antechamber doesn't write the residue info back into the mol2 file,
-	// so we can't use our usual MoleculeMapper to do the atom mapping here.
-	// Thankfully, the atom order is preserved, so we can use that to do the mapping instead.
-	// val mapper = src.mapTo(dst)
-	fun mapAtom(srcAtom: Atom) =
-		dst.atoms[src.atoms.indexOf(srcAtom)]
-
-	// translate the atoms back
-	val atomTypes = IdentityHashMap<Atom,String>().apply {
-		for ((srcAtom, type) in srcMetadata.atomTypes) {
-			val dstAtom = mapAtom(srcAtom)
-			put(dstAtom, type)
-		}
-	}
-	val bondTypes = HashMap<AtomPair,String>().apply {
-		for ((srcBond, type) in srcMetadata.bondTypes) {
-			val dsta = mapAtom(srcBond.a)
-			val dstb = mapAtom(srcBond.b)
-			put(AtomPair(dsta, dstb), type)
-		}
-	}
-
 	// HACKHACK: sometimes Antechamber gets the types wrong for proteins
 	// no idea why this happens, but just overwrite with the correct answer for these cases
 	// TODO: maybe there's a less hacky way to resolve this issue?
@@ -97,11 +72,12 @@ fun Molecule.calcTypesAmber(ffname: ForcefieldName): AmberTypes {
 
 							tyr.atoms
 								.find { it.name.toUpperCase() == "CZ" }
-								?.let { cz ->
-									if (atomTypes[cz] == "CA") {
-										atomTypes[cz] = "C"
+								?.let { dstAtom ->
+									val srcAtom = src.atoms[dst.atoms.indexOf(dstAtom)]
+									if (srcMetadata.atomTypes[srcAtom] == "CA") {
+										srcMetadata.atomTypes[srcAtom] = "C"
 									}
-							}
+								}
 						}
 				}
 			}
@@ -109,7 +85,59 @@ fun Molecule.calcTypesAmber(ffname: ForcefieldName): AmberTypes {
 		else -> Unit
 	}
 
-	return AmberTypes(ffname, atomTypes, bondTypes)
+	// Tragically, we antechamber doesn't write the residue info back into the mol2 file,
+	// so we can't use our usual MoleculeMapper to do the atom mapping here.
+	// Thankfully, the atom order is preserved, so we can use that to do the mapping instead.
+	// val mapper = src.mapTo(dst)
+	val atomMap = src.atoms.associateWithTo(IdentityHashMap()) { srcAtom ->
+		dst.atoms[src.atoms.indexOf(srcAtom)]
+	}
+
+	// translate the atoms back
+	val dstMetadata = Mol2Metadata()
+	for ((srcAtom, type) in srcMetadata.atomTypes) {
+		val dstAtom = atomMap.getValue(srcAtom)
+		dstMetadata.atomTypes[dstAtom] = type
+	}
+	for ((srcBond, type) in srcMetadata.bondTypes) {
+		val dsta = atomMap.getValue(srcBond.a)
+		val dstb = atomMap.getValue(srcBond.b)
+		dstMetadata.bondTypes[AtomPair(dsta, dstb)] = type
+	}
+
+	return AmberTypes(listOf(ffname), dstMetadata.atomTypes, dstMetadata.bondTypes)
+}
+
+
+fun List<Pair<Molecule,AmberTypes>>.combine(): Pair<Molecule,AmberTypes> {
+
+	val (combinedMol, atomMap ) =
+		map { (mol, _) -> mol }
+		.combine("combined")
+
+	val atomTypes = IdentityHashMap<Atom,String>()
+	val bondTypes = HashMap<AtomPair,String>()
+	for ((_, types) in this) {
+
+		for ((atom, type) in types.atomTypes) {
+			atomTypes[atomMap.getValue(atom)] = type
+		}
+
+		for ((bond, type) in types.bondTypes) {
+			bondTypes[AtomPair(
+				atomMap.getValue(bond.a),
+				atomMap.getValue(bond.b)
+			)] = type
+		}
+	}
+
+	val combinedTypes = AmberTypes(
+		flatMap { (_, types) -> types.ffnames },
+		atomTypes,
+		bondTypes
+	)
+
+	return combinedMol to combinedTypes
 }
 
 
@@ -121,30 +149,66 @@ data class AmberParams(
 ) {
 
 	// TODO: parse the top file for forcefield params?
+
+	companion object {
+
+		fun from(mol2s: List<String>, ffnames: List<ForcefieldName>, frcmods: List<String> = emptyList()): AmberParams {
+
+			val molname = "mol.%d.mol2"
+			val frcname = "mol.%d.frc"
+			val topname = "mol.top"
+			val crdname = "mol.crd"
+
+			val commands = ArrayList<String>()
+			commands += "verbosity 2"
+			for (ffname in ffnames) {
+				commands += "source leaprc.${ffname.name}"
+			}
+			for (i in frcmods.indices) {
+				commands += "loadAmberParams ${frcname.format(i)}"
+			}
+			for (i in mol2s.indices) {
+				commands += "mol$i = loadMol2 ${molname.format(i)}"
+			}
+			commands += if (mol2s.size > 1) {
+					"combined = combine { ${mol2s.indices.joinToString(" ") { "mol$it" }} }"
+				} else {
+					"combined = mol0"
+				}
+			commands += "saveAmberParm combined $topname, $crdname"
+
+			val filesToWrite = HashMap<String,String>()
+			mol2s.forEachIndexed { i, mol2 ->
+				filesToWrite[molname.format(i)] = mol2
+			}
+			frcmods.forEachIndexed { i, frcmod ->
+				filesToWrite[frcname.format(i)] = frcmod
+			}
+
+			// run LEaP to get the params
+			val leapResults = Leap.run(
+				filesToWrite,
+				commands = commands.joinToString("\n"),
+				filesToRead = listOf(topname, crdname)
+			)
+
+			return AmberParams(
+				leapResults.files[topname] ?: throw Leap.Exception("no topology file", mol2s.joinToString("\n"), leapResults),
+				leapResults.files[crdname] ?: throw Leap.Exception("no coordinates file", mol2s.joinToString("\n"), leapResults)
+			)
+		}
+	}
 }
 
-fun Molecule.calcParamsAmber(types: AmberTypes): AmberParams {
+fun Molecule.calcParamsAmber(types: AmberTypes, frcmods: List<String> = emptyList()) =
+	listOf(this to types).calcParamsAmber(frcmods)
 
-	val mol2 = toMol2(types.toMol2Metadata(this))
-
-	val molname = "mol.mol2"
-	val topname = "mol.top"
-	val crdname = "mol.crd"
-
-	// run LEaP to get the params
-	val leapResults = Leap.run(
-		filesToWrite = mapOf(molname to mol2),
-		commands = """
-			|verbosity 2
-			|source leaprc.${types.ffname.name}
-			|mol = loadMol2 $molname
-			|saveAmberParm mol $topname, $crdname
-		""".trimMargin(),
-		filesToRead = listOf(topname, crdname)
+fun List<Pair<Molecule,AmberTypes>>.calcParamsAmber(frcmods: List<String> = emptyList()) =
+	AmberParams.from(
+		mol2s = map { (mol, types) -> mol.toMol2(types.toMol2Metadata(mol)) },
+		ffnames = flatMap { (_, types) -> types.ffnames }
+			.toSet()
+			.toList(),
+		frcmods = frcmods
 	)
 
-	return AmberParams(
-		leapResults.files[topname] ?: throw Leap.Exception("no topology file", mol2, leapResults),
-		leapResults.files[crdname] ?: throw Leap.Exception("no coordinates file", mol2, leapResults)
-	)
-}

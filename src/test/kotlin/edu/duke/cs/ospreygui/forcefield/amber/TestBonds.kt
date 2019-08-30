@@ -32,7 +32,7 @@ class TestBonds : SharedSpec({
 			mol.bonds.add(a1, a2)
 		}
 
-		val bondedMol = Molecule.fromMol2(OspreyGui.getResourceAsString("1cc8.protein.mol2"))
+		val bondedMol = Molecule.fromMol2(OspreyGui.getResourceAsString("1cc8.protein.sybyl.mol2"))
 		mol.bonds.toContentSet() shouldBe bondedMol.bonds.toContentSet()
 	}
 })
