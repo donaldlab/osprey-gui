@@ -2,7 +2,6 @@ package edu.duke.cs.ospreygui.forcefield.amber
 
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.ospreygui.io.fromMol2
 import edu.duke.cs.ospreygui.io.toPDB
 
@@ -17,7 +16,8 @@ fun Molecule.inferBondsAmber(): List<Pair<Atom,Atom>> {
 	val dstBonds = ArrayList<Pair<Atom,Atom>>()
 
 	// treat each molecule in the partition with the appropriate forcefield and ambertools
-	partition@for ((type, src) in partition(combineSolvent = true)) {
+	val (partition, atomMap) = dst.partitionAndAtomMap(combineSolvent = true)
+	partition@for ((type, src) in partition) {
 
 		// TODO: allow user to pick the forcefields?
 		val srcBonds = when (type) {
@@ -37,29 +37,9 @@ fun Molecule.inferBondsAmber(): List<Pair<Atom,Atom>> {
 			MoleculeType.Synthetic -> continue@partition
 		}
 
-		fun Polymer.Residue.translate(): Polymer.Residue {
-			val srcRes = this
-			val srcChain = (src as Polymer).chains.find { srcRes in it.residues }!!
-
-			return (dst as Polymer).chains.find { it.id == srcChain.id }!!
-				.residues.find { it.id == srcRes.id }!!
-		}
-
-		fun Atom.translate(): Atom {
-			val srcAtom = this
-
-			return if (src is Polymer) {
-				val srcRes = src.findResidueOrThrow(srcAtom)
-				val dstRes = srcRes.translate()
-				dstRes.atoms.find { it.name == srcAtom.name }!!
-			} else {
-				dst.atoms.find { it.name == srcAtom.name }!!
-			}
-		}
-
 		// translate the bonds to the input mol
 		for ((srcA1, srcA2) in srcBonds) {
-			dstBonds.add(srcA1.translate() to srcA2.translate())
+			dstBonds.add(atomMap.getAOrThrow(srcA1) to atomMap.getAOrThrow(srcA2))
 		}
 	}
 

@@ -175,7 +175,8 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 	val dstAtoms = ArrayList<Pair<Atom,Atom>>()
 
 	// treat each molecule in the partition with the appropriate protocol
-	partition@for ((type, src) in partition(combineSolvent = true)) {
+	val (partition, atomMap) = dst.partitionAndAtomMap(combineSolvent = true)
+	partition@for ((type, src) in partition) {
 
 		// TODO: allow user to pick the forcefields?
 		val srcAtoms = when (type) {
@@ -195,29 +196,10 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 			MoleculeType.Synthetic -> continue@partition
 		}
 
-		fun Polymer.Residue.translate(): Polymer.Residue {
-			val srcRes = this
-			val srcChain = (src as Polymer).chains.find { srcRes in it.residues }!!
-
-			return (dst as Polymer).chains.find { it.id == srcChain.id }!!
-				.residues.find { it.id == srcRes.id }!!
-		}
-
-		fun Atom.translate(): Atom {
-			val srcAtom = this
-
-			return if (src is Polymer) {
-				val srcRes = src.findResidueOrThrow(srcAtom)
-				val dstRes = srcRes.translate()
-				dstRes.atoms.find { it.name == srcAtom.name }!!
-			} else {
-				dst.atoms.find { it.name == srcAtom.name }!!
-			}
-		}
-
-		// translate the bonds to the input mol
-		for ((srcHeavy, srcH) in srcAtoms) {
-			dstAtoms.add(srcHeavy.translate() to srcH.copy())
+		// translate the atoms to the input mol
+		for ((srcHeavy, h) in srcAtoms) {
+			val dstHeavy = atomMap.getAOrThrow(srcHeavy)
+			dstAtoms.add(dstHeavy to h)
 		}
 	}
 
@@ -292,7 +274,7 @@ private fun Molecule.translateHydrogens(dst: Molecule): List<Pair<Atom,Atom>> {
 
 			val dstHeavy = mapper.mapAtom(srcHeavy) ?: return@mapNotNull null
 
-			return@mapNotNull dstHeavy to srcH.copy()
+			return@mapNotNull dstHeavy to srcH
 		}
 }
 

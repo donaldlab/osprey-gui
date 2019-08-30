@@ -1,8 +1,7 @@
 package edu.duke.cs.ospreygui.forcefield.amber
 
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.Polymer
-import edu.duke.cs.molscope.molecule.combine
+import edu.duke.cs.molscope.molecule.*
+import kotlin.NoSuchElementException
 import kotlin.collections.ArrayList
 
 
@@ -151,13 +150,14 @@ enum class MoleculeType(
  * Partition a single Molecule into a list of Molecules
  * based on AMBER rules for residue classification.
  *
- * Ignores all bonds.
+ * Also returns a map between atoms in the input molecule (A side)
+ * and atoms in the partitioned molecules (B side).
  */
-fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,Molecule>> {
+fun Molecule.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair<MoleculeType,Molecule>>,AtomMap> {
 
 	// for non-polymers, assume the whole molecule is a small molecule
 	if (this !is Polymer) {
-		return listOf(MoleculeType.SmallMolecule to this)
+		return listOf(MoleculeType.SmallMolecule to this) to AtomMap.identity(atoms)
 	}
 
 	data class Partitioned(
@@ -194,19 +194,43 @@ fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,M
 		}
 	}
 
+	val combinedAtomMap = AtomMap()
+
 	// create a molecule for each item in the partition
 	var mols = partition.flatMap { (moltype, chainId, residues) ->
+
 		if (moltype.isPolymer) {
+
+			val atomMap = AtomMap()
 
 			// map all the residues to a new polymer
 			val polymer = Polymer(moltype.name)
-			val chain = Polymer.Chain(chainId)
-			for (res in residues) {
-				val resAtoms = res.atoms.map { it.copy() }
-				polymer.atoms.addAll(resAtoms)
-				chain.residues.add(Polymer.Residue(res.id, res.type, resAtoms))
+			val chain = Polymer.Chain(chainId).also { polymer.chains.add(it) }
+
+			// copy the atoms
+			val srcAtoms = residues.flatMap { it.atoms }
+			for (srcAtom in srcAtoms) {
+				val dstAtom = srcAtom.copy()
+				atomMap.add(srcAtom, dstAtom)
+				polymer.atoms.add(dstAtom)
 			}
-			polymer.chains.add(chain)
+
+			// copy the bonds (within the same partition item)
+			for (srcAtom in srcAtoms) {
+				val dstAtom = atomMap.getBOrThrow(srcAtom)
+				for (srcBonded in bonds.bondedAtoms(srcAtom)) {
+					val dstBonded = atomMap.getB(srcBonded)
+						?: throw IllegalArgumentException("bond $srcAtom - $srcBonded spans multiple partitioned molecules, one of which is of type $moltype")
+					polymer.bonds.add(dstAtom, dstBonded)
+				}
+			}
+
+			// copy the residues
+			for (res in residues) {
+				chain.residues.add(Polymer.Residue(res.id, res.type, res.atoms.mapNotNull { atomMap.getB(it) }))
+			}
+
+			combinedAtomMap.addAll(atomMap)
 
 			return@flatMap listOf(moltype to polymer)
 
@@ -216,8 +240,26 @@ fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,M
 			return@flatMap residues.map { res ->
 				val mol = Molecule(moltype.name, res.type)
 
+				val atomMap = AtomMap()
+
 				// copy the atoms
-				mol.atoms.addAll(res.atoms.map { it.copy() })
+				for (srcAtom in res.atoms) {
+					val dstAtom = srcAtom.copy()
+					atomMap.add(srcAtom, dstAtom)
+					mol.atoms.add(dstAtom)
+				}
+
+				// copy the bonds (within the same residue)
+				for (srcAtom in res.atoms) {
+					val dstAtom = atomMap.getBOrThrow(srcAtom)
+					for (srcBonded in bonds.bondedAtoms(srcAtom)) {
+						val dstBonded = atomMap.getB(srcBonded) ?: throw IllegalArgumentException("bond spans multiple molecules")
+						mol.bonds.add(dstAtom, dstBonded)
+					}
+				}
+				// TODO: will that work for multi-residue non-protein/nucleic acid polymers? eg glycans?
+
+				combinedAtomMap.addAll(atomMap)
 
 				return@map moltype to mol
 			}
@@ -230,8 +272,10 @@ fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,M
 			.filter { (type, _) -> type == MoleculeType.Solvent }
 			.map { (_, mol) -> mol }
 			.takeIf { it.isNotEmpty() }
-			?.combine(MoleculeType.Solvent.name)
-			?.let { (combinedSolvent, _) ->
+			?.let { solventMols ->
+
+				val combinedSolvent = Molecule(MoleculeType.Solvent.name)
+				solventMols.forEach { combinedSolvent.atoms.addAll(it.atoms) }
 
 				mols = mols
 					.filter { (type, _) -> type != MoleculeType.Solvent }
@@ -239,5 +283,8 @@ fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,M
 			}
 	}
 
-	return mols
+	return mols to combinedAtomMap
 }
+
+fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,Molecule>> =
+	partitionAndAtomMap(combineSolvent).first

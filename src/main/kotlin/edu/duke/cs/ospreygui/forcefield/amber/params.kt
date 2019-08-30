@@ -120,13 +120,13 @@ fun List<Pair<Molecule,AmberTypes>>.combine(): Pair<Molecule,AmberTypes> {
 	for ((_, types) in this) {
 
 		for ((atom, type) in types.atomTypes) {
-			atomTypes[atomMap.getValue(atom)] = type
+			atomTypes[atomMap.getBOrThrow(atom)] = type
 		}
 
 		for ((bond, type) in types.bondTypes) {
 			bondTypes[AtomPair(
-				atomMap.getValue(bond.a),
-				atomMap.getValue(bond.b)
+				atomMap.getBOrThrow(bond.a),
+				atomMap.getBOrThrow(bond.b)
 			)] = type
 		}
 	}
