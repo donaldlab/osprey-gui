@@ -1,5 +1,6 @@
 package edu.duke.cs.ospreygui.forcefield.amber
 
+import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.ospreygui.OspreyGui
@@ -23,12 +24,33 @@ class TestMinimization : SharedSpec({
 			info.minimizedCoords!!.size shouldBe 1165
 		}
 
+		test("protein with restrained carbons") {
+
+			val mol = Molecule.fromMol2(OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"))
+			val restrainedAtoms = mol.atoms.filter { it.element == Element.Carbon }
+
+			val info = MinimizerInfo(mol)
+			listOf(info).minimize(10, restrainedAtoms)
+
+			info.minimizedCoords!!.size shouldBe 1165
+		}
+
 		test("benzamidine") {
 
 			val mol = Molecule.fromMol2(OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"))
 
 			val info = MinimizerInfo(mol)
 			listOf(info).minimize(10)
+
+			info.minimizedCoords!!.size shouldBe 16
+		}
+
+		test("benzamidine with all restrained atoms") {
+
+			val mol = Molecule.fromMol2(OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"))
+
+			val info = MinimizerInfo(mol)
+			listOf(info).minimize(10, mol.atoms)
 
 			info.minimizedCoords!!.size shouldBe 16
 		}

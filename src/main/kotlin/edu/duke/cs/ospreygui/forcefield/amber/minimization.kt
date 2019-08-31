@@ -1,7 +1,9 @@
 package edu.duke.cs.ospreygui.forcefield.amber
 
+import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.tools.assert
 import org.joml.Vector3d
 import java.util.*
 import kotlin.NoSuchElementException
@@ -36,8 +38,11 @@ class MinimizerInfo(val mol: Molecule) {
 				mol.atoms.map { atomMap.getAOrThrow(it) }
 			}
 
-	val originalCoords: List<Vector3d> =
-		minimizableAtoms.map { Vector3d(it.pos) }
+	var unminimizedCoords: List<Vector3d>? = null
+
+	fun captureCoords() {
+		unminimizedCoords = minimizableAtoms.map { Vector3d(it.pos) }
+	}
 
 	var minimizedCoords: List<Vector3d>? = null
 
@@ -48,10 +53,19 @@ class MinimizerInfo(val mol: Molecule) {
 	}
 }
 
-fun List<MinimizerInfo>.minimize(numSteps: Int) {
+fun List<MinimizerInfo>.minimize(
+	numSteps: Int,
+	restrainedAtoms: List<Atom> = emptyList()
+) {
+
+	// capture the original coords
+	for (info in this) {
+		info.captureCoords()
+	}
 
 	val infosByAtomIndex = ArrayList<Pair<IntRange,MinimizerInfo>>()
-	var atomIndex = 0
+	val indicesByAtom = IdentityHashMap<Atom,Int>()
+	val atomsByIndex = ArrayList<Atom>()
 
 	// get the amber params for the combined molecules
 	val frcmods = ArrayList<String>()
@@ -62,9 +76,15 @@ fun List<MinimizerInfo>.minimize(numSteps: Int) {
 
 					// but keep track of the atom indices,
 					// so we can match the minimized coordinates back later
-					val indexRange = atomIndex until atomIndex + mol.atoms.size
-					atomIndex += mol.atoms.size
+					val indexRange = atomsByIndex.size until atomsByIndex.size + mol.atoms.size
 					infosByAtomIndex.add(indexRange to info)
+
+					// and also so we can refer to specific atoms by index
+					for (atomB in mol.atoms) {
+						val atomA = info.atomMap.getAOrThrow(atomB)
+						indicesByAtom[atomA] = atomsByIndex.size
+						atomsByIndex.add(atomA)
+					}
 
 					val types = mol.calcTypesAmber(moltype.defaultForcefieldNameOrThrow)
 
@@ -75,7 +95,28 @@ fun List<MinimizerInfo>.minimize(numSteps: Int) {
 		}
 	val params = molsAndTypes.calcParamsAmber(frcmods)
 
-	val results = Sander.minimize(params.top, params.crd, numSteps)
+	// just in case, check the atom indices by matching atom names
+	assert {
+		TopIO.read(params.top).atomNames == flatMap { info -> info.minimizableAtoms.map { it.name } }
+	}
+
+	// convert restrained atoms into a sander-style restraint mask
+	val restraintMask = if (restrainedAtoms.isNotEmpty()) {
+		"@"	+ restrainedAtoms
+			.map { indicesByAtom.getValue(it) + 1 } // atom indices in sander start with 1
+			.joinToString(",")
+	} else {
+		null
+	}
+
+	// minimize it!
+	// TODO: progress info?
+	val results = Sander.minimize(
+		params.top,
+		params.crd,
+		numCycles = numSteps,
+		restraintMask = restraintMask
+	)
 
 	// grab the minimized coords for each mol
 	val coordsByInfo = IdentityHashMap<MinimizerInfo,MutableList<Vector3d>>()
@@ -93,9 +134,8 @@ fun List<MinimizerInfo>.minimize(numSteps: Int) {
 	for ((info, coords) in coordsByInfo) {
 
 		// just in case...
-		assert(info.originalCoords.size == coords.size)
+		assert(info.minimizableAtoms.size == coords.size)
 
 		info.minimizedCoords = coords
-		info.setCoords(coords)
 	}
 }

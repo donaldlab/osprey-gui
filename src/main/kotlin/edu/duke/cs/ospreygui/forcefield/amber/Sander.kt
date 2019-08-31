@@ -9,6 +9,10 @@ object Sander {
 
 	private val sanderPath = Paths.get("ambertools/bin/sander").toAbsolutePath()
 
+	// we customized sander to give us bigger limits here
+	const val maxCommandsLineSize = 65664
+	const val maxRestraintMaskSize = 65536
+
 	data class Results(
 		val exitCode: Int,
 		val console: List<String>,
@@ -122,7 +126,8 @@ object Sander {
 		crd: String,
 		numCycles: Int = 100,
 		reportEveryCycles: Int = 10,
-		restraintWeight: Double? = 1.0
+		restraintMask: String? = null,
+		restraintWeight: Double = 1.0
 	): Results {
 
 		val commands = ArrayList<String>()
@@ -137,20 +142,32 @@ object Sander {
 		// TODO: expose more options?
 		// ntmin     minimization type
 
-		if (restraintWeight != null) {
+		if (restraintMask != null) {
+
+			// alas, the restraint mask has a limited size
+			if (restraintMask.length > maxRestraintMaskSize) {
+				throw IllegalArgumentException("Alas, the restraintmask for sander can only be $maxRestraintMaskSize characters. This is too long:\n$restraintMask")
+			}
+
 			commands += listOf(
 				"ntr=1", // turn on cartesian restraints
 				"restraint_wt=$restraintWeight",
-				"restraintmask=':*'" // restrain all atoms
+				"restraintmask='$restraintMask'"
 			)
-			// TODO: allow selecting atoms in restraint mask?
-			//   see `ambmask` docs for syntax and naming queries
 		}
 
 		commands += listOf(
 			"igb=1" // use generalized borne solvation
 		)
 		// TODO: expose more solvation options?
+
+		// check the command line sizes
+		commands
+			.filter { it.length > maxCommandsLineSize }
+			.takeIf { it.isNotEmpty() }
+			?.let { lines ->
+				throw IllegalArgumentException("Sander commands lines size are over the limit of $maxCommandsLineSize:\n${lines.joinToString("\n")}")
+			}
 
 		return run(
 			top,

@@ -11,6 +11,13 @@ Patches to external code needed by osprey-gui
 		mol2fix.diff:
 			fixes buffer overflow/overread bugs with writing mol2 files
 
+	AmberTools/sander:
+		apply at $AMBERHOME/AmberTools/src
+
+		bigRestraintMask.diff:
+			allows up to 65536 characters for `restraintmask` values instead of just 256
+			lets us express arbitrarily complicated masks by just sending a list of atom indices
+
 
 Notes about patching:
 
