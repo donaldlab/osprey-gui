@@ -95,6 +95,7 @@ class MoleculePrep(
 				add(MissingAtomsEditor())
 				add(BondEditor())
 				add(ProtonationEditor())
+				add(MinimizerTool())
 			}
 		}
 		win.addSlide(this)
