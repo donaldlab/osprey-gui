@@ -5,10 +5,10 @@ import cuchaz.kludge.tools.IntFlags
 import cuchaz.kludge.tools.Ref
 import cuchaz.kludge.tools.toFloat
 import edu.duke.cs.molscope.Slide
-import edu.duke.cs.molscope.gui.SlideCommands
-import edu.duke.cs.molscope.gui.SlideFeature
+import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
+import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.*
@@ -23,8 +23,8 @@ class MinimizerTool : SlideFeature {
 
 	private val winState = WindowState()
 
-	private class MolInfo(val mol: Molecule) {
-		val minInfo = MinimizerInfo(mol)
+	private class MolInfo(val view: MoleculeRenderView) {
+		val minInfo = MinimizerInfo(view.mol)
 		val pSelected = Ref.of(true)
 	}
 
@@ -55,10 +55,10 @@ class MinimizerTool : SlideFeature {
 				begin("Minimize##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
 
 				molViews
-					.map { it.mol }
-					.forEach { mol ->
+					.forEach { view ->
 
-						val info = molInfos.getOrPut(mol) { MolInfo(mol) }
+						val mol = view.mol
+						val info = molInfos.getOrPut(mol) { MolInfo(view) }
 
 						// show the molecule type
 						checkbox("$mol##${System.identityHashCode(mol)}", info.pSelected)
@@ -79,6 +79,25 @@ class MinimizerTool : SlideFeature {
 							}
 
 							endPopup()
+						}
+
+						// add buttons to set coords
+						val unminimizedCoords = info.minInfo.unminimizedCoords
+						val minimizedCoords = info.minInfo.minimizedCoords
+						text("Set Coords:")
+						sameLine()
+						styleDisabledIf(unminimizedCoords == null) {
+							if (button("Unminimized") && unminimizedCoords != null) {
+								info.minInfo.setCoords(unminimizedCoords)
+								info.view.moleculeChanged()
+							}
+						}
+						sameLine()
+						styleDisabledIf(minimizedCoords == null) {
+							if (button("Minimized") && minimizedCoords != null) {
+								info.minInfo.setCoords(minimizedCoords)
+								info.view.moleculeChanged()
+							}
 						}
 
 						// let the entries breathe a little
@@ -114,6 +133,12 @@ class MinimizerTool : SlideFeature {
 							slidewin.showExceptions { throw t }
 						}
 
+						// set the minmized coords now
+						for (info in job.infos) {
+							info.minInfo.minimizedCoords?.let { info.minInfo.setCoords(it) }
+							info.view.moleculeChanged()
+						}
+
 						// cleanup the finished job
 						this@MinimizerTool.job = null
 					}
@@ -141,7 +166,16 @@ class MinimizerTool : SlideFeature {
 			Thread {
 
 				try {
-					infos.map { it.minInfo }.minimize(numSteps)
+
+					val minInfos = infos.map { it.minInfo }
+
+					// keep the heavy atoms from wandering, but let the hydrogens adjust freely
+					val restrainedAtoms = minInfos.flatMap { minInfo ->
+						minInfo.mol.atoms.filter { it.element != Element.Hydrogen }
+					}
+
+					minInfos.minimize(numSteps, restrainedAtoms)
+
 				} catch (t: Throwable) {
 					throwable = t
 				}
