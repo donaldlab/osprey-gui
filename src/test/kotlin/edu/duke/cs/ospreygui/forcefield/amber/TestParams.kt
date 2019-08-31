@@ -434,6 +434,14 @@ class TestParams : SharedSpec({
 				}
 			}
 
+			test("mods") {
+
+				val types = mol.calcTypesAmber(ForcefieldName.ff96)
+				val frcmod = mol.calcModsAmber(types)
+
+				frcmod shouldBe null
+			}
+
 			test("params") {
 
 				val types = mol.calcTypesAmber(ForcefieldName.ff96)
@@ -470,6 +478,14 @@ class TestParams : SharedSpec({
 				mol.atoms.assertType(types, "H14", "ha")
 				mol.atoms.assertType(types, "H15", "hn")
 				mol.atoms.assertType(types, "H16", "hn")
+			}
+
+			test("mods") {
+
+				val types = AmberTypes(listOf(ForcefieldName.gaff2), metadata.atomTypes, metadata.bondTypes)
+				val frcmod = mol.calcModsAmber(types)
+
+				frcmod shouldBe OspreyGui.getResourceAsString("benzamidine.h.frcmod")
 			}
 
 			test("params") {

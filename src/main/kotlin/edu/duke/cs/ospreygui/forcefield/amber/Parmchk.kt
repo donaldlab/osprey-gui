@@ -77,4 +77,17 @@ object Parmchk {
 			)
 		}
 	}
+
+	class Exception(val msg: String, val mol2: String, val results: Results) : RuntimeException(StringBuilder().apply {
+		append(msg)
+		append("\n\n")
+		append("Input:\n")
+		append(mol2)
+		append("\n\n")
+		append("console:\n")
+		results.console.forEach {
+			append(it)
+			append("\n")
+		}
+	}.toString())
 }

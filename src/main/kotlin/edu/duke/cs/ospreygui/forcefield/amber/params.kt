@@ -109,6 +109,24 @@ fun Molecule.calcTypesAmber(ffname: ForcefieldName): AmberTypes {
 }
 
 
+fun Molecule.calcModsAmber(types: AmberTypes): String? {
+
+	val mol2 = toMol2(types.toMol2Metadata(this))
+	val ffname = types.ffnames
+		.takeIf { it.size == 1 }
+		?.first()
+		?: throw IllegalArgumentException("must have only a single forcefield name to calculate forcefield modifications")
+	val atomTypes = Parmchk.AtomTypes.from(ffname) ?: return null
+
+	val results = Parmchk.run(mol2, atomTypes)
+
+	if (results.frcmod == null) {
+		throw Parmchk.Exception("No results generated", mol2, results)
+	}
+
+	return results.frcmod
+}
+
 fun List<Pair<Molecule,AmberTypes>>.combine(): Pair<Molecule,AmberTypes> {
 
 	val (combinedMol, atomMap ) =
