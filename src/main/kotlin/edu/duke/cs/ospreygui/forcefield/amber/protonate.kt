@@ -32,7 +32,12 @@ fun Molecule.deprotonate(atom: Atom) {
 	// remove all the hydrogens
 	bonds.bondedAtoms(atom)
 		.filter { it.element == Element.Hydrogen }
-		.forEach { atoms.remove(it) }
+		.forEach {
+			atoms.remove(it)
+			if (this is Polymer) {
+				findResidue(it)?.atoms?.remove(it)
+			}
+		}
 }
 
 /**
@@ -157,11 +162,13 @@ fun Molecule.protonate(atom: Atom, protonation: Protonation) {
 	val centerAtom = hmol.atoms.find { it.name == atom.name }
 		?: throw Error("can't find central atom in LEaP output molecule")
 	mol.deprotonate(atom)
+	val res = (mol as? Polymer)?.findResidue(atom)
 	hmol.bonds.bondedAtoms(centerAtom)
 		.filter { it.element == Element.Hydrogen }
 		.forEach {
 			mol.atoms.add(it)
 			mol.bonds.add(atom, it)
+			res?.atoms?.add(it)
 		}
 }
 

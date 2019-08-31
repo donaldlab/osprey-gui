@@ -11,6 +11,7 @@ import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
+import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.osprey.dof.DihedralRotation
@@ -187,6 +188,9 @@ class ProtonationEditor : SlideFeature {
 				view.mol.apply {
 					atoms.add(hAtom)
 					bonds.add(heavyAtom, hAtom)
+					if (this is Polymer) {
+						findResidue(heavyAtom)?.atoms?.add(hAtom)
+					}
 				}
 				view.moleculeChanged()
 			}

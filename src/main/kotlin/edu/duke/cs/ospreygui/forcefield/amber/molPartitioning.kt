@@ -220,7 +220,9 @@ fun Molecule.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair
 				val dstAtom = atomMap.getBOrThrow(srcAtom)
 				for (srcBonded in bonds.bondedAtoms(srcAtom)) {
 					val dstBonded = atomMap.getB(srcBonded)
-						?: throw IllegalArgumentException("bond $srcAtom - $srcBonded spans multiple partitioned molecules, one of which is of type $moltype")
+						?: throw IllegalArgumentException(
+							"$srcBonded is not in the residues in this $moltype polymer, but is bonded to $srcAtom which is"
+						)
 					polymer.bonds.add(dstAtom, dstBonded)
 				}
 			}
@@ -274,8 +276,18 @@ fun Molecule.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair
 			.takeIf { it.isNotEmpty() }
 			?.let { solventMols ->
 
-				val combinedSolvent = Molecule(MoleculeType.Solvent.name)
-				solventMols.forEach { combinedSolvent.atoms.addAll(it.atoms) }
+				// combine all the solvent molecules into a single chain in a polymer
+				val combinedSolvent = Polymer(MoleculeType.Solvent.name)
+				val solventChain = Polymer.Chain("A").also { combinedSolvent.chains.add(it) }
+				solventMols.forEachIndexed { i, solventMol ->
+					combinedSolvent.atoms.addAll(solventMol.atoms)
+					val resType = (solventMol as? Polymer)
+						?.chains?.firstOrNull()
+						?.residues?.firstOrNull()
+						?.type
+						?: "SOL"
+					solventChain.residues.add(Polymer.Residue((i + 1).toString(), resType, solventMol.atoms))
+				}
 
 				mols = mols
 					.filter { (type, _) -> type != MoleculeType.Solvent }

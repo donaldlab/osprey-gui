@@ -8,6 +8,7 @@ import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.io.fromPDB
 import io.kotlintest.matchers.maps.shouldNotContainKey
+import io.kotlintest.matchers.types.shouldBeTypeOf
 import io.kotlintest.shouldBe
 import org.joml.Vector3d
 
@@ -76,6 +77,28 @@ class TestPolymerPartitioning : SharedSpec({
 					atoms.find { it.name == "N2" }!!.apply {
 						element shouldBe Element.Nitrogen
 						pos shouldBe Vector3d(4.965, 11.590, 21.821)
+					}
+				}
+			}
+		}
+
+		test("combine solvent") {
+
+			val partition = mol.partition(combineSolvent = true)
+			val solvents = partition
+				.filter { (moltype, _) -> moltype == MoleculeType.Solvent }
+
+			solvents.size shouldBe 1
+
+			val solvent = solvents.first().second
+
+			// all the solvent molecules should be in a single chain in a polymer
+			solvent.shouldBeTypeOf<Polymer> { polymer ->
+				polymer.chains.size shouldBe 1
+				polymer.chains.first().apply {
+					residues.size shouldBe 117
+					residues.forEachIndexed { i, res ->
+						res.id shouldBe (i + 1).toString()
 					}
 				}
 			}
