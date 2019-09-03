@@ -76,7 +76,11 @@ class MoleculePrep(
 
 			s.features.menu("File") {
 				add(SaveOMOL(this@MoleculePrep))
-				add(SavePDB(this@MoleculePrep))
+				addSeparator()
+				add(ExportPDB(this@MoleculePrep))
+				add(ExportMol2(this@MoleculePrep))
+				addSeparator()
+				addSpacing(4)
 				addSeparator()
 				add(CloseSlide(win))
 			}

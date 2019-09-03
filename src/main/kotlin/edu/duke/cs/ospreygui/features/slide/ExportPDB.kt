@@ -8,6 +8,8 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.molecule.combine
+import edu.duke.cs.ospreygui.io.ChainGeneratorSingleResidue
+import edu.duke.cs.ospreygui.io.ChainIdGeneratorAZ
 import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.io.write
 import edu.duke.cs.ospreygui.prep.MoleculePrep
@@ -15,9 +17,9 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 
-class SavePDB(val prep: MoleculePrep) : SlideFeature {
+class ExportPDB(val prep: MoleculePrep) : SlideFeature {
 
-	override val id = FeatureId("save.pdb")
+	override val id = FeatureId("export.pdb")
 
 	companion object {
 		const val extension = "pdb"
@@ -27,7 +29,7 @@ class SavePDB(val prep: MoleculePrep) : SlideFeature {
 	var dir = Paths.get(".")
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
-		if (menuItem("Save PDB")) {
+		if (menuItem("Export PDB")) {
 			FileDialog.saveFile(filterList, dir)?.let { path ->
 				dir = path.parent
 				save(slide, slidewin, path)
@@ -45,8 +47,10 @@ class SavePDB(val prep: MoleculePrep) : SlideFeature {
 		val pathWithExt = path.parent.resolve(filename)
 
 		// combine the included assembled mols and save the file
+		val chainIdGenerator = ChainIdGeneratorAZ()
+		val chainGenerator = ChainGeneratorSingleResidue(chainIdGenerator)
 		prep.getIncludedMols()
-			.combine(prep.mol.name).first
+			.combine(prep.mol.name, chainIdGenerator, chainGenerator).first
 			.toPDB()
 			.write(pathWithExt)
 
