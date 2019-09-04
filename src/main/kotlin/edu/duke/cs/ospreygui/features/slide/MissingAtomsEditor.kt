@@ -77,7 +77,7 @@ class MissingAtomsEditor : SlideFeature {
 				addedAtoms?.let { addedAtoms ->
 
 					text("Added Atoms:")
-					beginChild("addedAtoms", 300f, 30f, true)
+					beginChild("addedAtoms", 300f, 200f, true)
 
 					if (addedAtoms.isNotEmpty()) {
 
