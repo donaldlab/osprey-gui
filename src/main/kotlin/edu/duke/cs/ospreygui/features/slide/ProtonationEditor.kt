@@ -243,7 +243,7 @@ class ProtonationEditor : SlideFeature {
 				).toFloat()
 			}
 
-			fun Atom.toInt() = name.filter { it.isDigit() }.toInt()
+			fun Atom.toInt() = name.filter { it.isDigit() }.toIntOrNull() ?: 1
 
 			fun Vector3d.toArray() = doubleArrayOf(x, y, z)
 			fun Vector3d.fromArray(array: DoubleArray) = set(array[0], array[1], array[2])
