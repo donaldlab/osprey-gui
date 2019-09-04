@@ -300,3 +300,17 @@ fun Molecule.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair
 
 fun Molecule.partition(combineSolvent: Boolean = true): List<Pair<MoleculeType,Molecule>> =
 	partitionAndAtomMap(combineSolvent).first
+
+fun Collection<Molecule>.partition(combineSolvent: Boolean = true) =
+	flatMap { it.partition(combineSolvent) }
+
+fun Collection<Molecule>.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair<MoleculeType,Molecule>>,AtomMap> {
+	val combinedMols = ArrayList<Pair<MoleculeType,Molecule>>()
+	val combinedAtomMap = AtomMap()
+	for (srcMol in this) {
+		val (dstMol, atomMap) = srcMol.partitionAndAtomMap(combineSolvent)
+		combinedMols.addAll(dstMol)
+		combinedAtomMap.addAll(atomMap)
+	}
+	return combinedMols to combinedAtomMap
+}

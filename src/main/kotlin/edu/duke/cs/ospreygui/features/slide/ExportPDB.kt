@@ -50,7 +50,7 @@ class ExportPDB(val prep: MoleculePrep) : SlideFeature {
 		val chainIdGenerator = ChainIdGeneratorAZ()
 		val chainGenerator = ChainGeneratorSingleResidue(chainIdGenerator)
 		prep.getIncludedMols()
-			.combine(prep.mol.name, chainIdGenerator, chainGenerator).first
+			.combine(prep.name, chainIdGenerator, chainGenerator).first
 			.toPDB()
 			.write(pathWithExt)
 

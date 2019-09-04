@@ -171,17 +171,28 @@ class TestMolIO : SharedSpec({
 		}
 	}
 
+	infix fun List<Molecule>.shouldBe(expected: List<Molecule>) {
+		val observed = this
+		observed.size shouldBe expected.size
+		observed.zip(expected).forEach { (observedMol, expectedMol) ->
+			observedMol shouldBe expectedMol
+		}
+	}
+
 	group("OMOL roundtrip") {
 
-		fun roundtrip(mol: Molecule) {
-			Molecule.fromOMOL(mol.toOMOL()) shouldBe mol
+		fun roundtrip(mols: List<Molecule>) {
+			Molecule.fromOMOL(mols.toOMOL()) shouldBe mols
 		}
 
 		test("dipeptide") {
-			roundtrip(dipeptide)
+			roundtrip(listOf(dipeptide))
 		}
 		test("benzamidine") {
-			roundtrip(benzamidine)
+			roundtrip(listOf(benzamidine))
+		}
+		test("dipeptide and benzamidine") {
+			roundtrip(listOf(dipeptide, benzamidine))
 		}
 	}
 

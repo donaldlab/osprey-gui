@@ -50,7 +50,7 @@ class ExportMol2(val prep: MoleculePrep, val title: String = "Export Mol2") : Sl
 		val chainIdGenerator = ChainIdGeneratorAZ()
 		val chainGenerator = ChainGeneratorSingleResidue(chainIdGenerator)
 		prep.getIncludedMols()
-			.combine(prep.mol.name, chainIdGenerator, chainGenerator).first
+			.combine(prep.name, chainIdGenerator, chainGenerator).first
 			.toMol2()
 			.write(pathWithExt)
 

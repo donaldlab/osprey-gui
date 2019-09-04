@@ -18,12 +18,14 @@ import kotlin.NoSuchElementException
 
 class MoleculePrep(
 	win: WindowCommands,
-	var mol: Molecule
+	mols: List<Molecule>
 ) {
 
 	// partition the molecule into pieces AMBER can understand
 	// except, combine all the solvent molecules into one "molecule"
-	val partition = mol.partition(combineSolvent = true)
+	val partition = mols.partition(combineSolvent = true)
+
+	var name = mols.firstOrNull()?.name ?: "Prep"
 
 	// include all molecules by default
 	private val isIncluded = IdentityHashMap<Molecule,Boolean>()
@@ -65,7 +67,7 @@ class MoleculePrep(
 	}
 
 	// make the slide last, since the FilterTool needs properties from the prep
-	val slide = Slide(mol.name, initialSize = Extent2D(640, 480)).apply {
+	val slide = Slide(name, initialSize = Extent2D(640, 480)).apply {
 		lock { s ->
 
 			// make a render view for each molecule in the partition

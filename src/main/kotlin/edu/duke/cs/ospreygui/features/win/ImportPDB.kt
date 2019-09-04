@@ -34,6 +34,6 @@ class ImportPDB : WindowFeature {
 	private fun open(win: WindowCommands, path: Path) = win.showExceptions {
 
 		// start a new prep
-		MoleculePrep(win, Molecule.fromPDB(path.read()))
+		MoleculePrep(win, listOf(Molecule.fromPDB(path.read())))
 	}
 }
