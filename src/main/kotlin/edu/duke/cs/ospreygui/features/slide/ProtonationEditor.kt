@@ -175,9 +175,7 @@ class ProtonationEditor : SlideFeature {
 
 	private fun clearAll(views: List<MoleculeRenderView>) {
 		for (view in views) {
-			view.mol.atoms
-				.filter { it.element != Element.Hydrogen }
-				.forEach { view.mol.deprotonate(it) }
+			view.mol.deprotonate()
 			view.moleculeChanged()
 		}
 	}

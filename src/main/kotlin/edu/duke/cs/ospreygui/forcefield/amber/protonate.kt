@@ -41,6 +41,21 @@ fun Molecule.deprotonate(atom: Atom) {
 }
 
 /**
+ * Removes all hydrogen atoms from the molecule.
+ */
+fun Molecule.deprotonate() {
+	atoms
+		.filter { it.element == Element.Hydrogen }
+		.forEach {
+			atoms.remove(it)
+			if (this is Polymer) {
+				findResidue(it)?.atoms?.remove(it)
+			}
+		}
+}
+
+
+/**
  * Adds hydrogens atoms to the atom in the supplied protonation state.
  */
 fun Molecule.protonate(atom: Atom, protonation: Protonation) {
