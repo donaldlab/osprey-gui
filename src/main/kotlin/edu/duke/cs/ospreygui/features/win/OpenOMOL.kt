@@ -33,6 +33,11 @@ class OpenOMOL : WindowFeature {
 	private fun open(win: WindowCommands, path: Path) = win.showExceptions {
 
 		// resume a previous prep
-		MoleculePrep(win, Molecule.fromOMOL(path.read()))
+		val mols = Molecule.fromOMOL(
+			path.read(),
+			// be generous in the GUI and don't crash, sometimes users edit these files by hand
+			throwOnMissingAtoms = false
+		)
+		MoleculePrep(win, mols)
 	}
 }

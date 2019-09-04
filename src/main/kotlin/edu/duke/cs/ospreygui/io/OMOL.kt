@@ -19,6 +19,10 @@ fun List<Molecule>.toOMOL(): String {
 
 	forEachIndexed { moli, mol ->
 
+		if (moli > 0) {
+			write("\n")
+		}
+
 		write("[molecule.$moli]\n")
 
 		// write the name
@@ -97,7 +101,7 @@ private fun String.quote() =
 /**
  * Read molecules from the OMOL (OSPREY molecule) format.
  */
-fun Molecule.Companion.fromOMOL(toml: String): List<Molecule> {
+fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = true): List<Molecule> {
 
 	// parse the TOML
 	val doc = Toml.parse(toml)
@@ -129,8 +133,12 @@ fun Molecule.Companion.fromOMOL(toml: String): List<Molecule> {
 		mols.add(mol)
 
 		val atoms = HashMap<Int,Atom>()
-		fun getAtom(i: Int, pos: TomlPosition? = null) =
-			atoms[i] ?: throw ParseException("atom not found at index $i", pos)
+		fun getAtom(i: Int, pos: TomlPosition? = null): Atom? =
+			atoms[i] ?: if (throwOnMissingAtoms) {
+				throw ParseException("atom not found at index $i", pos)
+			} else {
+				null
+			}
 
 		// read the atoms
 		val atomsArray = molTable.getArrayOrThrow("atoms")
@@ -171,10 +179,9 @@ fun Molecule.Companion.fromOMOL(toml: String): List<Molecule> {
 				throw ParseException("bond does not contain integers", pos)
 			}
 
-			mol.bonds.add(
-				getAtom(bondArray.getLong(0).toInt()),
-				getAtom(bondArray.getLong(1).toInt())
-			)
+			val a1 = getAtom(bondArray.getLong(0).toInt()) ?: continue
+			val a2 = getAtom(bondArray.getLong(1).toInt()) ?: continue
+			mol.bonds.add(a1, a2)
 		}
 
 		// read the polymer, if needed
@@ -199,11 +206,11 @@ fun Molecule.Companion.fromOMOL(toml: String): List<Molecule> {
 							residueTable.getStringOrThrow("id", resPos),
 							residueTable.getStringOrThrow("type", resPos),
 							atoms =
-								residueTable.getArrayOrThrow("atoms", resPos).let { mainchainArray ->
-									if (!mainchainArray.containsLongs()) {
+								residueTable.getArrayOrThrow("atoms", resPos).let { resAtomsArray ->
+									if (!resAtomsArray.containsLongs()) {
 										throw ParseException("field \"atoms\" doesn't contain integers", resPos)
 									}
-									(0 until mainchainArray.size()).map { getAtom(mainchainArray.getLong(it).toInt()) }
+									(0 until resAtomsArray.size()).mapNotNull { getAtom(resAtomsArray.getLong(it).toInt()) }
 								}
 						))
 					}
