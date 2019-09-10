@@ -77,6 +77,20 @@ tasks {
 			// TODO: contributing.md?
 		}
 	}
+
+	startScripts {
+		doLast {
+			// Tragically, an incompatibility between Windows and Gradle's batch script
+			// causes the batch script to fail when the classpath is long and complicated.
+			// This workaround isn't an ideal solution (because it destroys the classpath order),
+			// but there aren't any better solutions available (yet). see:
+			// https://github.com/gradle/gradle/issues/1989
+			windowsScript.writeText(windowsScript.readText().replace(
+				Regex("set CLASSPATH=.*"),
+				"set CLASSPATH=%APP_HOME%/lib/*"
+			))
+		}
+	}
 }
 
 application {
