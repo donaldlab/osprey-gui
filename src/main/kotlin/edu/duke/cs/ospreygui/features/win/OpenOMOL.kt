@@ -19,7 +19,7 @@ class OpenOMOL : WindowFeature {
 	override val id = FeatureId("open.omol")
 
 	val filterList = FilterList(listOf("omol.toml"))
-	var dir = Paths.get(".")
+	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, win: WindowCommands) = imgui.run {
 		if (menuItem("Open OMOL")) {

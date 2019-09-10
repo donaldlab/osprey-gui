@@ -20,7 +20,7 @@ class ImportPDB : WindowFeature {
 
 	val filterList = FilterList(listOf("pdb"))
 	// TEMP: pdb.gz?
-	var dir = Paths.get(".")
+	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, win: WindowCommands) = imgui.run {
 		if (menuItem("Import PDB")) {

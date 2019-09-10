@@ -26,7 +26,7 @@ class ExportMol2(val prep: MoleculePrep, val title: String = "Export Mol2") : Sl
 	}
 
 	val filterList = FilterList(listOf(extension))
-	var dir = Paths.get(".")
+	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem(title)) {
