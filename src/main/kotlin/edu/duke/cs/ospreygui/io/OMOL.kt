@@ -6,7 +6,6 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import org.tomlj.Toml
 import org.tomlj.TomlPosition
-import org.tomlj.TomlTable
 
 
 /**
@@ -106,12 +105,12 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 	// parse the TOML
 	val doc = Toml.parse(toml)
 	if (doc.hasErrors()) {
-		throw ParseException("TOML parsing failure:\n${doc.errors().joinToString("\n")}")
+		throw TomlParseException("TOML parsing failure:\n${doc.errors().joinToString("\n")}")
 	}
 
-	val molsTable = doc.getTable("molecule") ?: throw ParseException("molecule table not found")
+	val molsTable = doc.getTable("molecule") ?: throw TomlParseException("molecule table not found")
 	val molIndices = molsTable.keySet()
-		.map { it.toIntOrNull() ?: throw ParseException("molecule index $it is not a number") }
+		.map { it.toIntOrNull() ?: throw TomlParseException("molecule index $it is not a number") }
 
 	val mols = ArrayList<Molecule>()
 
@@ -135,7 +134,7 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 		val atoms = HashMap<Int,Atom>()
 		fun getAtom(i: Int, pos: TomlPosition? = null): Atom? =
 			atoms[i] ?: if (throwOnMissingAtoms) {
-				throw ParseException("atom not found at index $i", pos)
+				throw TomlParseException("atom not found at index $i", pos)
 			} else {
 				null
 			}
@@ -143,7 +142,7 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 		// read the atoms
 		val atomsArray = molTable.getArrayOrThrow("atoms")
 		if (!atomsArray.containsTables()) {
-			throw ParseException("atoms does not contain tables", molTable.inputPositionOf("atoms"))
+			throw TomlParseException("atoms does not contain tables", molTable.inputPositionOf("atoms"))
 		}
 		for (i in 0 until atomsArray.size()) {
 			val atomTable = atomsArray.getTable(i)
@@ -161,7 +160,7 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 
 			val index = atomTable.getIntOrThrow("i", pos)
 			if (index in atoms) {
-				throw ParseException("duplicate atom index: $i", pos)
+				throw TomlParseException("duplicate atom index: $i", pos)
 			}
 			atoms[index] = atom
 		}
@@ -169,14 +168,14 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 		// read the bonds
 		val bondsArray = molTable.getArrayOrThrow("bonds")
 		if (!bondsArray.containsArrays()) {
-			throw ParseException("bonds does not contain arrays", molTable.inputPositionOf("bonds"))
+			throw TomlParseException("bonds does not contain arrays", molTable.inputPositionOf("bonds"))
 		}
 		for (i in 0 until bondsArray.size()) {
 			val bondArray = bondsArray.getArray(i)
 			val pos = bondsArray.inputPositionOf(i)
 
 			if (!bondArray.containsLongs()) {
-				throw ParseException("bond does not contain integers", pos)
+				throw TomlParseException("bond does not contain integers", pos)
 			}
 
 			val a1 = getAtom(bondArray.getLong(0).toInt()) ?: continue
@@ -193,7 +192,7 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 			for (chainId in polymerTable.keySet()) {
 				val chainArray = polymerTable.getArrayOrThrow(chainId, pos)
 				if (!chainArray.containsTables()) {
-					throw ParseException("chain does not contain tables", pos)
+					throw TomlParseException("chain does not contain tables", pos)
 				}
 
 				polymer.chains.add(Polymer.Chain(chainId).also { chain ->
@@ -208,7 +207,7 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 							atoms =
 								residueTable.getArrayOrThrow("atoms", resPos).let { resAtomsArray ->
 									if (!resAtomsArray.containsLongs()) {
-										throw ParseException("field \"atoms\" doesn't contain integers", resPos)
+										throw TomlParseException("field \"atoms\" doesn't contain integers", resPos)
 									}
 									(0 until resAtomsArray.size()).mapNotNull { getAtom(resAtomsArray.getLong(it).toInt()) }
 								}
@@ -221,19 +220,3 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 
 	return mols
 }
-
-private fun TomlTable.getStringOrThrow(key: String, pos: TomlPosition? = null) =
-	getString(key) ?: throw ParseException("missing field \"$key\", or it is not a string", pos)
-
-private fun TomlTable.getArrayOrThrow(key: String, pos: TomlPosition? = null) =
-	getArray(key) ?: throw ParseException("missing field \"$key\", or it is not an array", pos)
-
-private fun TomlTable.getDoubleOrThrow(key: String, pos: TomlPosition? = null) =
-	getDouble(key) ?: throw ParseException("missing field \"$key\", or it is not a floating-point number", pos)
-
-private fun TomlTable.getIntOrThrow(key: String, pos: TomlPosition? = null) =
-	getLong(key)?.toInt() ?: throw ParseException("missing field \"$key\", or it is not an integer", pos)
-
-class ParseException(msg: String, val pos: TomlPosition? = null) : RuntimeException(
-	msg + if (pos != null) " at $pos" else ""
-)
