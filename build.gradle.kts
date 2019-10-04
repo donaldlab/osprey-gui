@@ -39,20 +39,12 @@ tasks.withType<KotlinCompile> {
 	}
 }
 
-// Make a value that can be set after processResources has configured itself.
-// ie, the value can be set after we know about the task graph,
-// and we can tell if this a dev or release build
-class ResourceVal<T>(var value: T) {
-	override fun toString() = value.toString()
+// assume we're doing a dev build if the top task is "classes"
+if (gradle.startParameter.taskNames.any { it.endsWith(":classes") }) {
+	System.setProperty("isDev", true.toString())
 }
-val isDev = ResourceVal(true)
-
-gradle.taskGraph.whenReady {
-
-	// assume we're doing a release build if we're calling the jar task
-	if (hasTask(":jar")) {
-		isDev.value = false
-	}
+val isDev = object {
+	override fun toString() = System.getProperty("isDev") ?: false.toString()
 }
 
 tasks {
