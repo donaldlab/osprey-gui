@@ -13,6 +13,7 @@ import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.slide.*
 import edu.duke.cs.ospreygui.forcefield.amber.partition
+import edu.duke.cs.ospreygui.io.ConfLib
 import java.util.*
 import kotlin.NoSuchElementException
 
@@ -61,6 +62,28 @@ class MoleculePrep(
 			.filter { (_, mol) -> isIncluded[mol] == true }
 			.map { (_, mol) -> mol }
 
+	class ConfLibs : Iterable<ConfLib> {
+
+		private val conflibs = ArrayList<ConfLib>()
+
+		override fun iterator() = conflibs.iterator()
+
+		fun add(toml: String) {
+
+			val conflib = ConfLib.from(toml)
+
+			// don't load the same library more than once
+			if (conflibs.any { it.name == conflib.name }) {
+				throw DuplicateConfLibException(conflib)
+			}
+
+			conflibs.add(conflib)
+		}
+	}
+	val conflibs = ConfLibs()
+
+	class DuplicateConfLibException(val conflib: ConfLib) : RuntimeException("Conformation library already loaded: ${conflib.name}")
+
 	val mutablePositionsByMol: MutableMap<Molecule,MutableList<MutablePosition>> = HashMap()
 	// TODO: flexible positions
 
@@ -101,7 +124,7 @@ class MoleculePrep(
 				add(ProtonationEditor())
 				add(MinimizerTool())
 			}
-			s.features.menu("Mutations") {
+			s.features.menu("Design") {
 				add(MutablePositionsEditor(this@MoleculePrep))
 			}
 		}

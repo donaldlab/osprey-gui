@@ -12,10 +12,12 @@ class TestConfLib : SharedSpec({
 
 	test("read Lovell") {
 
-		val conflib = ConfLib.from(OspreyGui.getResourceAsString("lovell.conflib.toml"))
+		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
 
 		// spot check a few bits
-		conflib.name shouldBe "Lovell rotamer library"
+		conflib.name shouldBe "Amino Acids: The Penultimate Rotamer Library (with Hydroxyl rotamers)"
+		conflib.description shouldNotBe null
+		conflib.citation shouldNotBe null
 
 		conflib.fragments.getValue("ALA").run {
 

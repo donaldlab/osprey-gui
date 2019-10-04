@@ -62,7 +62,7 @@ class ConfLib(
 
 			// read the header
 			val libName = doc.getStringOrThrow("name")
-			val libDesc = doc.getString("desc")
+			val libDesc = doc.getString("description")
 			val citation = doc.getString("citation")
 
 			// read the fragments

@@ -4,6 +4,8 @@ import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.tools.ByteFlags
 import cuchaz.kludge.tools.IntFlags
 import cuchaz.kludge.tools.Ref
+import cuchaz.kludge.window.FileDialog
+import cuchaz.kludge.window.FilterList
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
@@ -13,17 +15,22 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
+import edu.duke.cs.ospreygui.OspreyGui
+import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.io.read
 import edu.duke.cs.ospreygui.prep.MutablePosition
 import edu.duke.cs.ospreygui.prep.MoleculePrep
+import java.nio.file.Paths
 
 
 class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 
 	// TODO: add shortcuts for proteins
 
-	override val id = FeatureId("mut.positions")
+	override val id = FeatureId("design.mutations")
 
 	private val winState = WindowState()
+	private val alert = Alert()
 
 	data class SelectedAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
 
@@ -241,8 +248,28 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 
 	private val posInfosByMol = HashMap<Molecule,ArrayList<PosInfo>>()
 
+	// cache the built-in conflib metadata
+	private val builtInConflibPaths = listOf(
+		"conflib/lovell.conflib.toml"
+	)
+	data class ConfLibInfo(
+		val name: String,
+		val description: String?,
+		val citation: String?
+	)
+	private val conflibInfos = ArrayList<ConfLibInfo>().apply {
+		for (path in builtInConflibPaths) {
+			val conflib = ConfLib.from(OspreyGui.getResourceAsString(path))
+			add(ConfLibInfo(
+				conflib.name,
+				conflib.description,
+				conflib.citation
+			))
+		}
+	}
+
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
-		if (menuItem("Positions")) {
+		if (menuItem("Mutations")) {
 			winState.isOpen = true
 		}
 	}
@@ -265,6 +292,50 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 
 				// draw the window
 				begin("Mutation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+
+				fun conflibTooltip(name: String?, desc: String?, citation: String?) {
+					if (isItemHovered()) {
+						beginTooltip()
+						if (name != null) {
+							text(name)
+						}
+						if (desc != null) {
+							text(desc)
+						}
+						if (citation != null) {
+							text(citation)
+						}
+						endTooltip()
+					}
+				}
+
+				// show available libraries
+				text("Conformation Libraries")
+				beginChild("libs", 300f, 100f, true)
+				for (conflib in prep.conflibs) {
+					text(conflib.name)
+					conflibTooltip(conflib.name, conflib.description, conflib.citation)
+				}
+				endChild()
+
+				if (button("Add")) {
+					openPopup("addlib")
+				}
+				if (beginPopup("addlib")) {
+					for (info in conflibInfos) {
+						if (menuItem(info.name)) {
+							addLib(imgui, OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+						}
+						conflibTooltip(null, info.description, info.citation)
+					}
+					endPopup()
+				}
+
+				sameLine()
+
+				if (button("Add from file")) {
+					addLibFromFile(this)
+				}
 
 				for ((i, mol) in prep.getIncludedMols().withIndex()) {
 
@@ -321,8 +392,9 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 				// render the position editor, when active
 				positionEditor?.gui(imgui, slide, slidewin)
 
-				end()
+				alert.render(this)
 
+				end()
 			},
 			onClose = {
 
@@ -358,6 +430,29 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 
 		// start the position editor
 		positionEditor = PositionEditor(pos)
+	}
+
+	private var libDir = Paths.get("").toAbsolutePath()
+	private val conflibFilter = FilterList(listOf("conflib.toml"))
+
+	private fun addLibFromFile(imgui: Commands) {
+		FileDialog.openFiles(
+			conflibFilter,
+			defaultPath = libDir
+		)?.let { paths ->
+			paths.firstOrNull()?.parent?.let { libDir = it }
+			for (path in paths) {
+				addLib(imgui, path.read())
+			}
+		}
+	}
+
+	private fun addLib(imgui: Commands, toml: String) {
+		try {
+			prep.conflibs.add(toml)
+		} catch (ex: MoleculePrep.DuplicateConfLibException) {
+			alert.show("Skipped adding duplicate Conformation Library:\n${ex.conflib.name}")
+		}
 	}
 }
 

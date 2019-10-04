@@ -1,9 +1,10 @@
 
-name = 'Lovell rotamer library'
+name = 'Amino Acids: The Penultimate Rotamer Library (with Hydroxyl rotamers)'
 description = '''
-An exact replica of the Lovell-based rotamer library from Osprey 3,
-but transformed into the new conformation library format for the Osprey GUI.
-Extra rotamers have been added to sample Hydroxyl group orientations.
+An exact replica of the rotamer library for amino acids from Osprey 3,
+but translated into the new conformation library format for the Osprey GUI.
+Extra rotamers have been added to the original Lovell rotamers
+to sample Hydroxyl group orientations.
 This library uses the newer "v2" template coordinates.'''
 citation = '''
 Lovell, Word, Richardson, and Richardson.
