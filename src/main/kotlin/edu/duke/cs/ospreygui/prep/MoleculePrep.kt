@@ -6,6 +6,7 @@ import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.features.slide.CloseSlide
 import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
 import edu.duke.cs.molscope.gui.features.slide.NavigationTool
+import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.render.RenderSettings
 import edu.duke.cs.molscope.view.BallAndStick
@@ -35,38 +36,35 @@ class MoleculePrep(
 				.forEach { mol -> this[mol] = true }
 		}
 
-	private val assembledMols = IdentityHashMap<Molecule,Molecule>()
-
 	fun isIncluded(mol: Molecule) =
 		isIncluded[mol] ?: throw NoSuchElementException("mol was not found in this prep")
 
 	fun setIncluded(mol: Molecule, isIncluded: Boolean, slide: Slide.Locked) {
+
 		this.isIncluded[mol] = isIncluded
+
+		// update the views
+		val existingView = slide.views.find { it is MoleculeRenderView && it.mol == mol }
 		if (isIncluded) {
-			addRenderView(slide, mol)
+			if (existingView == null) {
+				slide.views.add(BallAndStick(mol))
+			}
 		} else {
-			removeRenderView(slide, mol)
+			if (existingView != null) {
+				slide.views.remove(existingView)
+			}
 		}
 	}
 
-	/** the base molecules */
 	fun getIncludedMols(): List<Molecule> =
 		partition
 			.filter { (_, mol) -> isIncluded[mol] == true }
 			.map { (_, mol) -> mol }
 
-	private fun removeRenderView(slide: Slide.Locked, baseMol: Molecule) {
-		// remove whichever is present, the base mol, or the assembled mol
-		val assembledMol = assembledMols[baseMol]
-		slide.views.removeIf { it is MoleculeRenderView && (it.mol == baseMol || it.mol == assembledMol) }
-	}
+	val mutablePositionsByMol: MutableMap<Molecule,MutableList<MutablePosition>> = HashMap()
+	// TODO: flexible positions
 
-	private fun addRenderView(slide: Slide.Locked, baseMol: Molecule) {
-		// use the assembled mol if available, otherwise the base mol
-		slide.views.add(BallAndStick(assembledMols[baseMol] ?: baseMol))
-	}
-
-	// make the slide last, since the FilterTool needs properties from the prep
+	// make the slide last, since many slide features need to access the prep
 	val slide = Slide(name, initialSize = Extent2D(640, 480)).apply {
 		lock { s ->
 
@@ -103,7 +101,23 @@ class MoleculePrep(
 				add(ProtonationEditor())
 				add(MinimizerTool())
 			}
+			s.features.menu("Mutations") {
+				add(MutablePositionsEditor(this@MoleculePrep))
+			}
 		}
 		win.addSlide(this)
 	}
+}
+
+
+data class MutablePosition(
+	var name: String,
+	val mol: Molecule
+) {
+
+	/** the atoms that will be replaced by mutations */
+	val removalAtoms: MutableList<Atom> = ArrayList()
+
+	/** the atoms that will end up with unfilled valences and need to be bonded to the mutants */
+	val anchorAtoms: MutableList<Atom> = ArrayList()
 }
