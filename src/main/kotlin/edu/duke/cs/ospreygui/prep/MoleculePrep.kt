@@ -8,9 +8,9 @@ import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
 import edu.duke.cs.molscope.gui.features.slide.NavigationTool
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.render.RenderSettings
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
+import edu.duke.cs.ospreygui.defaultRenderSettings
 import edu.duke.cs.ospreygui.features.slide.*
 import edu.duke.cs.ospreygui.forcefield.amber.partition
 import edu.duke.cs.ospreygui.io.ConfLib
@@ -109,12 +109,7 @@ class MoleculePrep(
 			}
 			s.features.menu("View") {
 				add(NavigationTool())
-				add(MenuRenderSettings(RenderSettings().apply {
-					// these settings looked nice on a small protein
-					shadingWeight = 1.4f
-					lightWeight = 1.4f
-					depthWeight = 1.0f
-				}))
+				add(MenuRenderSettings(defaultRenderSettings))
 				add(ClashViewer())
 			}
 			s.features.menu("Prepare") {
