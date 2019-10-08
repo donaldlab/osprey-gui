@@ -18,7 +18,7 @@ import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.read
-import edu.duke.cs.ospreygui.prep.MutablePosition
+import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.MoleculePrep
 import java.nio.file.Paths
 
@@ -56,7 +56,7 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 		}
 	}
 
-	private inner class PositionEditor(val pos: MutablePosition) {
+	private inner class PositionEditor(val pos: DesignPosition) {
 
 		val mol  = pos.mol
 
@@ -241,7 +241,7 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 	}
 	private var positionEditor: PositionEditor? = null
 
-	private data class PosInfo(val pos: MutablePosition) {
+	private data class PosInfo(val pos: DesignPosition) {
 
 		val pSelected = Ref.of(false)
 	}
@@ -423,7 +423,7 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 		val num = maxNum + 1
 
 		// create the position and add it
-		val pos = MutablePosition("$prefix$num", mol)
+		val pos = DesignPosition("$prefix$num", mol)
 		positions.add(pos)
 
 		posInfosByMol.getValue(mol).add(PosInfo(pos))

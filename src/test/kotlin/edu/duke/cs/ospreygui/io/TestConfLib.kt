@@ -35,11 +35,17 @@ class TestConfLib : SharedSpec({
 				element shouldBe Element.Carbon
 			}
 
-			intraBonds.size shouldBe 3
-			intraBonds.find { it.a == hb1 && it.b == cb } shouldNotBe null
+			bonds.size shouldBe 3
+			bonds.find { it.a == hb1 && it.b == cb } shouldNotBe null
 
-			interBonds.size shouldBe 2
-			interBonds.find { it.atom == ha && it.anchorIndex == 1 } shouldNotBe null
+			anchor.size shouldBe 3
+			anchor.find { it.id == 1 }!!.apply {
+				element shouldBe Element.Carbon
+				pos shouldBe Vector3d(20.016, 5.363, 22.945)
+			}
+
+			anchorBonds.size shouldBe 2
+			anchorBonds.find { it.atom == ha && it.anchor.id == 1 } shouldNotBe null
 
 			confs.size shouldBe 1
 		}
@@ -50,8 +56,9 @@ class TestConfLib : SharedSpec({
 			name shouldBe "Valine"
 
 			atoms.size shouldBe 11
-			intraBonds.size shouldBe 9
-			interBonds.size shouldBe 2
+			bonds.size shouldBe 9
+			anchor.size shouldBe 3
+			anchorBonds.size shouldBe 2
 
 			confs.size shouldBe 3
 			confs.getValue("p").run {

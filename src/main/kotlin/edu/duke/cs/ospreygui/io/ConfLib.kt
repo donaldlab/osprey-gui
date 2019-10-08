@@ -22,14 +22,20 @@ class ConfLib(
 		val element: Element
 	)
 
-	data class IntraBond(
+	data class AnchorInfo(
+		val id: Int,
+		val element: Element,
+		val pos: Vector3d
+	)
+
+	data class Bond(
 		val a: AtomInfo,
 		val b: AtomInfo
 	)
 
-	data class InterBond(
+	data class AnchorBond(
 		val atom: AtomInfo,
-		val anchorIndex: Int
+		val anchor: AnchorInfo
 	)
 
 	data class Conf(
@@ -43,10 +49,16 @@ class ConfLib(
 		val id: String,
 		val name: String,
 		val atoms: List<AtomInfo>,
-		val intraBonds: List<IntraBond>,
-		val interBonds: List<InterBond>,
+		val bonds: List<Bond>,
+		val anchor: List<AnchorInfo>,
+		val anchorBonds: List<AnchorBond>,
 		val confs: Map<String,Conf>
-	)
+	) {
+
+		val anchor1 get() = anchor.getOrNull(0) ?: throw NoSuchElementException("anchor 1 is missing")
+		val anchor2 get() = anchor.getOrNull(1) ?: throw NoSuchElementException("anchor 2 is missing")
+		val anchor3 get() = anchor.getOrNull(2) ?: throw NoSuchElementException("anchor 3 is missing")
+	}
 
 	companion object {
 
@@ -57,8 +69,6 @@ class ConfLib(
 			if (doc.hasErrors()) {
 				throw TomlParseException("TOML parsing failure:\n${doc.errors().joinToString("\n")}")
 			}
-
-			// TODO: add positions to exceptions
 
 			// read the header
 			val libName = doc.getStringOrThrow("name")
@@ -85,36 +95,62 @@ class ConfLib(
 					atoms[id] = AtomInfo(
 						id,
 						atomTable.getStringOrThrow("name", pos),
-						Element.get(atomTable.getStringOrThrow("elem", pos))
+						Element[atomTable.getStringOrThrow("elem", pos)]
 					)
 				}
 
 				fun getAtom(id: Int, pos: TomlPosition? = null) =
 					atoms[id] ?: throw TomlParseException("no atom with id $id in fragment $fragId", pos)
 
-				// read the intra bonds
-				val intraBonds = ArrayList<IntraBond>()
-				val intraArray = fragTable.getArrayOrThrow("intraBonds", fragPos)
-				for (i in 0 until intraArray.size()) {
-					val bondArray = intraArray.getArray(i)
-					val pos = intraArray.inputPositionOf(i)
+				// read the bonds
+				val bonds = ArrayList<Bond>()
+				val bondsArray = fragTable.getArrayOrThrow("bonds", fragPos)
+				for (i in 0 until bondsArray.size()) {
+					val bondArray = bondsArray.getArray(i)
+					val pos = bondsArray.inputPositionOf(i)
 
-					intraBonds.add(IntraBond(
+					bonds.add(Bond(
 						getAtom(bondArray.getInt(0), pos),
 						getAtom(bondArray.getInt(1), pos)
 					))
 				}
 
-				// read the inter bonds
-				val interBonds = ArrayList<InterBond>()
-				val interArray = fragTable.getArrayOrThrow("interBonds", fragPos)
+				// read the anchor
+				val anchor = HashMap<Int,AnchorInfo>()
+				val anchorArray = fragTable.getArrayOrThrow("anchor", fragPos)
+				if (anchorArray.size() < 3) {
+					throw TomlParseException("There should be at least 3 anchor atoms in fragment $fragId", fragPos)
+				}
+				for (i in 0 until anchorArray.size()) {
+					val atomTable = anchorArray.getTable(i)
+					val pos = anchorArray.inputPositionOf(i)
+
+					val id = atomTable.getIntOrThrow("id", pos)
+					val xyzArray = atomTable.getArrayOrThrow("xyz", pos)
+					anchor[id] = AnchorInfo(
+						id,
+						Element[atomTable.getStringOrThrow("elem", pos)],
+						Vector3d(
+							xyzArray.getDouble(0),
+							xyzArray.getDouble(1),
+							xyzArray.getDouble(2)
+						)
+					)
+				}
+
+				fun getAnchor(id: Int, pos: TomlPosition? = null) =
+					anchor[id] ?: throw TomlParseException("no anchor with id $id in fragment $fragId", pos)
+
+				// read the anchor bonds
+				val anchorBonds = ArrayList<AnchorBond>()
+				val interArray = fragTable.getArrayOrThrow("anchorBonds", fragPos)
 				for (i in 0 until interArray.size()) {
 					val bondArray = interArray.getArray(i)
 					val pos = interArray.inputPositionOf(i)
 
-					interBonds.add(InterBond(
+					anchorBonds.add(AnchorBond(
 						getAtom(bondArray.getInt(0), pos),
-						bondArray.getInt(1)
+						getAnchor(bondArray.getInt(1), pos)
 					))
 				}
 
@@ -127,6 +163,7 @@ class ConfLib(
 
 					val name = confTable.getString("name") ?: confId
 					val desc = confTable.getString("description")
+					val dihedralDegrees = confTable.getDouble("dihedralDegrees")
 					val coords = HashMap<AtomInfo,Vector3d>()
 
 					val coordsArray = confTable.getArrayOrThrow("coords", confPos)
@@ -150,8 +187,9 @@ class ConfLib(
 					fragId,
 					fragName,
 					atoms.map { (_, atom) -> atom },
-					intraBonds,
-					interBonds,
+					bonds,
+					anchor.map { (_, atom) -> atom },
+					anchorBonds,
 					confs
 				)
 			}

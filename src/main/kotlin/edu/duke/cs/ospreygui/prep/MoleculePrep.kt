@@ -84,7 +84,7 @@ class MoleculePrep(
 
 	class DuplicateConfLibException(val conflib: ConfLib) : RuntimeException("Conformation library already loaded: ${conflib.name}")
 
-	val mutablePositionsByMol: MutableMap<Molecule,MutableList<MutablePosition>> = HashMap()
+	val mutablePositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = HashMap()
 	// TODO: flexible positions
 
 	// make the slide last, since many slide features need to access the prep
@@ -128,14 +128,33 @@ class MoleculePrep(
 }
 
 
-data class MutablePosition(
+data class DesignPosition(
 	var name: String,
 	val mol: Molecule
 ) {
 
+	/**
+	 * Anchor atoms are used to bond and align conformations to the molecule.
+	 * Both the fragment in the conformation library and the design position
+	 * should have at least three anchor atoms.
+	 */
+	val anchorAtoms: MutableList<Atom> = ArrayList()
+
+	/**
+	 * Conformations are aligned to the molecule so that both anchor 1 atoms exactly coincide.
+	 */
+	val anchor1 get() = anchorAtoms.getOrNull(0) ?: throw NoSuchElementException("anchor atom 1 is missing")
+
+	/**
+	 * Conformations are aligned to the molecule so that the anchor 1-2 vectors are parallel.
+	 */
+	val anchor2 get() = anchorAtoms.getOrNull(1) ?: throw NoSuchElementException("anchor atom 2 is missing")
+
+	/**
+	 * Conformations are aligned to the molecule so that the anchor 3-1-2 wedges lie in the same plane.
+	 */
+	val anchor3 get() = anchorAtoms.getOrNull(2) ?: throw NoSuchElementException("anchor atom 3 is missing")
+
 	/** the atoms that will be replaced by mutations */
 	val removalAtoms: MutableList<Atom> = ArrayList()
-
-	/** the atoms that will end up with unfilled valences and need to be bonded to the mutants */
-	val anchorAtoms: MutableList<Atom> = ArrayList()
 }
