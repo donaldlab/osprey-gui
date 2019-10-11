@@ -6,7 +6,6 @@ import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.features.slide.CloseSlide
 import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
 import edu.duke.cs.molscope.gui.features.slide.NavigationTool
-import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
@@ -125,36 +124,4 @@ class MoleculePrep(
 		}
 		win.addSlide(this)
 	}
-}
-
-
-data class DesignPosition(
-	var name: String,
-	val mol: Molecule
-) {
-
-	/**
-	 * Anchor atoms are used to bond and align conformations to the molecule.
-	 * Both the fragment in the conformation library and the design position
-	 * should have at least three anchor atoms.
-	 */
-	val anchorAtoms: MutableList<Atom> = ArrayList()
-
-	/**
-	 * Conformations are aligned to the molecule so that both anchor 1 atoms exactly coincide.
-	 */
-	val anchor1 get() = anchorAtoms.getOrNull(0) ?: throw NoSuchElementException("anchor atom 1 is missing")
-
-	/**
-	 * Conformations are aligned to the molecule so that the anchor 1-2 vectors are parallel.
-	 */
-	val anchor2 get() = anchorAtoms.getOrNull(1) ?: throw NoSuchElementException("anchor atom 2 is missing")
-
-	/**
-	 * Conformations are aligned to the molecule so that the anchor 3-1-2 wedges lie in the same plane.
-	 */
-	val anchor3 get() = anchorAtoms.getOrNull(2) ?: throw NoSuchElementException("anchor atom 3 is missing")
-
-	/** the atoms that will be replaced by mutations */
-	val removalAtoms: MutableList<Atom> = ArrayList()
 }

@@ -99,7 +99,7 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 					?: throw Error("can't init design position, molecule has no render view")
 
 					// init the atoms lists
-					for (atom in pos.removalAtoms) {
+					for (atom in pos.atoms) {
 						val info = SelectedAtom(atom, atom.label(), view)
 						selectedAtoms.add(info)
 						info.addEffect()
@@ -194,7 +194,7 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 				info.removeEffect()
 
 				// update the design pos too
-				pos.removalAtoms.remove(info.atom)
+				pos.atoms.remove(info.atom)
 
 			} else {
 
@@ -214,7 +214,7 @@ class MutablePositionsEditor(val prep: MoleculePrep) : SlideFeature {
 				info.addEffect()
 
 				// update the design pos too
-				pos.removalAtoms.add(info.atom)
+				pos.atoms.add(info.atom)
 			}
 
 			val selectedAtoms = selectedAtoms
