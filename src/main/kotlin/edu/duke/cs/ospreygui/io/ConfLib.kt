@@ -1,9 +1,14 @@
 package edu.duke.cs.ospreygui.io
 
 import edu.duke.cs.molscope.molecule.Element
+import edu.duke.cs.molscope.tools.identityHashSet
 import org.joml.Vector3d
 import org.tomlj.Toml
+import org.tomlj.TomlArray
 import org.tomlj.TomlPosition
+import java.util.*
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 
 /**
@@ -22,27 +27,106 @@ class ConfLib(
 		val element: Element
 	)
 
-	data class AnchorInfo(
-		val id: Int,
-		val element: Element,
-		val pos: Vector3d
-	)
-
 	data class Bond(
 		val a: AtomInfo,
 		val b: AtomInfo
 	)
 
-	data class AnchorBond(
-		val atom: AtomInfo,
-		val anchor: AnchorInfo
-	)
+	sealed class Anchor {
+
+		abstract val id: Int
+
+		/**
+		 * Find all atoms bonded to this anchor.
+		 */
+		abstract fun findAtoms(frag: Fragment): List<AtomInfo>
+
+		data class Single(
+			override val id: Int,
+			val bonds: List<AtomInfo>
+		) : Anchor() {
+
+			override fun findAtoms(frag: Fragment) =
+				this.bonds
+					.flatMap { findAtoms(frag, it) }
+					.toCollection(identityHashSet())
+					.toList()
+		}
+
+		data class Double(
+			override val id: Int,
+			val bondsa: List<AtomInfo>,
+			val bondsb: List<AtomInfo>
+		) : Anchor() {
+
+			override fun findAtoms(frag: Fragment) =
+				listOf(bondsa, bondsb)
+					.flatMap { bonds ->
+						bonds.flatMap { findAtoms(frag, it) }
+					}
+					.toCollection(identityHashSet())
+					.toList()
+		}
+
+		companion object {
+
+			fun findAtoms(frag: Fragment, source: AtomInfo): List<AtomInfo> {
+
+				// do BFS in the bond graph
+				val toVisit = ArrayDeque<AtomInfo>()
+				val visitScheduled = identityHashSet<AtomInfo>()
+
+				fun scheduleVisit(atom: AtomInfo) {
+					toVisit.add(atom)
+					visitScheduled.add(atom)
+				}
+
+				// start with the source
+				scheduleVisit(source)
+
+				val out = ArrayList<AtomInfo>()
+
+				while (true) {
+
+					// visit the next atom
+					val atom = toVisit.pollFirst() ?: break
+					out.add(atom)
+
+					// schedule visits to neighbors
+					for (bondedAtom in frag.bondedAtoms(atom)) {
+						if (bondedAtom !in visitScheduled) {
+							scheduleVisit(bondedAtom)
+						}
+					}
+				}
+
+				return out
+			}
+		}
+	}
+
+	sealed class AnchorCoords {
+
+		data class Single(
+			val a: Vector3d,
+			val b: Vector3d,
+			val c: Vector3d
+		) : AnchorCoords()
+
+		data class Double(
+			val a: Vector3d,
+			val b: Vector3d,
+			val c: Vector3d,
+			val d: Vector3d
+		) : AnchorCoords()
+	}
 
 	data class Conf(
 		val id: String,
 		val name: String,
 		val description: String?,
-		val coords: Map<AtomInfo,Vector3d>
+		val coords: Map<AtomInfo,Vector3d>,
+		val anchorCoords: Map<Anchor,AnchorCoords>
 	)
 
 	data class Fragment(
@@ -50,14 +134,26 @@ class ConfLib(
 		val name: String,
 		val atoms: List<AtomInfo>,
 		val bonds: List<Bond>,
-		val anchor: List<AnchorInfo>,
-		val anchorBonds: List<AnchorBond>,
+		val anchors: List<Anchor>,
 		val confs: Map<String,Conf>
 	) {
 
-		val anchor1 get() = anchor.getOrNull(0) ?: throw NoSuchElementException("anchor 1 is missing")
-		val anchor2 get() = anchor.getOrNull(1) ?: throw NoSuchElementException("anchor 2 is missing")
-		val anchor3 get() = anchor.getOrNull(2) ?: throw NoSuchElementException("anchor 3 is missing")
+		fun bondedAtoms(atom: AtomInfo): List<AtomInfo> =
+			bonds
+				.mapNotNull { (a, b) ->
+					when {
+						atom === a -> b
+						atom === b -> a
+						else -> null
+					}
+				}
+
+		private val atomsByAnchor = IdentityHashMap<Anchor,List<AtomInfo>>()
+
+		fun getAtomsFor(anchor: Anchor) =
+			atomsByAnchor.getOrPut(anchor) {
+				anchor.findAtoms(this)
+			}
 	}
 
 	companion object {
@@ -115,44 +211,46 @@ class ConfLib(
 					))
 				}
 
-				// read the anchor
-				val anchor = HashMap<Int,AnchorInfo>()
-				val anchorArray = fragTable.getArrayOrThrow("anchor", fragPos)
-				if (anchorArray.size() < 3) {
-					throw TomlParseException("There should be at least 3 anchor atoms in fragment $fragId", fragPos)
-				}
+				fun TomlArray.toBonds(pos: TomlPosition): List<AtomInfo> =
+					(0 until size())
+						.map { i -> getAtom(getInt(i), pos) }
+
+				// read the anchors
+				val anchors = HashMap<Int,Anchor>()
+				val anchorArray = fragTable.getArrayOrThrow("anchors", fragPos)
 				for (i in 0 until anchorArray.size()) {
-					val atomTable = anchorArray.getTable(i)
+					val anchorTable = anchorArray.getTable(i)
 					val pos = anchorArray.inputPositionOf(i)
 
-					val id = atomTable.getIntOrThrow("id", pos)
-					val xyzArray = atomTable.getArrayOrThrow("xyz", pos)
-					anchor[id] = AnchorInfo(
-						id,
-						Element[atomTable.getStringOrThrow("elem", pos)],
-						Vector3d(
-							xyzArray.getDouble(0),
-							xyzArray.getDouble(1),
-							xyzArray.getDouble(2)
-						)
-					)
+					val id = anchorTable.getIntOrThrow("id", pos)
+					val type = anchorTable.getString("type")?.toLowerCase()
+					anchors[id] = when (type) {
+						"single" -> {
+							Anchor.Single(
+								id,
+								anchorTable.getArrayOrThrow("bonds", pos).toBonds(pos)
+							)
+						}
+						"double" -> {
+							Anchor.Double(
+								id,
+								anchorTable.getArrayOrThrow("bondsa", pos).toBonds(pos),
+								anchorTable.getArrayOrThrow("bondsb", pos).toBonds(pos)
+							)
+						}
+						else -> throw TomlParseException("unrecognized anchor type: $type", pos)
+					}
 				}
 
 				fun getAnchor(id: Int, pos: TomlPosition? = null) =
-					anchor[id] ?: throw TomlParseException("no anchor with id $id in fragment $fragId", pos)
+					anchors[id] ?: throw TomlParseException("no anchor with id $id in fragment $fragId", pos)
 
-				// read the anchor bonds
-				val anchorBonds = ArrayList<AnchorBond>()
-				val interArray = fragTable.getArrayOrThrow("anchorBonds", fragPos)
-				for (i in 0 until interArray.size()) {
-					val bondArray = interArray.getArray(i)
-					val pos = interArray.inputPositionOf(i)
-
-					anchorBonds.add(AnchorBond(
-						getAtom(bondArray.getInt(0), pos),
-						getAnchor(bondArray.getInt(1), pos)
-					))
-				}
+				fun TomlArray.toVector3d() =
+					Vector3d(
+						getDouble(0),
+						getDouble(1),
+						getDouble(2)
+					)
 
 				// read the confs
 				val confs = HashMap<String,Conf>()
@@ -163,8 +261,8 @@ class ConfLib(
 
 					val name = confTable.getString("name") ?: confId
 					val desc = confTable.getString("description")
-					val dihedralDegrees = confTable.getDouble("dihedralDegrees")
-					val coords = HashMap<AtomInfo,Vector3d>()
+					val coords = IdentityHashMap<AtomInfo,Vector3d>()
+					val anchorCoords = IdentityHashMap<Anchor,AnchorCoords>()
 
 					val coordsArray = confTable.getArrayOrThrow("coords", confPos)
 					for (i in 0 until coordsArray.size()) {
@@ -172,15 +270,31 @@ class ConfLib(
 						val pos = coordsArray.inputPositionOf(i)
 
 						val atomInfo = getAtom(coordTable.getIntOrThrow("id", pos))
-						val xyzArray = coordTable.getArrayOrThrow("xyz", pos)
-						coords[atomInfo] = Vector3d(
-							xyzArray.getDouble(0),
-							xyzArray.getDouble(1),
-							xyzArray.getDouble(2)
-						)
+						coords[atomInfo] = coordTable.getArrayOrThrow("xyz", pos).toVector3d()
 					}
 
-					confs[confId] = Conf(confId, name, desc, coords)
+					val anchorCoordsArray = confTable.getArrayOrThrow("anchorCoords", confPos)
+					for (i in 0 until anchorCoordsArray.size()) {
+						val coordTable = anchorCoordsArray.getTable(i)
+						val pos = anchorCoordsArray.inputPositionOf(i)
+
+						val anchor = getAnchor(coordTable.getIntOrThrow("id", pos))
+						anchorCoords[anchor] = when (anchor) {
+							is Anchor.Single -> AnchorCoords.Single(
+								a = coordTable.getArrayOrThrow("a", pos).toVector3d(),
+								b = coordTable.getArrayOrThrow("b", pos).toVector3d(),
+								c = coordTable.getArrayOrThrow("c", pos).toVector3d()
+							)
+							is Anchor.Double -> AnchorCoords.Double(
+								a = coordTable.getArrayOrThrow("a", pos).toVector3d(),
+								b = coordTable.getArrayOrThrow("b", pos).toVector3d(),
+								c = coordTable.getArrayOrThrow("c", pos).toVector3d(),
+								d = coordTable.getArrayOrThrow("d", pos).toVector3d()
+							)
+						}
+					}
+
+					confs[confId] = Conf(confId, name, desc, coords, anchorCoords)
 				}
 
 				frags[fragId] = Fragment(
@@ -188,8 +302,7 @@ class ConfLib(
 					fragName,
 					atoms.map { (_, atom) -> atom },
 					bonds,
-					anchor.map { (_, atom) -> atom },
-					anchorBonds,
+					anchors.map { (_, anchor) -> anchor },
 					confs
 				)
 			}
