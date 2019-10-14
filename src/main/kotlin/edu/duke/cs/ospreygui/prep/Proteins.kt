@@ -23,11 +23,14 @@ object Proteins {
 
 	fun setDesignPosition(pos: DesignPosition, res: Polymer.Residue) = pos.apply {
 
+		// make sure the residue is part of the molecule
+		val mol = mol.asPolymer()
+		if (mol.chains.none { res in it.residues }) {
+			throw IllegalArgumentException("residue $res is not in the molecule for this design position")
+		}
+
 		// set the name
 		name = "${res.id} ${res.type}"
-
-		// get the previous residue, if any
-		val mol = mol.asPolymer()
 
 		// get the backbone atoms
 		val resN = res.getProteinAtom("N")
@@ -35,7 +38,7 @@ object Proteins {
 		val resC = res.getProteinAtom("C")
 
 		// get the C atom from the previous residue, if any
-		val prevC = mol.bonds.bondedAtoms(res.getProteinAtom("N"))
+		val prevC = mol.bonds.bondedAtoms(resN)
 			.firstOrNull { it !in res.atoms && it.name == "C" }
 			?: throw UnsupportedOperationException("TODO: support N-terminal residues")
 
@@ -49,6 +52,16 @@ object Proteins {
 			)
 			.map { it.atom }
 
+		currentAtoms.apply {
+
+			// clear any existing atoms
+			clear()
+
+			// add all the non-backbone atoms connected to the anchor atoms
+			addAll(resCA.getConnectedAtoms())
+			addAll(resN.getConnectedAtoms())
+		}
+
 		anchorGroups.apply {
 
 			// clear any existing anchors
@@ -56,33 +69,26 @@ object Proteins {
 
 			// add the pair of single anchors
 			add(mutableListOf(
-				DesignPosition.Anchor.Single(
+				SingleAnchor(
 					a = resCA,
 					b = resN,
 					c = resC
-				).apply {
-					attachedAtoms.addAll(resCA.getConnectedAtoms())
-				},
-				DesignPosition.Anchor.Single(
+				),
+				SingleAnchor(
 					a = resN,
 					b = prevC,
 					c = resCA
-				).apply {
-					attachedAtoms.addAll(resN.getConnectedAtoms())
-				}
+				)
 			))
 
 			// add the double anchor
 			add(mutableListOf(
-				DesignPosition.Anchor.Double(
+				DoubleAnchor(
 					a = resCA,
 					b = resN,
 					c = prevC,
 					d = resC
-				).apply {
-					attachedAtoms.addAll(resCA.getConnectedAtoms())
-					attachedAtoms.addAll(resN.getConnectedAtoms())
-				}
+				)
 			))
 		}
 	}
