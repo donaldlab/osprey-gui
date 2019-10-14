@@ -1,6 +1,5 @@
 package edu.duke.cs.ospreygui.prep
 
-import edu.duke.cs.molscope.molecule.Atom.Companion.identitySetOf
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.ospreygui.OspreyGui
@@ -38,18 +37,10 @@ class TestMutation : SharedSpec({
 		}
 	}
 
-	group("1CC8") {
+	group("protein") {
 
 		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
 		val protein1cc8 = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
-
-		// pick gly 17 (aribtrarily) to use as a mutable position
-		fun Polymer.gly17() =
-			findChainOrThrow("A").findResidueOrThrow("17")
-
-		// and grab the N-wards residue too
-		fun Polymer.ser16() =
-			findChainOrThrow("A").findResidueOrThrow("16")
 
 		data class Instance(
 			val res: Polymer.Residue,
@@ -60,48 +51,11 @@ class TestMutation : SharedSpec({
 			// copy the molecule, so we don't destroy the original
 			val mol = protein1cc8.copy()
 
-			val ser16 = mol.ser16()
-			val gly17 = mol.gly17()
-			val pos = DesignPosition("pos1", mol).apply {
+			// pick gly 17 (aribtrarily) to use as a mutable position
+			val gly17 = mol.findChainOrThrow("A").findResidueOrThrow("17")
 
-				anchorGroups.apply {
-
-					add(mutableListOf(
-						DesignPosition.Anchor.Single(
-							attachedAtoms = identitySetOf(
-								gly17.findAtomOrThrow("HA2"),
-								gly17.findAtomOrThrow("HA3")
-							),
-							a = gly17.findAtomOrThrow("CA"),
-							b = gly17.findAtomOrThrow("N"),
-							c = gly17.findAtomOrThrow("C")
-						),
-						DesignPosition.Anchor.Single(
-							attachedAtoms = identitySetOf(
-								gly17.findAtomOrThrow("H")
-							),
-							a = gly17.findAtomOrThrow("N"),
-							b = ser16.findAtomOrThrow("C"),
-							c = gly17.findAtomOrThrow("CA")
-						)
-					))
-
-					add(mutableListOf(
-						DesignPosition.Anchor.Double(
-							attachedAtoms = identitySetOf(
-								gly17.findAtomOrThrow("H"),
-								gly17.findAtomOrThrow("HA2"),
-								gly17.findAtomOrThrow("HA3")
-							),
-							a = gly17.findAtomOrThrow("CA"),
-							b = gly17.findAtomOrThrow("N"),
-							c = ser16.findAtomOrThrow("C"),
-							d = gly17.findAtomOrThrow("C")
-						)
-					))
-				}
-			}
-
+			// make the design position
+			val pos = Proteins.makeDesignPosition(mol, gly17, "gly17")
 			return Instance(gly17, pos)
 		}
 
@@ -332,4 +286,6 @@ class TestMutation : SharedSpec({
 			}
 		}
 	}
+
+	// TODO: small molecules?
 })

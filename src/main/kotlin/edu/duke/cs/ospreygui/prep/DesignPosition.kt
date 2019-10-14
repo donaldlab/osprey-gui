@@ -254,13 +254,13 @@ class DesignPosition(
 				}
 
 		data class Single(
-			override val attachedAtoms: MutableSet<Atom>,
 			val a: Atom,
 			val b: Atom,
 			val c: Atom
 		) : Anchor() {
 
 			override val anchorAtoms = listOf(a, b, c)
+			override val attachedAtoms = Atom.identitySet()
 
 			override fun isAnchorCompatible(anchor: ConfLib.Anchor) = anchor is ConfLib.Anchor.Single
 
@@ -332,7 +332,6 @@ class DesignPosition(
 		}
 
 		data class Double(
-			override val attachedAtoms: MutableSet<Atom>,
 			val a: Atom,
 			val b: Atom,
 			val c: Atom,
@@ -340,6 +339,7 @@ class DesignPosition(
 		) : Anchor() {
 
 			override val anchorAtoms = listOf(a, b, c, d)
+			override val attachedAtoms = Atom.identitySet()
 
 			override fun isAnchorCompatible(anchor: ConfLib.Anchor) = anchor is ConfLib.Anchor.Double
 
