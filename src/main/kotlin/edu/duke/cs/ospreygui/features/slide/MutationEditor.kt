@@ -17,8 +17,9 @@ import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
+import java.math.BigInteger
+import java.text.NumberFormat
 import kotlin.collections.ArrayList
-import kotlin.collections.HashMap
 
 
 class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
@@ -27,9 +28,11 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 	private val winState = WindowState()
 
-	private inner class PositionEditor(val pos: DesignPosition, val moltype: MoleculeType) {
+	private inner class PositionEditor(val posInfo: PosInfo) {
 
-		val mol  = pos.mol
+		val pos get() = posInfo.pos
+		val moltype get() = posInfo.moltype
+		val mol= pos.mol
 
 		val winState = WindowState()
 			.apply { pOpen.value = true }
@@ -51,8 +54,6 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				view.renderEffects.remove(atom)
 			}
 		}
-
-		private val currentAtoms = ArrayList<CurrentAtom>()
 
 		private fun toggleCurrentAtom(atom: Atom, view: MoleculeRenderView) {
 
@@ -98,8 +99,6 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		inner class AnchorAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
 
-			val pSelected = Ref.of(false)
-
 			fun addEffect() {
 				view.renderEffects[atom] = anchorEffect
 			}
@@ -140,7 +139,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			}
 		}
 
-		val anchorGroupInfos = ArrayList<AnchorGroupInfo>()
+		private val currentAtoms = ArrayList<CurrentAtom>()
+		private val anchorGroupInfos = ArrayList<AnchorGroupInfo>()
 
 		fun resetInfos(view: MoleculeRenderView) {
 
@@ -170,6 +170,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				currentAtoms.add(info)
 				info.addEffect()
 			}
+
+			updateSequenceCounts()
 		}
 
 		fun Atom.label(): String {
@@ -188,8 +190,6 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			return label
 		}
 
-		val DesignPosition.confSpace get() = prep.positionConfSpaces.getOrMake(this)
-
 		fun DesignPosition.resetConfSpace() {
 
 			// delete the old conf space
@@ -204,6 +204,9 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				} catch (ex: DesignPosition.IllegalAnchorsException) {
 					null
 				}
+
+				// select its "mutation" by default, if possible
+				wildTypeFragment?.let { mutations.add(it) }
 			}
 		}
 
@@ -215,6 +218,9 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 
 		fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
+
+			var resetTabSelection = false
+
 			winState.render(
 				onOpen = {
 
@@ -223,21 +229,33 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 					// init the infos
 					resetInfos(slide.findViewOrThrow())
+
+					// start with first tab
+					resetTabSelection = true
 				},
 				whenOpen = {
 
 					// draw the window
 					begin("Design Position Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
 
+					// if we need to reset the tab selection, make the flags for the first tab
+					fun makeFlags() =
+						if (resetTabSelection) {
+							resetTabSelection = false
+							IntFlags.of(Commands.TabItemFlags.SetSelected)
+						} else {
+							IntFlags.of(Commands.TabItemFlags.None)
+						}
+
 					tabBar("tabs") {
 						when (moltype) {
-							MoleculeType.Protein -> tabItem("Protein") {
+							MoleculeType.Protein -> tabItem("Protein", flags = makeFlags()) {
 								renderProteinTab(imgui, slide, slidewin)
 							}
 							// TODO: others?
 							else -> Unit
 						}
-						tabItem("Atoms") {
+						tabItem("Atoms", flags = makeFlags()) {
 							renderAtomsTab(imgui, slide, slidewin)
 						}
 						tabItem(mutationsTabState, "Mutations",
@@ -440,7 +458,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 				text("Anchor Group:")
 				sameLine()
-				withId(anchorGroupInfo) {
+				withId(anchorsi) {
 
 					// button to delete anchor group
 					if (button("x")) {
@@ -448,9 +466,9 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 						posChanged = true
 					}
 
-					for (anchorInfo in anchorGroupInfo.anchorInfos) {
+					for ((anchori, anchorInfo) in anchorGroupInfo.anchorInfos.withIndex()) {
 						indent(20f)
-						withId(anchorInfo) {
+						withId(anchori) {
 
 							fun anchorDeleteButton() {
 								if (button("x")) {
@@ -615,7 +633,6 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		}
 
 		private val fragInfos = ArrayList<FragInfo>()
-
 		private var selectedFrag: ConfLib.Fragment? = null
 
 		private fun activateMutationsTab() {
@@ -672,12 +689,12 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			beginChild("mutations", 300f, 400f, true)
 			if (fragInfos.isNotEmpty()) {
 				for (info in fragInfos) {
-					if (radioButton("###${System.identityHashCode(info.frag)}", selectedFrag == info.frag)) {
+					if (radioButton("###radio-${info.id}", selectedFrag == info.frag)) {
 						selectedFrag = info.frag
 						mutate(slide.findViewOrThrow(), info.frag)
 					}
 					sameLine()
-					if (checkbox(info.frag.name, info.pSelected)) {
+					if (checkbox("${info.frag.name}##check-${info.id}", info.pSelected)) {
 
 						// mark the mutation as included or not in the design position conf space
 						if (info.pSelected.value) {
@@ -685,6 +702,9 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 						} else {
 							pos.confSpace.mutations.remove(info.frag)
 						}
+
+						// update the sequence count
+						updateSequenceCounts()
 					}
 				}
 			} else {
@@ -716,12 +736,69 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 	}
 	private var positionEditor: PositionEditor? = null
 
-	private data class PosInfo(val pos: DesignPosition, val moltype: MoleculeType) {
+	private inner class PosInfo(val pos: DesignPosition, val moltype: MoleculeType) {
 
 		val pSelected = Ref.of(false)
 	}
 
-	private val posInfosByMol = HashMap<Molecule,ArrayList<PosInfo>>()
+	private val DesignPosition.confSpace get() = prep.positionConfSpaces.getOrMake(this)
+
+	private inner class MolInfo(val molType: MoleculeType, val mol: Molecule) {
+
+		val posInfos = ArrayList<PosInfo>()
+		var numSequences = BigInteger.ZERO
+
+		fun updateSequenceCount() {
+
+			numSequences = BigInteger.ONE
+
+			for (info in posInfos) {
+				numSequences *= info.pos.confSpace.mutations.size.toBigInteger()
+			}
+		}
+
+		fun makeNewPosition(): PosInfo {
+
+			val positions = prep.designPositionsByMol
+				.getOrPut(mol) { ArrayList() }
+
+			// choose a default but unique name
+			val prefix = "Pos "
+			val maxNum = positions
+				.mapNotNull {
+					it.name
+						.takeIf { it.startsWith(prefix) }
+						?.substring(prefix.length)
+						?.toIntOrNull()
+				}
+				.max()
+				?: 0
+			val num = maxNum + 1
+
+			// create the position and add it
+			val pos = DesignPosition("$prefix$num", mol)
+			positions.add(pos)
+
+			val posInfo = PosInfo(pos, molType)
+			posInfos.add(posInfo)
+			return posInfo
+		}
+	}
+	private val molInfos = ArrayList<MolInfo>()
+
+	private val sequenceFormatter = NumberFormat.getIntegerInstance()
+		.apply {
+			isGroupingUsed = true
+		}
+
+	private var numSequences = BigInteger.ZERO
+
+	private fun updateSequenceCounts() {
+		molInfos.forEach { it.updateSequenceCount() }
+		numSequences = molInfos
+			.map { it.numSequences }
+			.reduce { a, b -> a*b }
+	}
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Mutations")) {
@@ -734,12 +811,14 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		winState.render(
 			onOpen = {
 
-				// reset pos infos
-				posInfosByMol.clear()
+				// reset infos
+				molInfos.clear()
 				for ((moltype, mol) in prep.mols) {
-					val infos = posInfosByMol.getOrPut(mol) { ArrayList() }
-					prep.designPositionsByMol.get(mol)?.forEach { pos ->
-						infos.add(PosInfo(pos, moltype))
+					MolInfo(moltype, mol).apply {
+						molInfos.add(this)
+						prep.designPositionsByMol[mol]?.forEach { pos ->
+							posInfos.add(PosInfo(pos, moltype))
+						}
 					}
 				}
 			},
@@ -748,10 +827,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				// draw the window
 				begin("Mutation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
 
-				for ((i, molAndMoltype) in prep.mols.withIndex()) {
-					// alas, Kotlin doesn't support nested destructuring declarations
-					val (moltype, mol) = molAndMoltype
-					withId(mol) {
+				for ((i, molInfo) in molInfos.withIndex()) {
+					withId(i) {
 
 						if (i > 0) {
 							// let the entries breathe
@@ -762,47 +839,60 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 							spacing()
 						}
 
-						// show the current design positions
-						val posInfos = posInfosByMol.getValue(mol)
-
-						text("$mol: ${posInfos.size} positions(s)")
+						text("${molInfo.mol}: ${molInfo.posInfos.size} positions(s)")
 						beginChild("positions", 300f, 200f, true)
-						for (posInfo in posInfos) {
+						for (posInfo in molInfo.posInfos) {
 							selectable(posInfo.pos.name, posInfo.pSelected)
 						}
 						endChild()
 
 						if (button("Add")) {
-							makeNewPosition(mol, moltype)
+
+							// start the position editor
+							positionEditor = PositionEditor(molInfo.makeNewPosition())
 						}
 
 						sameLine()
 
-						val canEdit = posInfos.count { it.pSelected.value } == 1
+						val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
 						styleEnabledIf(canEdit) {
 							if (button("Edit") && canEdit) {
-								posInfos
+
+								// start the position editor
+								molInfo.posInfos
 									.find { it.pSelected.value }
-									?.let {
-										positionEditor = PositionEditor(it.pos, it.moltype)
-									}
+									?.let { positionEditor = PositionEditor(it) }
 							}
 						}
 
 						sameLine()
 
-						styleEnabledIf(posInfos.any { it.pSelected.value }) {
+						styleEnabledIf(molInfo.posInfos.any { it.pSelected.value }) {
 							if (button("Remove")) {
-								posInfos
+								molInfo.posInfos
 									.filter { it.pSelected.value }
 									.forEach {
-										posInfos.remove(it)
-										prep.designPositionsByMol[mol]?.remove(it.pos)
+										molInfo.posInfos.remove(it)
+										prep.designPositionsByMol[molInfo.mol]?.remove(it.pos)
 										prep.positionConfSpaces.remove(it.pos)
 									}
+								updateSequenceCounts()
 							}
 						}
+
+						spacing()
+
+						// show the number of sequences so far
+						text("Sequences: ${sequenceFormatter.format(molInfo.numSequences)}")
 					}
+				}
+
+				// for multiple molecules, show the combined sequence count
+				if (molInfos.size > 1) {
+
+					spacing()
+
+					text("Combined Sequences: ${sequenceFormatter.format(numSequences)}")
 				}
 
 				// render the position editor, when active
@@ -813,37 +903,9 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			onClose = {
 
 				// cleanup
-				posInfosByMol.clear()
+				molInfos.clear()
 			}
 		)
-	}
-
-	private fun makeNewPosition(mol: Molecule, moltype: MoleculeType) {
-
-		val positions = prep.designPositionsByMol
-			.getOrPut(mol) { ArrayList() }
-
-		// choose a default but unique name
-		val prefix = "Pos "
-		val maxNum = positions
-			.mapNotNull {
-				it.name
-					.takeIf { it.startsWith(prefix) }
-					?.substring(prefix.length)
-					?.toIntOrNull()
-			}
-			.max()
-			?: 0
-		val num = maxNum + 1
-
-		// create the position and add it
-		val pos = DesignPosition("$prefix$num", mol)
-		positions.add(pos)
-
-		posInfosByMol.getValue(mol).add(PosInfo(pos, moltype))
-
-		// start the position editor
-		positionEditor = PositionEditor(pos, moltype)
 	}
 }
 

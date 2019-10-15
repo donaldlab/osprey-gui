@@ -90,7 +90,7 @@ class ConfSpacePrep(
 				add(MenuRenderSettings(defaultRenderSettings))
 				add(ClashViewer())
 			}
-			s.features.menu("Design") {
+			s.features.menu("Edit") {
 				add(MutationEditor(this@ConfSpacePrep))
 			}
 		}
