@@ -11,6 +11,7 @@ import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.defaultRenderSettings
 import edu.duke.cs.ospreygui.features.slide.*
+import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.forcefield.amber.partition
 import edu.duke.cs.ospreygui.io.ConfLib
 import java.util.*
@@ -56,9 +57,12 @@ class MoleculePrep(
 		}
 	}
 
-	fun getIncludedMols(): List<Molecule> =
+	fun getIncludedTypedMols(): List<Pair<MoleculeType,Molecule>> =
 		partition
 			.filter { (_, mol) -> isIncluded[mol] == true }
+
+	fun getIncludedMols(): List<Molecule> =
+		getIncludedTypedMols()
 			.map { (_, mol) -> mol }
 
 	class ConfLibs : Iterable<ConfLib> {
@@ -67,7 +71,7 @@ class MoleculePrep(
 
 		override fun iterator() = conflibs.iterator()
 
-		fun add(toml: String) {
+		fun add(toml: String): ConfLib {
 
 			val conflib = ConfLib.from(toml)
 
@@ -77,6 +81,8 @@ class MoleculePrep(
 			}
 
 			conflibs.add(conflib)
+
+			return conflib
 		}
 	}
 	val conflibs = ConfLibs()
@@ -119,7 +125,7 @@ class MoleculePrep(
 				add(MinimizerTool())
 			}
 			s.features.menu("Design") {
-				add(MutablePositionsEditor(this@MoleculePrep))
+				add(MutationEditor(this@MoleculePrep))
 			}
 		}
 		win.addSlide(this)

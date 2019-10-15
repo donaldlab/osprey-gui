@@ -4,66 +4,30 @@ import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.tools.ByteFlags
 import cuchaz.kludge.tools.IntFlags
 import cuchaz.kludge.tools.Ref
-import cuchaz.kludge.window.FileDialog
-import cuchaz.kludge.window.FilterList
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
-import edu.duke.cs.ospreygui.OspreyGui
+import edu.duke.cs.ospreygui.features.components.ConfLibPicker
+import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
-import edu.duke.cs.ospreygui.io.read
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.MoleculePrep
-import java.nio.file.Paths
+import edu.duke.cs.ospreygui.prep.Proteins
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 
-class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
+class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
-	// TODO: add shortcuts for proteins
-
-	override val id = FeatureId("design.positions")
+	override val id = FeatureId("design.mutations")
 
 	private val winState = WindowState()
-	private val alert = Alert()
 
-	data class AnchorAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
-
-		val pSelected = Ref.of(false)
-
-		fun addEffect() {
-			view.renderEffects[atom] = anchorEffect
-		}
-
-		fun removeEffect() {
-			view.renderEffects.remove(atom)
-		}
-	}
-
-	data class SelectedAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
-
-		val pSelected = Ref.of(false)
-
-		fun addEffect() {
-			view.renderEffects[atom] = selectedEffect
-		}
-
-		fun removeEffect() {
-			view.renderEffects.remove(atom)
-		}
-	}
-
-	enum class PickMode {
-		Anchor,
-		Sidechain
-	}
-
-	private inner class PositionEditor(val pos: DesignPosition) {
+	private inner class PositionEditor(val pos: DesignPosition, val moltype: MoleculeType) {
 
 		val mol  = pos.mol
 
@@ -72,10 +36,139 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 		val nameBuf = Commands.TextBuffer(1024)
 
 		val clickTracker = ClickTracker()
-		var pickMode = PickMode.Anchor
+		var autoSelectHydrogens = Ref.of(true)
+		val mutationsTabState = Commands.TabState()
 
-		val anchorAtoms = ArrayList<AnchorAtom>()
-		val sidechainAtoms = ArrayList<SelectedAtom>()
+		inner class CurrentAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
+
+			val pSelected = Ref.of(false)
+
+			fun addEffect() {
+				view.renderEffects[atom] = selectedEffect
+			}
+
+			fun removeEffect() {
+				view.renderEffects.remove(atom)
+			}
+		}
+
+		private val currentAtoms = ArrayList<CurrentAtom>()
+
+		private fun toggleCurrentAtom(atom: Atom, view: MoleculeRenderView) {
+
+			// is the atom already selected?
+			val isSelected = pos.currentAtoms.any { it === atom }
+			if (isSelected) {
+
+				// atom already selected, so deselect it
+				pos.currentAtoms.removeIf { it === atom }
+
+				// toggle the bonded hydrogens if needed
+				if (autoSelectHydrogens.value) {
+					val hAtoms = mol.bonds.bondedAtoms(atom)
+						.filter { it.element == Element.Hydrogen }
+						.toIdentitySet()
+					pos.currentAtoms.removeIf { it in hAtoms }
+				}
+
+			} else {
+
+				// atom not selected yet, so select it
+				pos.currentAtoms.add(atom)
+
+				// toggle the bonded hydrogens if needed
+				if (autoSelectHydrogens.value) {
+					mol.bonds.bondedAtoms(atom)
+						.filter { it.element == Element.Hydrogen }
+						.forEach { h -> pos.currentAtoms.add(h) }
+				}
+			}
+
+			resetInfos(view)
+		}
+
+		private fun removeCurrentAtoms(atoms: Set<Atom>, view: MoleculeRenderView) {
+
+			pos.currentAtoms.removeIf { it in atoms }
+
+			resetInfos(view)
+		}
+
+		inner class AnchorAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
+
+			val pSelected = Ref.of(false)
+
+			fun addEffect() {
+				view.renderEffects[atom] = anchorEffect
+			}
+
+			fun removeEffect() {
+				view.renderEffects.remove(atom)
+			}
+
+			var atomClickHandler: ((MoleculeRenderView, Atom) -> Unit)? = null
+		}
+
+		inner class AnchorInfo(
+			val anchor: DesignPosition.Anchor
+		) {
+
+			val anchorAtoms = ArrayList<AnchorAtom>()
+
+			fun findAtomInfo(atom: Atom) =
+				anchorAtoms.find { it.atom === atom }
+
+			fun removeEffects() {
+				anchorAtoms.forEach { it.removeEffect() }
+			}
+		}
+
+		inner class AnchorGroupInfo(
+			val anchors: MutableList<DesignPosition.Anchor>
+		) {
+
+			val anchorInfos = ArrayList<AnchorInfo>()
+
+			fun removeEffects() {
+				anchorInfos.forEach { it.removeEffects() }
+			}
+
+			fun replaceAnchor(old: DesignPosition.Anchor, new: DesignPosition.Anchor) {
+				anchors[anchors.indexOf(old)] = new
+			}
+		}
+
+		val anchorGroupInfos = ArrayList<AnchorGroupInfo>()
+
+		fun resetInfos(view: MoleculeRenderView) {
+
+			anchorGroupInfos.forEach { it.removeEffects() }
+			anchorGroupInfos.clear()
+			currentAtoms.forEach { it.removeEffect() }
+			currentAtoms.clear()
+
+			// add the anchor effects
+			for (anchorGroup in pos.anchorGroups) {
+				anchorGroupInfos.add(AnchorGroupInfo(anchorGroup).apply {
+					for (anchor in anchorGroup) {
+						anchorInfos.add(AnchorInfo(anchor).apply {
+							for (atom in anchor.anchorAtoms) {
+								val info = AnchorAtom(atom, atom.label(), view)
+								anchorAtoms.add(info)
+								info.addEffect()
+							}
+						})
+					}
+				})
+			}
+
+			// add the current atoms effects
+			for (atom in pos.currentAtoms) {
+				val info = CurrentAtom(atom, atom.label(), view)
+				currentAtoms.add(info)
+				info.addEffect()
+			}
+		}
 
 		fun Atom.label(): String {
 
@@ -93,6 +186,13 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 			return label
 		}
 
+		fun Slide.Locked.findViewOrThrow() =
+			views
+				.filterIsInstance<MoleculeRenderView>()
+				.find { it.mol == mol }
+				?: throw Error("can't init design position, molecule has no render view")
+
+
 		fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 			winState.render(
 				onOpen = {
@@ -100,119 +200,36 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 					// add the hover effect
 					slidewin.hoverEffects[id] = hoverEffect
 
-					// find the view for this molecule
-					val view = slide.views
-						.filterIsInstance<MoleculeRenderView>()
-						.find { it.mol == mol }
-					?: throw Error("can't init design position, molecule has no render view")
-
-					// init the atoms lists
-					for (atom in pos.anchorAtoms) {
-						val info = AnchorAtom(atom, atom.label(), view)
-						anchorAtoms.add(info)
-						info.addEffect()
-					}
-					for (atom in pos.atoms) {
-						val info = SelectedAtom(atom, atom.label(), view)
-						sidechainAtoms.add(info)
-						info.addEffect()
-					}
+					// init the infos
+					resetInfos(slide.findViewOrThrow())
 				},
 				whenOpen = {
-
-					// did we click anything?
-					if (clickTracker.clicked(slidewin)) {
-
-						// select the atom from the click, if any
-						slidewin.mouseTarget?.let { target ->
-							(target.view as? MoleculeRenderView)?.let { view ->
-
-								// make sure we're picking from the same molecule
-								if (view.mol == mol) {
-
-									(target.target as? Atom)?.let { atom ->
-
-										// add/remove the atom to/from the selection
-										when (pickMode) {
-											PickMode.Anchor -> toggleAnchorAtom(atom, view)
-											PickMode.Sidechain -> toggleSidechainAtom(atom, view)
-										}
-									}
-								}
-							}
-						}
-					}
 
 					// draw the window
 					begin("Design Position Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
 
-					// edit the name
-					nameBuf.text = pos.name
-					inputText("Name", nameBuf)
-					pos.name = nameBuf.text
-
-					spacing()
-
-					// show anchor atoms
-					if (radioButton("Anchor Atoms: ${anchorAtoms.size}", pickMode == PickMode.Anchor)) {
-						pickMode = PickMode.Anchor
-					}
-					sameLine()
-					infoTip("""
-						|Anchor atoms help align the sidechain to the mainchain for a design position.
-						|At least three anchor atoms must be selected.
-						|Sidechain conformations are aligned such that the anchor 1 positions are exactly conincident.
-						|Then, the anchor 1-2 lines are made parallel.
-						|Then, the anchor 1-2-3 planes are made parallel.
-						""".trimMargin())
-					beginChild("anchorAtoms", 300f, 100f, true)
-
-					fun showAnchor(id: Int, anchorAtom: AnchorAtom?) {
-						if (anchorAtom != null) {
-							selectable("anchor $id: ${anchorAtom.label}", anchorAtom.pSelected)
-						} else {
-							selectable("anchor $id: none", false)
+					tabBar("tabs") {
+						when (moltype) {
+							MoleculeType.Protein -> tabItem("Protein") {
+								renderProteinTab(imgui, slide, slidewin)
+							}
+							// TODO: others?
+							else -> Unit
 						}
-					}
-					showAnchor(1, anchorAtoms.getOrNull(0))
-					showAnchor(2, anchorAtoms.getOrNull(1))
-					showAnchor(3, anchorAtoms.getOrNull(2))
-					for (i in 3 until anchorAtoms.size) {
-						val anchorAtom = anchorAtoms[i]
-						selectable(anchorAtom.label, anchorAtom.pSelected)
-					}
-					endChild()
-
-					styleEnabledIf(anchorAtoms.any { it.pSelected.value }) {
-						if (button("Remove")) {
-							anchorAtoms
-								.filter { it.pSelected.value }
-								.forEach {
-									toggleAnchorAtom(it.atom, it.view)
-								}
+						tabItem("Atoms") {
+							renderAtomsTab(imgui, slide, slidewin)
 						}
-					}
-
-					spacing()
-
-					// show sidechain atoms
-					if (radioButton("Sidechain Atoms: ${sidechainAtoms.size}", pickMode == PickMode.Sidechain)) {
-						pickMode = PickMode.Sidechain
-					}
-					beginChild("sidechainAtoms", 300f, 200f, true)
-					for (info in sidechainAtoms) {
-						selectable(info.label, info.pSelected)
-					}
-					endChild()
-
-					styleEnabledIf(sidechainAtoms.any { it.pSelected.value }) {
-						if (button("Remove")) {
-							sidechainAtoms
-								.filter { it.pSelected.value }
-								.forEach {
-									toggleSidechainAtom(it.atom, it.view)
-								}
-						}
+						tabItem(mutationsTabState, "Mutations",
+							onActivated = {
+								activateMutationsTab()
+							},
+							whenActive = {
+								renderMutationsTab(imgui, slide, slidewin)
+							},
+							onDeactivated = {
+								deactivateMutationsTab(slide)
+							}
+						)
 					}
 
 					end()
@@ -220,95 +237,463 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 				onClose = {
 					positionEditor = null
 
-					// remove the effects
+					// cleanup effects
 					slidewin.hoverEffects.remove(id)
-					anchorAtoms.forEach { it.removeEffect() }
-					sidechainAtoms.forEach { it.removeEffect() }
+
+					// cleanup the infos
+					anchorGroupInfos.forEach { it.removeEffects() }
+					anchorGroupInfos.clear()
+					currentAtoms.forEach { it.removeEffect() }
+					currentAtoms.clear()
 				}
 			)
 		}
 
-		private fun toggleAnchorAtom(atom: Atom, view: MoleculeRenderView) {
+		private fun <R> hoveredAtom(slidewin: SlideCommands, block: (MoleculeRenderView, Atom) -> R): R? {
 
-			// find the existing selected atom, if any
-			var info = anchorAtoms.find { it.atom == atom }
-			if (info != null) {
+			// select the atom from the click, if any
+			slidewin.mouseTarget?.let { target ->
+				(target.view as? MoleculeRenderView)?.let { view ->
 
-				// atom already selected, so unselect it
-				anchorAtoms.remove(info)
-				info.removeEffect()
+					// make sure we're picking from the same molecule
+					if (view.mol == mol) {
 
-				// update the design pos too
-				pos.anchorAtoms.remove(info.atom)
+						(target.target as? Atom)?.let { atom ->
 
-			} else {
+							// found an elligible atom!
+							return block(view, atom)
+						}
+					}
+				}
+			}
 
-				// atom not selected yet, so select it
-				info = AnchorAtom(atom, atom.label(), view)
-				anchorAtoms.add(info)
-				info.addEffect()
+			// no elligible atom hovered
+			return null
+		}
 
-				// update the design pos too
-				pos.anchorAtoms.add(info.atom)
+		private var selectedChain: Polymer.Chain? = null
+		private var selectedRes: Polymer.Residue? = null
+
+		private fun renderProteinTab(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
+
+			if (mol !is Polymer) return
+
+			// select an initial chain if needed
+			if (selectedChain == null) {
+				selectedChain = mol.chains.first()
+			}
+
+			// did we pointing at an atom?
+			val hoveredRes = hoveredAtom(slidewin) { view, atom ->
+
+				// was it a residue?
+				val res = mol.findResidue(atom)
+				if (res != null) {
+
+					// did we click on it?
+					if (clickTracker.clicked(slidewin)) {
+						selectResidue(view, res)
+					}
+				}
+
+				res
+			}
+
+			// show all the chains as radios
+			text("Chains:")
+			columns(5)
+			for (chain in mol.chains) {
+				if (radioButton(chain.id, selectedChain == chain)) {
+					selectedChain = chain
+				}
+				nextColumn()
+			}
+			columns(1)
+
+			// we should definitely have a chain by now
+			val selectedChain = selectedChain ?: return
+
+			val view = slide.findViewOrThrow()
+
+			// show all the residues as radios
+			text("Residues:")
+			beginChild("residues", 500f, 400f, true)
+			columns(5)
+			for (res in selectedChain.residues) {
+				if (radioButton("${res.id} ${res.type}", res == selectedRes || res == hoveredRes)) {
+					slidewin.showExceptions {
+						selectResidue(view, res)
+					}
+				}
+				nextColumn()
+			}
+			columns(1)
+			endChild()
+		}
+
+		private fun selectResidue(view: MoleculeRenderView, res: Polymer.Residue) {
+
+			// save the selection
+			selectedRes = res
+
+			// update the design position
+			Proteins.setDesignPosition(pos, res)
+			resetInfos(view)
+		}
+
+		private var atomClickHandler: ((MoleculeRenderView, Atom) -> Unit)? = null
+
+		private fun atomClickSidechain(view: MoleculeRenderView, atom: Atom) {
+			toggleCurrentAtom(atom, view)
+		}
+
+		private fun renderAtomsTab(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
+
+			var infosNeedReset = false
+
+			// default to the sidechain atom click handler
+			if (atomClickHandler == null) {
+				atomClickHandler = ::atomClickSidechain
+			}
+
+			// did we click on an atom?
+			hoveredAtom(slidewin) { view, atom ->
+				if (clickTracker.clicked(slidewin)) {
+
+					// invoke the atom click handler
+					atomClickHandler?.invoke(view, atom)
+				}
+			}
+
+			// edit the name
+			nameBuf.text = pos.name
+			inputText("Name", nameBuf)
+			pos.name = nameBuf.text
+
+			spacing()
+
+			// show current atoms (but call them "sidechain" atoms I guess?)
+			if (radioButton("Sidechain Atoms: ${currentAtoms.size}", atomClickHandler == ::atomClickSidechain)) {
+				atomClickHandler = ::atomClickSidechain
+			}
+			indent(20f)
+			checkbox("Automatically select hydrogens", autoSelectHydrogens)
+			beginChild("currentAtoms", 300f, 200f, true)
+			for (info in currentAtoms) {
+				selectable(info.label, info.pSelected)
+			}
+			endChild()
+
+			styleEnabledIf(currentAtoms.any { it.pSelected.value }) {
+				if (button("Remove")) {
+					val selectedAtoms = currentAtoms
+						.filter { it.pSelected.value }
+						.map { it.atom }
+						.toIdentitySet()
+					removeCurrentAtoms(selectedAtoms, slide.findViewOrThrow())
+				}
+			}
+
+			unindent(20f)
+			spacing()
+
+			// TODO: cleanup anchor rendering code? the indentation is getting a little ridiculous...
+
+			// show anchors
+			text("Anchors:")
+			sameLine()
+			infoTip("""
+				|Anchor atoms are mainchain atoms that help align the sidechain to the mainchain.
+			""".trimMargin())
+			indent(20f)
+
+			for ((anchorsi, anchorGroupInfo) in anchorGroupInfos.withIndex()) {
+
+				// breathe a little
+				if (anchorsi > 0) {
+					spacing()
+					separator()
+					spacing()
+				}
+
+				text("Anchor Group:")
+				sameLine()
+				withId(anchorGroupInfo) {
+
+					// button to delete anchor group
+					if (button("x")) {
+						pos.anchorGroups.remove(anchorGroupInfo.anchors)
+						infosNeedReset = true
+					}
+
+					for (anchorInfo in anchorGroupInfo.anchorInfos) {
+						indent(20f)
+						withId(anchorInfo) {
+
+							fun anchorDeleteButton() {
+								if (button("x")) {
+									anchorGroupInfo.anchors.remove(anchorInfo.anchor)
+									infosNeedReset = true
+								}
+							}
+
+							fun anchorRadioButton(name: String, atom: Atom, anchorUpdater: (Atom) -> DesignPosition.Anchor) {
+								val atomInfo = anchorInfo.findAtomInfo(atom)
+								if (atomInfo == null) {
+									text("$name: (error)")
+								} else {
+									if (radioButton("$name: ${atomInfo.label}", atomClickHandler == atomInfo.atomClickHandler)) {
+
+										/* This is a little tricky, so let me explain:
+
+											When the radio is clicked, we make a function that:
+												1. creates new anchor with the selected atom by calling anchorUpdater()
+												2. replaces the old anchor with the new anchor in the anchor group
+												3. rebuilds all the GUI shadow info for the design position by calling resetInfos()
+												4. resets the atoms tab atom click handler
+
+											Then we assign that function to the atom info for the anchor atom so we can find it again later.
+											And we also assign it to the atoms tab atom click handler, so it's activated.
+
+											Conveniently, resetInfos() will drop this function from the heap when
+											it re-creates all the AnchorInfos instances, so we won't have stale handlers hanging around
+										*/
+										atomInfo.atomClickHandler = { view, atom ->
+											anchorGroupInfo.replaceAnchor(
+												anchorInfo.anchor,
+												anchorUpdater(atom)
+											)
+											/* NOTE:
+												Could set infosNeedReset = true here, but it won't work.
+												By the time atomClickHandler gets called, we'll be on a different stack frame,
+												and a different instance of infosNeedReset.
+												So just call resetInfos() directly. Which is ok, since
+												atomClickHandler gets called outside of the info render loops.
+											 */
+											resetInfos(view)
+											atomClickHandler = null
+										}
+										atomClickHandler = atomInfo.atomClickHandler
+									}
+								}
+							}
+
+							when (anchorInfo.anchor) {
+								is DesignPosition.SingleAnchor -> {
+									text("Single Anchor")
+									sameLine()
+									infoTip("""
+										|Single anchors allow the sidechain to bond to the mainchain at one atom.
+										|Three atoms are required: a, b, and c.
+										|Only the a atom is allowed to bond to the sidechain.
+										|First, a positions are exactly superposed.
+										|Then, a->b vectors are made parallel.
+										|Then, a,b,c planes are made parallel.
+									""".trimMargin())
+									sameLine()
+									anchorDeleteButton()
+
+									anchorRadioButton("a", anchorInfo.anchor.a) { pickedAtom ->
+										anchorInfo.anchor.copy(a = pickedAtom)
+									}
+									anchorRadioButton("b", anchorInfo.anchor.b) { pickedAtom ->
+										anchorInfo.anchor.copy(b = pickedAtom)
+									}
+									anchorRadioButton("c", anchorInfo.anchor.c) { pickedAtom ->
+										anchorInfo.anchor.copy(c = pickedAtom)
+									}
+								}
+								is DesignPosition.DoubleAnchor -> {
+									text("Double Anchor")
+									sameLine()
+									infoTip("""
+										|Double anchors allow the sidechain to bond to the mainchain at two atoms.
+										|Four atoms are required: a, b, c, and d.
+										|Only the a and b atoms are allowed to bond to the sidechain.
+										|TODO: describe alignment
+									""".trimMargin())
+									sameLine()
+									anchorDeleteButton()
+
+									anchorRadioButton("a", anchorInfo.anchor.a) { pickedAtom ->
+										anchorInfo.anchor.copy(a = pickedAtom)
+									}
+									anchorRadioButton("b", anchorInfo.anchor.b) { pickedAtom ->
+										anchorInfo.anchor.copy(b = pickedAtom)
+									}
+									anchorRadioButton("c", anchorInfo.anchor.c) { pickedAtom ->
+										anchorInfo.anchor.copy(c = pickedAtom)
+									}
+									anchorRadioButton("d", anchorInfo.anchor.d) { pickedAtom ->
+										anchorInfo.anchor.copy(d = pickedAtom)
+									}
+								}
+							}
+						}
+
+						unindent(20f)
+					}
+
+					if (button("Add Single Anchor")) {
+						slidewin.showExceptions {
+							anchorGroupInfo.anchors.add(pos.SingleAnchor(
+								// pick dummy atoms for now
+								a = mol.atoms[0],
+								b = mol.atoms[1],
+								c = mol.atoms[2]
+							))
+							infosNeedReset = true
+						}
+					}
+
+					sameLine()
+
+					if (button("Add Double Anchor")) {
+						slidewin.showExceptions {
+							anchorGroupInfo.anchors.add(pos.DoubleAnchor(
+								// pick dummy atoms for now
+								a = mol.atoms[0],
+								b = mol.atoms[1],
+								c = mol.atoms[2],
+								d = mol.atoms[3]
+							))
+							infosNeedReset = true
+						}
+					}
+				}
+			}
+
+			unindent(20f)
+
+			spacing()
+
+			if (button("Add Anchor Group")) {
+				pos.anchorGroups.add(ArrayList())
+				infosNeedReset = true
+			}
+
+			// finally, reset the infos if there's a pending need
+			if (infosNeedReset) {
+				resetInfos(slide.findViewOrThrow())
 			}
 		}
 
-		private fun toggleSidechainAtom(atom: Atom, view: MoleculeRenderView) {
+		private val conflibPicker = ConfLibPicker(prep).apply {
+			onAdd = { activateMutationsTab() }
+		}
 
-			// find the existing selected atom, if any
-			var info = sidechainAtoms.find { it.atom == atom }
-			if (info != null) {
+		inner class FragInfo(
+			val id: String,
+			val frag: ConfLib.Fragment
+		) {
+			val pSelected = Ref.of(false)
+		}
 
-				// atom already selected, so unselect it
-				sidechainAtoms.remove(info)
-				info.removeEffect()
+		private val fragInfos = ArrayList<FragInfo>()
 
-				// update the design pos too
-				pos.atoms.remove(info.atom)
+		private var wildTypeFrag: ConfLib.Fragment? = null
+		private var selectedFrag: ConfLib.Fragment? = null
 
-			} else {
+		private fun activateMutationsTab() {
 
-				// atom not selected yet, so select it
-				info = SelectedAtom(atom, atom.label(), view)
-				sidechainAtoms.add(info)
-				info.addEffect()
+			// make the old infos easy to transfer
+			val oldInfos = fragInfos.associateBy { it.id }
+			fun makeInfo(conflib: ConfLib?, frag: ConfLib.Fragment): FragInfo {
 
-				// update the design pos too
-				pos.atoms.add(info.atom)
+				// build the info id from the library and fragment id
+				val id = "${System.identityHashCode(conflib)}.${frag.id}"
+
+				return FragInfo(id, frag).apply {
+
+					// copy over old data if possible
+					oldInfos[id]?.let { oldInfo ->
+						pSelected.value = oldInfo.pSelected.value
+					}
+				}
 			}
+
+			// rebuild the fragment infos
+			fragInfos.clear()
+
+			// add the wild type fragment, if we can
+			try {
+				wildTypeFrag = pos.makeFragment("wt", "WildType").apply {
+					fragInfos.add(makeInfo(null, this))
+				}
+			} catch (ex: DesignPosition.IllegalAnchorsException) {
+				wildTypeFrag = null
+			}
+
+			// add fragments from the libraries
+			for (conflib in prep.conflibs) {
+				conflib.fragments.values
+					.filter { pos.isFragmentCompatible(it) }
+					.sortedBy { it.name }
+					.forEach { frag ->
+						fragInfos.add(makeInfo(conflib, frag))
+					}
+			}
+
+			// select the wildtype fragment by default
+			selectedFrag = wildTypeFrag
+
+			// TODO: collect tags for the fragments? eg, hydrophobic, aromatic
+		}
+
+		private fun renderMutationsTab(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
+
+			// show the conflib picker
+			conflibPicker.render(imgui)
+
+			// show the available mutations
+			beginChild("mutations", 300f, 400f, true)
+			if (fragInfos.isNotEmpty()) {
+				for (info in fragInfos) {
+					if (radioButton("###${System.identityHashCode(info.frag)}", selectedFrag == info.frag)) {
+						selectedFrag = info.frag
+						mutate(slide.findViewOrThrow(), info.frag)
+					}
+					sameLine()
+					checkbox(info.frag.name, info.pSelected)
+				}
+			} else {
+				text("(no compatible mutations)")
+			}
+			endChild()
+		}
+
+		private fun deactivateMutationsTab(slide: Slide.Locked) {
+
+			val view = slide.findViewOrThrow()
+
+			// restore the wildtype if needed
+			wildTypeFrag?.let { mutate(view, it) }
+			wildTypeFrag = null
+			selectedFrag = null
+		}
+
+		private fun mutate(view: MoleculeRenderView, frag: ConfLib.Fragment) {
+
+			// pick an arbitrary conformation from the fragment
+			val conf = frag.confs.values.first()
+			pos.setConf(frag, conf)
+
+			// update the view
+			resetInfos(view)
+			view.moleculeChanged()
 		}
 	}
 	private var positionEditor: PositionEditor? = null
 
-	private data class PosInfo(val pos: DesignPosition) {
+	private data class PosInfo(val pos: DesignPosition, val moltype: MoleculeType) {
 
 		val pSelected = Ref.of(false)
 	}
 
 	private val posInfosByMol = HashMap<Molecule,ArrayList<PosInfo>>()
 
-	// cache the built-in conflib metadata
-	private val builtInConflibPaths = listOf(
-		"conflib/lovell.conflib.toml"
-	)
-	data class ConfLibInfo(
-		val name: String,
-		val description: String?,
-		val citation: String?
-	)
-	private val conflibInfos = ArrayList<ConfLibInfo>().apply {
-		for (path in builtInConflibPaths) {
-			val conflib = ConfLib.from(OspreyGui.getResourceAsString(path))
-			add(ConfLibInfo(
-				conflib.name,
-				conflib.description,
-				conflib.citation
-			))
-		}
-	}
-
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
-		if (menuItem("Positions")) {
+		if (menuItem("Mutations")) {
 			winState.isOpen = true
 		}
 	}
@@ -320,10 +705,10 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 
 				// reset pos infos
 				posInfosByMol.clear()
-				for (mol in prep.getIncludedMols()) {
+				for ((moltype, mol) in prep.getIncludedTypedMols()) {
 					val infos = posInfosByMol.getOrPut(mol) { ArrayList() }
 					prep.mutablePositionsByMol.get(mol)?.forEach { pos ->
-						infos.add(PosInfo(pos))
+						infos.add(PosInfo(pos, moltype))
 					}
 				}
 			},
@@ -332,106 +717,64 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 				// draw the window
 				begin("Mutation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
 
-				fun conflibTooltip(name: String?, desc: String?, citation: String?) {
-					if (isItemHovered()) {
-						beginTooltip()
-						if (name != null) {
-							text(name)
+				for ((i, molAndMoltype) in prep.getIncludedTypedMols().withIndex()) {
+					// alas, Kotlin doesn't support nested destructuring declarations
+					val (moltype, mol) = molAndMoltype
+					withId(mol) {
+
+						if (i > 0) {
+							// let the entries breathe
+							spacing()
+							spacing()
+							separator()
+							spacing()
+							spacing()
 						}
-						if (desc != null) {
-							text(desc)
+
+						// show the current design positions
+						val posInfos = posInfosByMol.getValue(mol)
+
+						text("$mol: ${posInfos.size} positions(s)")
+						beginChild("positions", 300f, 200f, true)
+						for (posInfo in posInfos) {
+							selectable(posInfo.pos.name, posInfo.pSelected)
 						}
-						if (citation != null) {
-							text(citation)
+						endChild()
+
+						if (button("Add")) {
+							makeNewPosition(mol, moltype)
 						}
-						endTooltip()
-					}
-				}
 
-				// show available libraries
-				text("Conformation Libraries")
-				beginChild("libs", 300f, 100f, true)
-				for (conflib in prep.conflibs) {
-					text(conflib.name)
-					conflibTooltip(conflib.name, conflib.description, conflib.citation)
-				}
-				endChild()
+						sameLine()
 
-				if (button("Add")) {
-					openPopup("addlib")
-				}
-				if (beginPopup("addlib")) {
-					for (info in conflibInfos) {
-						if (menuItem(info.name)) {
-							addLib(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+						val canEdit = posInfos.count { it.pSelected.value } == 1
+						styleEnabledIf(canEdit) {
+							if (button("Edit") && canEdit) {
+								posInfos
+									.find { it.pSelected.value }
+									?.let {
+										positionEditor = PositionEditor(it.pos, it.moltype)
+									}
+							}
 						}
-						conflibTooltip(null, info.description, info.citation)
-					}
-					endPopup()
-				}
 
-				sameLine()
+						sameLine()
 
-				if (button("Add from file")) {
-					addLibFromFile()
-				}
-
-				for ((i, mol) in prep.getIncludedMols().withIndex()) {
-
-					if (i > 0) {
-						// let the entries breathe
-						spacing()
-						spacing()
-						separator()
-						spacing()
-						spacing()
-					}
-
-					// show the current design positions
-					val posInfos = posInfosByMol.getValue(mol)
-
-					text("$mol: ${posInfos.size} positions(s)")
-					beginChild("positions-${System.identityHashCode(mol)}", 300f, 200f, true)
-					for (posInfo in posInfos) {
-						selectable(posInfo.pos.name, posInfo.pSelected)
-					}
-					endChild()
-
-					if (button("Add")) {
-						makeNewPosition(mol)
-					}
-
-					sameLine()
-
-					val canEdit = posInfos.count { it.pSelected.value } == 1
-					styleEnabledIf(canEdit) {
-						if (button("Edit") && canEdit) {
-							posInfos
-								.find { it.pSelected.value }
-								?.let {
-									positionEditor = PositionEditor(it.pos)
-								}
-						}
-					}
-
-					sameLine()
-
-					styleEnabledIf(posInfos.any { it.pSelected.value }) {
-						if (button("Remove")) {
-							posInfos
-								.filter { it.pSelected.value }
-								.forEach {
-									posInfos.remove(it)
-									prep.mutablePositionsByMol[mol]?.remove(it.pos)
-								}
+						styleEnabledIf(posInfos.any { it.pSelected.value }) {
+							if (button("Remove")) {
+								posInfos
+									.filter { it.pSelected.value }
+									.forEach {
+										posInfos.remove(it)
+										prep.mutablePositionsByMol[mol]?.remove(it.pos)
+									}
+							}
 						}
 					}
 				}
 
 				// render the position editor, when active
 				positionEditor?.gui(imgui, slide, slidewin)
-
-				alert.render(this)
 
 				end()
 			},
@@ -443,7 +786,7 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 		)
 	}
 
-	private fun makeNewPosition(mol: Molecule) {
+	private fun makeNewPosition(mol: Molecule, moltype: MoleculeType) {
 
 		val positions = prep.mutablePositionsByMol
 			.getOrPut(mol) { ArrayList() }
@@ -465,33 +808,10 @@ class DesignPositionsEditor(val prep: MoleculePrep) : SlideFeature {
 		val pos = DesignPosition("$prefix$num", mol)
 		positions.add(pos)
 
-		posInfosByMol.getValue(mol).add(PosInfo(pos))
+		posInfosByMol.getValue(mol).add(PosInfo(pos, moltype))
 
 		// start the position editor
-		positionEditor = PositionEditor(pos)
-	}
-
-	private var libDir = Paths.get("").toAbsolutePath()
-	private val conflibFilter = FilterList(listOf("conflib.toml"))
-
-	private fun addLibFromFile() {
-		FileDialog.openFiles(
-			conflibFilter,
-			defaultPath = libDir
-		)?.let { paths ->
-			paths.firstOrNull()?.parent?.let { libDir = it }
-			for (path in paths) {
-				addLib(path.read())
-			}
-		}
-	}
-
-	private fun addLib(toml: String) {
-		try {
-			prep.conflibs.add(toml)
-		} catch (ex: MoleculePrep.DuplicateConfLibException) {
-			alert.show("Skipped adding duplicate Conformation Library:\n${ex.conflib.name}")
-		}
+		positionEditor = PositionEditor(pos, moltype)
 	}
 }
 

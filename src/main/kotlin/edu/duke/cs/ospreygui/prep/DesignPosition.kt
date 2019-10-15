@@ -156,6 +156,8 @@ class DesignPosition(
 				return@filter atoms.union() == currentAtoms
 			}
 
+	class IllegalAnchorsException(msg: String, val pos: DesignPosition) : IllegalStateException(msg)
+
 	/**
 	 * Makes a fragment from the existing atoms and coords.
 	 */
@@ -164,8 +166,8 @@ class DesignPosition(
 		val posAnchors = getCurrentAnchorGroups()
 			.let { groups ->
 				when {
-					groups.isEmpty() -> throw IllegalStateException("can't make fragment for this design position, no active anchors")
-					groups.size > 1 -> throw IllegalStateException("can't make fragment for this design position, multiple active anchors")
+					groups.isEmpty() -> throw IllegalAnchorsException("can't make fragment for this design position, no active anchors", this)
+					groups.size > 1 -> throw IllegalAnchorsException("can't make fragment for this design position, multiple active anchors", this)
 					else -> groups[0]
 				}
 			}
@@ -286,6 +288,9 @@ class DesignPosition(
 		val c: Atom
 	) : Anchor() {
 
+		fun copy(a: Atom = this.a, b: Atom = this.b, c: Atom = this.c) =
+			SingleAnchor(a, b, c)
+
 		override val anchorAtoms = listOf(a, b, c)
 
 		override fun getConnectedAtoms() =
@@ -363,6 +368,9 @@ class DesignPosition(
 		val c: Atom,
 		val d: Atom
 	) : Anchor() {
+
+		fun copy(a: Atom = this.a, b: Atom = this.b, c: Atom = this.c, d: Atom = this.d) =
+			DoubleAnchor(a, b, c, d)
 
 		override val anchorAtoms = listOf(a, b, c, d)
 
