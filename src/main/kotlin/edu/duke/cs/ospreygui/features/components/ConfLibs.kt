@@ -7,7 +7,7 @@ import edu.duke.cs.molscope.gui.Alert
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.read
-import edu.duke.cs.ospreygui.prep.MoleculePrep
+import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import java.nio.file.Paths
 
 
@@ -40,7 +40,7 @@ object ConfLibs {
 	}
 }
 
-class ConfLibPicker(val prep: MoleculePrep) {
+class ConfLibPicker(val prep: ConfSpacePrep) {
 
 	private var libDir = Paths.get("").toAbsolutePath()
 	private val conflibFilter = FilterList(listOf("conflib.toml"))
@@ -114,7 +114,7 @@ class ConfLibPicker(val prep: MoleculePrep) {
 		try {
 			val conflib = prep.conflibs.add(toml)
 			onAdd?.invoke(conflib)
-		} catch (ex: MoleculePrep.DuplicateConfLibException) {
+		} catch (ex: ConfSpacePrep.DuplicateConfLibException) {
 			alert.show("Skipped adding duplicate Conformation Library:\n${ex.conflib.name}")
 		}
 	}

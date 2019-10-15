@@ -7,23 +7,23 @@ import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.WindowFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.ospreygui.io.fromPDB
+import edu.duke.cs.ospreygui.forcefield.amber.partition
+import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.io.read
-import edu.duke.cs.ospreygui.prep.MoleculePrep
+import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import java.nio.file.Path
 import java.nio.file.Paths
 
 
-class ImportPDB : WindowFeature {
+class NewConfSpace : WindowFeature {
 
-	override val id = FeatureId("import.pdb")
+	override val id = FeatureId("new.confspace")
 
-	val filterList = FilterList(listOf("pdb"))
-	// TEMP: pdb.gz?
+	val filterList = FilterList(listOf("omol.toml"))
 	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, win: WindowCommands) = imgui.run {
-		if (menuItem("Import PDB")) {
+		if (menuItem("New Conformation Space")) {
 			FileDialog.openFile(filterList, dir)?.let { path ->
 				dir = path.parent
 				open(win, path)
@@ -33,7 +33,12 @@ class ImportPDB : WindowFeature {
 
 	private fun open(win: WindowCommands, path: Path) = win.showExceptions {
 
-		// start a new prep
-		MoleculePrep(win, listOf(Molecule.fromPDB(path.read())))
+		// read the prepared molecules
+		val mols = Molecule.fromOMOL(
+			path.read(),
+			// be generous in the GUI and don't crash, sometimes users edit these files by hand
+			throwOnMissingAtoms = false
+		)
+		ConfSpacePrep(win, mols.partition(combineSolvent = true))
 	}
 }

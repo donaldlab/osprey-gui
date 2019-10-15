@@ -14,14 +14,14 @@ import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.components.ConfLibPicker
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
-import edu.duke.cs.ospreygui.prep.MoleculePrep
 import edu.duke.cs.ospreygui.prep.Proteins
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
 
-class MutationEditor(val prep: MoleculePrep) : SlideFeature {
+class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 	override val id = FeatureId("design.mutations")
 
@@ -736,7 +736,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
 				// reset pos infos
 				posInfosByMol.clear()
-				for ((moltype, mol) in prep.getIncludedTypedMols()) {
+				for ((moltype, mol) in prep.mols) {
 					val infos = posInfosByMol.getOrPut(mol) { ArrayList() }
 					prep.designPositionsByMol.get(mol)?.forEach { pos ->
 						infos.add(PosInfo(pos, moltype))
@@ -748,7 +748,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 				// draw the window
 				begin("Mutation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
 
-				for ((i, molAndMoltype) in prep.getIncludedTypedMols().withIndex()) {
+				for ((i, molAndMoltype) in prep.mols.withIndex()) {
 					// alas, Kotlin doesn't support nested destructuring declarations
 					val (moltype, mol) = molAndMoltype
 					withId(mol) {
