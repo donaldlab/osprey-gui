@@ -153,6 +153,7 @@ class ConfLib(
 	data class Fragment(
 		val id: String,
 		val name: String,
+		val type: String,
 		val atoms: List<AtomInfo>,
 		val bonds: List<Bond>,
 		val anchors: List<Anchor>,
@@ -202,6 +203,7 @@ class ConfLib(
 				val fragPos = fragsTable.inputPositionOf(fragId)
 
 				val fragName = fragTable.getString("name") ?: fragId
+				val fragType = fragTable.getStringOrThrow("type")
 
 				// read the atoms
 				val atoms = HashMap<Int,AtomInfo>()
@@ -323,6 +325,7 @@ class ConfLib(
 				frags[fragId] = Fragment(
 					fragId,
 					fragName,
+					fragType,
 					atoms.map { (_, atom) -> atom },
 					bonds,
 					anchors.map { (_, anchor) -> anchor },

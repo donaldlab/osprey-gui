@@ -17,7 +17,7 @@ object Proteins {
 			?: throw NotAProteinException("residue does not have atom $name")
 
 	fun makeDesignPosition(mol: Polymer, res: Polymer.Residue, name: String) =
-		DesignPosition(name, mol).apply {
+		DesignPosition(name, res.type, mol).apply {
 			setDesignPosition(this, res)
 		}
 
@@ -29,8 +29,9 @@ object Proteins {
 			throw IllegalArgumentException("residue $res is not in the molecule for this design position")
 		}
 
-		// set the name
+		// set the metadata
 		name = "${res.id} ${res.type}"
+		type = res.type
 
 		// get the backbone atoms
 		val resN = res.getProteinAtom("N")
@@ -40,11 +41,8 @@ object Proteins {
 		// get the C atom from the previous residue, if any
 		val prevC = mol.bonds.bondedAtoms(resN)
 			.firstOrNull { it !in res.atoms && it.name == "C" }
-			?: throw UnsupportedOperationException("TODO: support N-terminal residues")
 
-		val bbAtoms = Atom.identitySetOf(resN, resCA, resC, prevC)
-
-		fun Atom.getConnectedAtoms() =
+		fun Atom.getConnectedAtoms(bbAtoms: Set<Atom>) =
 			mol.bfs(
 				source = this,
 				visitSource = false,
@@ -52,44 +50,71 @@ object Proteins {
 			)
 			.map { it.atom }
 
-		currentAtoms.apply {
+		// clear previous info
+		currentAtoms.clear()
+		anchorGroups.clear()
 
-			// clear any existing atoms
-			clear()
+		if (prevC != null) {
 
-			// add all the non-backbone atoms connected to the anchor atoms
-			addAll(resCA.getConnectedAtoms())
-			addAll(resN.getConnectedAtoms())
-		}
+			// not N-terminal residue
+			val bbAtoms = Atom.identitySetOf(resN, resCA, resC, prevC)
 
-		anchorGroups.apply {
+			currentAtoms.apply {
 
-			// clear any existing anchors
-			clear()
+				// add all the non-backbone atoms connected to the anchor atoms
+				addAll(resCA.getConnectedAtoms(bbAtoms))
+				addAll(resN.getConnectedAtoms(bbAtoms))
+			}
 
-			// add the pair of single anchors
-			add(mutableListOf(
-				SingleAnchor(
-					a = resCA,
-					b = resN,
-					c = resC
-				),
-				SingleAnchor(
-					a = resN,
-					b = prevC,
-					c = resCA
-				)
-			))
+			anchorGroups.apply {
 
-			// add the double anchor
-			add(mutableListOf(
-				DoubleAnchor(
-					a = resCA,
-					b = resN,
-					c = prevC,
-					d = resC
-				)
-			))
+				// add the pair of single anchors
+				add(mutableListOf(
+					SingleAnchor(
+						a = resCA,
+						b = resN,
+						c = resC
+					),
+					SingleAnchor(
+						a = resN,
+						b = prevC,
+						c = resCA
+					)
+				))
+
+				// add the double anchor
+				add(mutableListOf(
+					DoubleAnchor(
+						a = resCA,
+						b = resN,
+						c = prevC,
+						d = resC
+					)
+				))
+			}
+
+		} else {
+
+			// N-terminal residue
+			val bbAtoms = Atom.identitySetOf(resN, resCA, resC)
+
+			currentAtoms.apply {
+
+				// add all the non-backbone atoms connected to the anchor atoms
+				addAll(resCA.getConnectedAtoms(bbAtoms))
+			}
+
+			anchorGroups.apply {
+
+				// add just the one single anchor
+				add(mutableListOf(
+					SingleAnchor(
+						a = resCA,
+						b = resN,
+						c = resC
+					)
+				))
+			}
 		}
 	}
 }

@@ -26,6 +26,7 @@ class TestConfLib : SharedSpec({
 
 			id shouldBe "ALA"
 			name shouldBe "Alanine"
+			type shouldBe "ALA"
 
 			atoms.size shouldBe 6
 			val ha = atoms.find { it.name == "HA" }!!.apply {
@@ -72,6 +73,7 @@ class TestConfLib : SharedSpec({
 
 			id shouldBe "VAL"
 			name shouldBe "Valine"
+			type shouldBe "VAL"
 
 			atoms.size shouldBe 12
 			bonds.size shouldBe 9
@@ -90,6 +92,7 @@ class TestConfLib : SharedSpec({
 
 			id shouldBe "PRO"
 			name shouldBe "Proline"
+			type shouldBe "PRO"
 
 			atoms.size shouldBe 10
 			bonds.size shouldBe 8
@@ -114,6 +117,26 @@ class TestConfLib : SharedSpec({
 				anchorCoords.getValue(anchor).shouldBeTypeOf<ConfLib.AnchorCoords.Double> {
 					it.d shouldBe Vector3d(21.102527, 24.472094, 37.053483)
 				}
+			}
+		}
+
+		// try an N-terminal residue
+		conflib.fragments.getValue("VALn").run {
+
+			id shouldBe "VALn"
+			name shouldBe "Valine, N-terminal"
+			type shouldBe "VAL"
+
+			atoms.size shouldBe 11
+			bonds.size shouldBe 9
+			anchors.size shouldBe 1
+
+			confs.size shouldBe 3
+			confs.getValue("p").run {
+				name shouldBe "p"
+				coords.size shouldBe 11
+				coords[atoms.find { it.name == "HA" }] shouldBe Vector3d(108.613, 17.002, -4.136)
+				coords[atoms.find { it.name == "CG2" }] shouldBe Vector3d(106.309809, 15.583253, -4.049056)
 			}
 		}
 	}

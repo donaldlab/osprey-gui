@@ -13,6 +13,7 @@ import kotlin.math.atan2
 
 class DesignPosition(
 	var name: String,
+	var type: String,
 	val mol: Molecule
 ) {
 
@@ -192,6 +193,7 @@ class DesignPosition(
 		return ConfLib.Fragment(
 			id = fragId,
 			name = fragName,
+			type = type,
 			atoms = atomInfos.values
 				.sortedBy { it.id }
 				.toList(),

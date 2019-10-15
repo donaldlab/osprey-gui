@@ -499,10 +499,10 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 											Conveniently, resetInfos() will drop this function from the heap when
 											it re-creates all the AnchorInfos instances, so we won't have stale handlers hanging around
 										*/
-										atomInfo.atomClickHandler = { view, atom ->
+										atomInfo.atomClickHandler = { view, clickedAtom ->
 											anchorGroupInfo.replaceAnchor(
 												anchorInfo.anchor,
-												anchorUpdater(atom)
+												anchorUpdater(clickedAtom)
 											)
 											pos.resetConfSpace()
 											/* NOTE:
@@ -627,6 +627,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		inner class FragInfo(
 			val id: String,
+			val name: String,
 			val frag: ConfLib.Fragment
 		) {
 			val pSelected = Ref.of(false)
@@ -640,8 +641,9 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			fun makeInfo(conflib: ConfLib?, frag: ConfLib.Fragment): FragInfo {
 
 				val id = conflib?.fragRuntimeId(frag) ?: "dynamic.${frag.id}"
+				val label = "${frag.name} (${frag.type})"
 
-				return FragInfo(id, frag).apply {
+				return FragInfo(id, label, frag).apply {
 
 					// is this fragment selected?
 					pSelected.value = pos.confSpace.mutations.contains(frag)
@@ -694,7 +696,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 						mutate(slide.findViewOrThrow(), info.frag)
 					}
 					sameLine()
-					if (checkbox("${info.frag.name}##check-${info.id}", info.pSelected)) {
+					if (checkbox("${info.name}##check-${info.id}", info.pSelected)) {
 
 						// mark the mutation as included or not in the design position conf space
 						if (info.pSelected.value) {
@@ -753,7 +755,11 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			numSequences = BigInteger.ONE
 
 			for (info in posInfos) {
-				numSequences *= info.pos.confSpace.mutations.size.toBigInteger()
+				numSequences *= info.pos.confSpace.mutations
+					.map { it.type }
+					.toSet()
+					.size
+					.toBigInteger()
 			}
 		}
 
@@ -776,7 +782,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			val num = maxNum + 1
 
 			// create the position and add it
-			val pos = DesignPosition("$prefix$num", mol)
+			val pos = DesignPosition("$prefix$num", "none", mol)
 			positions.add(pos)
 
 			val posInfo = PosInfo(pos, molType)

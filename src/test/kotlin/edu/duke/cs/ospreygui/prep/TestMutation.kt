@@ -58,12 +58,24 @@ class TestMutation : SharedSpec({
 			val res: Polymer.Residue,
 			val pos: DesignPosition
 		)
+		fun ala2(): Instance {
+
+			// copy the molecule, so we don't destroy the original
+			val mol = protein1cc8.copy()
+			val res = mol.findChainOrThrow("A").findResidueOrThrow("2")
+
+			// make the design position
+			val pos = Proteins.makeDesignPosition(mol, res, "ala2")
+
+			// the current atoms should be glycine sidechain atoms
+			pos.currentAtoms.map { it.name }.toSet() shouldBe setOf("HA", "CB", "HB1", "HB2", "HB3")
+
+			return Instance(res, pos)
+		}
 		fun gly17(): Instance {
 
 			// copy the molecule, so we don't destroy the original
 			val mol = protein1cc8.copy()
-
-			// pick gly 17 (aribtrarily) to use as a mutable position
 			val res = mol.findChainOrThrow("A").findResidueOrThrow("17")
 
 			// make the design position
@@ -78,8 +90,6 @@ class TestMutation : SharedSpec({
 
 			// copy the molecule, so we don't destroy the original
 			val mol = protein1cc8.copy()
-
-			// pick gly 17 (aribtrarily) to use as a mutable position
 			val res = mol.findChainOrThrow("A").findResidueOrThrow("52")
 
 			// make the design position
@@ -112,6 +122,21 @@ class TestMutation : SharedSpec({
 			}
 			fragAnchorN.shouldBeTypeOf<ConfLib.Anchor.Single> {
 				it.id shouldBe 2
+			}
+		}
+
+		fun DesignPosition.AnchorMatch.shouldHaveAnchors_CA(namesCA: Set<String>) {
+
+			// should have gotten the 1x single anchor
+			pairs.size shouldBe 1
+
+			val (posAnchorCA, fragAnchorCA) = pairs[0]
+			posAnchorCA.shouldBeTypeOf<DesignPosition.SingleAnchor> {
+				it.a.name shouldBe "CA"
+				it.getConnectedAtoms().map { it.name }.toSet() shouldBe namesCA
+			}
+			fragAnchorCA.shouldBeTypeOf<ConfLib.Anchor.Single> {
+				it.id shouldBe 1
 			}
 		}
 
@@ -425,6 +450,67 @@ class TestMutation : SharedSpec({
 
 			// mutate to glycine
 			val frag = conflib.fragments.getValue("GLY")
+			val conf = frag.confs.getValue("GLY")
+			pos.setConf(frag, conf)
+
+			// mutate back to wildtype
+			pos.setConf(wtFrag, wtConf)
+
+			// does this look like the original residue?
+			res.atoms.size shouldBe wtPositions.size
+			for ((atomName, atomPos) in wtPositions) {
+				res.shouldHaveAtomNear(atomName, atomPos)
+			}
+		}
+
+		test("Nala->glycine") {
+
+			val (res, pos) = ala2()
+
+			// find the glycine conformation in the library
+			val frag = conflib.fragments.getValue("GLYn")
+			val conf = frag.confs.getValue("GLY")
+
+			// check the anchors
+			pos.findAnchorMatch(frag)!!.shouldHaveAnchors_CA(
+				namesCA = setOf("HA", "CB", "HB1", "HB2", "HB3")
+			)
+
+			// do eeeet!
+			pos.setConf(frag, conf)
+
+			// does this look like glycine?
+			res.atoms.size shouldBe 9
+			res.shouldHaveAtomNear("N", 14.789000, 27.073000, 24.130000)
+			res.shouldHaveAtomNear("CA", 13.936000, 25.892000, 24.216000)
+			res.shouldHaveAtomNear("C", 12.753000, 25.845000, 23.241000)
+			res.shouldHaveAtomNear("O", 11.656000, 25.370000, 23.562000)
+			res.shouldHaveAtomNear("H1", 14.423345, 27.671948, 23.403599)
+			res.shouldHaveAtomNear("H2", 15.693612, 26.728407, 23.841847)
+			res.shouldHaveAtomNear("H3", 14.686749, 27.541349, 25.018984)
+			res.shouldHaveAtomNear("HA2", 14.542628, 24.991303, 24.041222)
+			res.shouldHaveAtomNear("HA3", 13.526968, 25.811973, 25.233619)
+		}
+
+		test("Nala->glycine->back") {
+
+			val (res, pos) = ala2()
+
+			// record all the atom positions
+			val wtPositions = res.capturePositions()
+
+			// make the wildtype fragment
+			val wtFrag = pos.makeFragment("wt", "WT")
+			val wtConf = wtFrag.confs.values.first()
+
+			// check the fragment anchors
+			wtFrag.anchors.run {
+				size shouldBe 1
+				this[0].shouldBeTypeOf<ConfLib.Anchor.Single>()
+			}
+
+			// mutate to glycine
+			val frag = conflib.fragments.getValue("GLYn")
 			val conf = frag.confs.getValue("GLY")
 			pos.setConf(frag, conf)
 
