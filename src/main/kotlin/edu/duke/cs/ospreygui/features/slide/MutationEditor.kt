@@ -84,6 +84,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 				}
 			}
 
+			pos.resetConfSpace()
 			resetInfos(view)
 		}
 
@@ -91,6 +92,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
 			pos.currentAtoms.removeIf { it in atoms }
 
+			pos.resetConfSpace()
 			resetInfos(view)
 		}
 
@@ -184,6 +186,25 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 			}
 
 			return label
+		}
+
+		val DesignPosition.confSpace get() = prep.positionConfSpaces.getOrMake(this)
+
+		fun DesignPosition.resetConfSpace() {
+
+			// delete the old conf space
+			prep.positionConfSpaces.remove(pos)
+
+			// make a new conf space
+			confSpace.apply {
+
+				// make a new wildtype fragment, if possible
+				wildTypeFragment = try {
+					pos.makeFragment("wt-$name", "WildType")
+				} catch (ex: DesignPosition.IllegalAnchorsException) {
+					null
+				}
+			}
 		}
 
 		fun Slide.Locked.findViewOrThrow() =
@@ -338,6 +359,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
 			// update the design position
 			Proteins.setDesignPosition(pos, res)
+			pos.resetConfSpace()
 			resetInfos(view)
 		}
 
@@ -349,7 +371,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
 		private fun renderAtomsTab(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
-			var infosNeedReset = false
+			var posChanged = false
 
 			// default to the sidechain atom click handler
 			if (atomClickHandler == null) {
@@ -423,7 +445,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 					// button to delete anchor group
 					if (button("x")) {
 						pos.anchorGroups.remove(anchorGroupInfo.anchors)
-						infosNeedReset = true
+						posChanged = true
 					}
 
 					for (anchorInfo in anchorGroupInfo.anchorInfos) {
@@ -433,7 +455,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 							fun anchorDeleteButton() {
 								if (button("x")) {
 									anchorGroupInfo.anchors.remove(anchorInfo.anchor)
-									infosNeedReset = true
+									posChanged = true
 								}
 							}
 
@@ -442,7 +464,8 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 								if (atomInfo == null) {
 									text("$name: (error)")
 								} else {
-									if (radioButton("$name: ${atomInfo.label}", atomClickHandler == atomInfo.atomClickHandler)) {
+									// TODO: BUGBUG: having the same atom in multiple spots causes all the radios to light up
+									if (radioButton("$name: ${atomInfo.label}", atomClickHandler === atomInfo.atomClickHandler)) {
 
 										/* This is a little tricky, so let me explain:
 
@@ -463,11 +486,12 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 												anchorInfo.anchor,
 												anchorUpdater(atom)
 											)
+											pos.resetConfSpace()
 											/* NOTE:
-												Could set infosNeedReset = true here, but it won't work.
+												Could set posChanged = true here, but it won't work the way you'd think.
 												By the time atomClickHandler gets called, we'll be on a different stack frame,
-												and a different instance of infosNeedReset.
-												So just call resetInfos() directly. Which is ok, since
+												and a different instance of posChanged.
+												So just call resetInfos() directly. Which is ok here, since
 												atomClickHandler gets called outside of the info render loops.
 											 */
 											resetInfos(view)
@@ -542,7 +566,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 								b = mol.atoms[1],
 								c = mol.atoms[2]
 							))
-							infosNeedReset = true
+							posChanged = true
 						}
 					}
 
@@ -557,7 +581,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 								c = mol.atoms[2],
 								d = mol.atoms[3]
 							))
-							infosNeedReset = true
+							posChanged = true
 						}
 					}
 				}
@@ -569,11 +593,12 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
 			if (button("Add Anchor Group")) {
 				pos.anchorGroups.add(ArrayList())
-				infosNeedReset = true
+				posChanged = true
 			}
 
-			// finally, reset the infos if there's a pending need
-			if (infosNeedReset) {
+			// finally, handle any pending updates after we changed the position
+			if (posChanged) {
+				pos.resetConfSpace()
 				resetInfos(slide.findViewOrThrow())
 			}
 		}
@@ -591,38 +616,32 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
 		private val fragInfos = ArrayList<FragInfo>()
 
-		private var wildTypeFrag: ConfLib.Fragment? = null
 		private var selectedFrag: ConfLib.Fragment? = null
 
 		private fun activateMutationsTab() {
 
-			// make the old infos easy to transfer
-			val oldInfos = fragInfos.associateBy { it.id }
 			fun makeInfo(conflib: ConfLib?, frag: ConfLib.Fragment): FragInfo {
 
-				// build the info id from the library and fragment id
-				val id = "${System.identityHashCode(conflib)}.${frag.id}"
+				val id = conflib?.fragRuntimeId(frag) ?: "dynamic.${frag.id}"
 
 				return FragInfo(id, frag).apply {
 
-					// copy over old data if possible
-					oldInfos[id]?.let { oldInfo ->
-						pSelected.value = oldInfo.pSelected.value
-					}
+					// is this fragment selected?
+					pSelected.value = pos.confSpace.mutations.contains(frag)
 				}
 			}
 
 			// rebuild the fragment infos
 			fragInfos.clear()
 
-			// add the wild type fragment, if we can
-			try {
-				wildTypeFrag = pos.makeFragment("wt", "WildType").apply {
-					fragInfos.add(makeInfo(null, this))
-				}
-			} catch (ex: DesignPosition.IllegalAnchorsException) {
-				wildTypeFrag = null
+			// add the wild type fragment first, if we can
+			val wildTypeFrag = pos.confSpace.wildTypeFragment
+			if (wildTypeFrag != null) {
+				fragInfos.add(makeInfo(null, wildTypeFrag))
 			}
+
+			// select the wildtype fragment by default
+			selectedFrag = wildTypeFrag
 
 			// add fragments from the libraries
 			for (conflib in prep.conflibs) {
@@ -634,9 +653,6 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 					}
 			}
 
-			// select the wildtype fragment by default
-			selectedFrag = wildTypeFrag
-
 			// TODO: collect tags for the fragments? eg, hydrophobic, aromatic
 		}
 
@@ -646,6 +662,13 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 			conflibPicker.render(imgui)
 
 			// show the available mutations
+			text("Mutations:")
+			sameLine()
+			infoTip("""
+				|Select the mutations you want to include in your design by clicking the checkboxes.
+				|You can temporarily preview a mutation by selecting the radion button next to a mutation.
+				|All temporary mutations will be reverted when you're finished with the mutation editor.
+			""".trimMargin())
 			beginChild("mutations", 300f, 400f, true)
 			if (fragInfos.isNotEmpty()) {
 				for (info in fragInfos) {
@@ -654,7 +677,15 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 						mutate(slide.findViewOrThrow(), info.frag)
 					}
 					sameLine()
-					checkbox(info.frag.name, info.pSelected)
+					if (checkbox(info.frag.name, info.pSelected)) {
+
+						// mark the mutation as included or not in the design position conf space
+						if (info.pSelected.value) {
+							pos.confSpace.mutations.add(info.frag)
+						} else {
+							pos.confSpace.mutations.remove(info.frag)
+						}
+					}
 				}
 			} else {
 				text("(no compatible mutations)")
@@ -667,8 +698,8 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 			val view = slide.findViewOrThrow()
 
 			// restore the wildtype if needed
-			wildTypeFrag?.let { mutate(view, it) }
-			wildTypeFrag = null
+			pos.confSpace.wildTypeFragment?.let { mutate(view, it) }
+
 			selectedFrag = null
 		}
 
@@ -707,7 +738,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 				posInfosByMol.clear()
 				for ((moltype, mol) in prep.getIncludedTypedMols()) {
 					val infos = posInfosByMol.getOrPut(mol) { ArrayList() }
-					prep.mutablePositionsByMol.get(mol)?.forEach { pos ->
+					prep.designPositionsByMol.get(mol)?.forEach { pos ->
 						infos.add(PosInfo(pos, moltype))
 					}
 				}
@@ -766,7 +797,8 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 									.filter { it.pSelected.value }
 									.forEach {
 										posInfos.remove(it)
-										prep.mutablePositionsByMol[mol]?.remove(it.pos)
+										prep.designPositionsByMol[mol]?.remove(it.pos)
+										prep.positionConfSpaces.remove(it.pos)
 									}
 							}
 						}
@@ -788,7 +820,7 @@ class MutationEditor(val prep: MoleculePrep) : SlideFeature {
 
 	private fun makeNewPosition(mol: Molecule, moltype: MoleculeType) {
 
-		val positions = prep.mutablePositionsByMol
+		val positions = prep.designPositionsByMol
 			.getOrPut(mol) { ArrayList() }
 
 		// choose a default but unique name

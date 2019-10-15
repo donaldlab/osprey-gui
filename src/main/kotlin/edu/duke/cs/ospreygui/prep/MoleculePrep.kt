@@ -7,6 +7,7 @@ import edu.duke.cs.molscope.gui.features.slide.CloseSlide
 import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
 import edu.duke.cs.molscope.gui.features.slide.NavigationTool
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.defaultRenderSettings
@@ -89,8 +90,22 @@ class MoleculePrep(
 
 	class DuplicateConfLibException(val conflib: ConfLib) : RuntimeException("Conformation library already loaded: ${conflib.name}")
 
-	val mutablePositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = HashMap()
-	// TODO: flexible positions
+	val designPositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = HashMap()
+
+	class PositionConfSpace {
+		var wildTypeFragment: ConfLib.Fragment? = null
+		val mutations: MutableSet<ConfLib.Fragment> = identityHashSet()
+		val flexibility: MutableMap<ConfLib.Fragment,Set<ConfLib.Conf>> = IdentityHashMap()
+	}
+	class PositionConfSpaces {
+
+		private val confSpaces: MutableMap<DesignPosition,PositionConfSpace> = HashMap()
+
+		operator fun get(pos: DesignPosition) = confSpaces[pos]
+		fun getOrMake(pos: DesignPosition) = confSpaces.getOrPut(pos) { PositionConfSpace() }
+		fun remove(pos: DesignPosition) = confSpaces.remove(pos)
+	}
+	val positionConfSpaces = PositionConfSpaces()
 
 	// make the slide last, since many slide features need to access the prep
 	val slide = Slide(name, initialSize = Extent2D(640, 480)).apply {

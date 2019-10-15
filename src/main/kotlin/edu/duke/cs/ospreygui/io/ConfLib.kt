@@ -21,6 +21,27 @@ class ConfLib(
 	val citation: String? = null
 ) {
 
+	/**
+	 * A globally unique id for each library, assigned at runtime.
+	 * This id is not intrinsic to the library itself, so should not be persisted anywhere.
+	 * Its only purpose is to allow assigning globally unique ids to fragments, conformations, etc at runtime.
+	 */
+	val runtimeId = "library-${nextId++}"
+
+	/**
+	 * A globally unique id for each fragment, assigned at runtime.
+	 * This id is not intrinsic to the library itself, so should not be persisted anywhere.
+	 */
+	fun fragRuntimeId(frag: Fragment) =
+		"$runtimeId.${frag.id}"
+
+	/**
+	 * A globally unique id for each conformation, assigned at runtime.
+	 * This id is not intrinsic to the library itself, so should not be persisted anywhere.
+	 */
+	fun confRuntimeId(frag: Fragment, conf: Conf) =
+		"$runtimeId.${frag.id}.${conf.id}"
+
 	data class AtomInfo(
 		val id: Int,
 		val name: String,
@@ -157,6 +178,8 @@ class ConfLib(
 	}
 
 	companion object {
+
+		private var nextId = 0
 
 		fun from(toml: String): ConfLib {
 
