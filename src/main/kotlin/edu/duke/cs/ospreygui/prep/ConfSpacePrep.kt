@@ -7,7 +7,6 @@ import edu.duke.cs.molscope.gui.features.slide.CloseSlide
 import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
 import edu.duke.cs.molscope.gui.features.slide.NavigationTool
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.ospreygui.defaultRenderSettings
 import edu.duke.cs.ospreygui.features.slide.*
@@ -51,9 +50,19 @@ class ConfSpacePrep(
 	val designPositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = HashMap()
 
 	class PositionConfSpace {
+
 		var wildTypeFragment: ConfLib.Fragment? = null
 		val mutations: MutableSet<String> = HashSet()
 		val confs: MutableMap<ConfLib.Fragment,Set<ConfLib.Conf>> = IdentityHashMap()
+
+		/**
+		 * Returns true iff the position allows a sequence type other than the wildtype.
+		 */
+		fun isMutable() =
+			mutations.any { it != wildTypeFragment?.type }
+
+		fun numConfs() =
+			confs.values.sumBy { it.size }
 	}
 	class PositionConfSpaces {
 
@@ -77,7 +86,7 @@ class ConfSpacePrep(
 			s.camera.lookAtEverything()
 
 			s.features.menu("File") {
-				// TODO: safe conf space
+				// TODO: save conf space
 				addSeparator()
 				// TODO: export compiled conf space
 				addSeparator()
@@ -92,6 +101,7 @@ class ConfSpacePrep(
 			}
 			s.features.menu("Edit") {
 				add(MutationEditor(this@ConfSpacePrep))
+				add(ConformationEditor(this@ConfSpacePrep))
 			}
 		}
 		win.addSlide(this)
