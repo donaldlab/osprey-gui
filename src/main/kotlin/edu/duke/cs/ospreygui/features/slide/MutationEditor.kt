@@ -24,7 +24,7 @@ import kotlin.collections.ArrayList
 
 class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
-	override val id = FeatureId("design.mutations")
+	override val id = FeatureId("edit.mutations")
 
 	private val winState = WindowState()
 
@@ -205,8 +205,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 					null
 				}
 
-				// select its "mutation" by default, if possible
-				wildTypeFragment?.let { mutations.add(it) }
+				// select the wild-type "mutation" by default, if possible
+				wildTypeFragment?.type?.let { mutations.add(it) }
 			}
 		}
 
@@ -625,50 +625,68 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			onAdd = { activateMutationsTab() }
 		}
 
-		inner class FragInfo(
-			val id: String,
-			val name: String,
+		inner class SeqInfo(
+			val type: String,
+			val label: String,
 			val frag: ConfLib.Fragment
 		) {
 			val pSelected = Ref.of(false)
+
+			// pick an arbitrary conformation from the fragment to show in the GUI
+			val conf = frag.confs.values.first()
 		}
 
-		private val fragInfos = ArrayList<FragInfo>()
-		private var selectedFrag: ConfLib.Fragment? = null
+		private val seqInfos = ArrayList<SeqInfo>()
+		private var selectedSeqInfo: SeqInfo? = null
 
 		private fun activateMutationsTab() {
 
-			fun makeInfo(conflib: ConfLib?, frag: ConfLib.Fragment): FragInfo {
+			fun add(type: String, isWildtype: Boolean, frag: ConfLib.Fragment): SeqInfo {
 
-				val id = conflib?.fragRuntimeId(frag) ?: "dynamic.${frag.id}"
-				val label = "${frag.name} (${frag.type})"
+				val label = if (isWildtype) {
+					"WildType: $type"
+				} else {
+					type
+				}
 
-				return FragInfo(id, label, frag).apply {
+				val seqInfo = SeqInfo(type, label, frag).apply {
 
 					// is this fragment selected?
-					pSelected.value = pos.confSpace.mutations.contains(frag)
+					pSelected.value = pos.confSpace.mutations.contains(type)
 				}
+
+				seqInfos.add(seqInfo)
+				return seqInfo
 			}
 
-			// rebuild the fragment infos
-			fragInfos.clear()
+			// rebuild the sequence infos
+			seqInfos.clear()
 
-			// add the wild type fragment first, if we can
+			// add the wild type first, if we can
 			val wildTypeFrag = pos.confSpace.wildTypeFragment
-			if (wildTypeFrag != null) {
-				fragInfos.add(makeInfo(null, wildTypeFrag))
+			val wildTypeInfo = if (wildTypeFrag != null) {
+				add(wildTypeFrag.type, true, wildTypeFrag)
+			} else {
+				null
 			}
 
-			// select the wildtype fragment by default
-			selectedFrag = wildTypeFrag
+			// select the wildtype info by default
+			selectedSeqInfo = wildTypeInfo
 
 			// add fragments from the libraries
 			for (conflib in prep.conflibs) {
 				conflib.fragments.values
 					.filter { pos.isFragmentCompatible(it) }
-					.sortedBy { it.name }
-					.forEach { frag ->
-						fragInfos.add(makeInfo(conflib, frag))
+					.groupBy { it.type }
+					.toMutableMap()
+					.apply {
+						// remove the wildtype if we already have it
+						wildTypeFrag?.type?.let { remove(it) }
+					}
+					.toList()
+					.sortedBy { (type, _) -> type }
+					.forEach { (type, frag) ->
+						add(type, false, frag.first())
 					}
 			}
 
@@ -689,20 +707,20 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				|All temporary mutations will be reverted when you're finished with the mutation editor.
 			""".trimMargin())
 			beginChild("mutations", 300f, 400f, true)
-			if (fragInfos.isNotEmpty()) {
-				for (info in fragInfos) {
-					if (radioButton("###radio-${info.id}", selectedFrag == info.frag)) {
-						selectedFrag = info.frag
-						mutate(slide.findViewOrThrow(), info.frag)
+			if (seqInfos.isNotEmpty()) {
+				for (info in seqInfos) {
+					if (radioButton("###radio-${info.type}", selectedSeqInfo == info)) {
+						selectedSeqInfo = info
+						setConf(slide.findViewOrThrow(), info.frag, info.conf)
 					}
 					sameLine()
-					if (checkbox("${info.name}##check-${info.id}", info.pSelected)) {
+					if (checkbox("${info.label}##check-${info.type}", info.pSelected)) {
 
 						// mark the mutation as included or not in the design position conf space
 						if (info.pSelected.value) {
-							pos.confSpace.mutations.add(info.frag)
+							pos.confSpace.mutations.add(info.type)
 						} else {
-							pos.confSpace.mutations.remove(info.frag)
+							pos.confSpace.mutations.remove(info.type)
 						}
 
 						// update the sequence count
@@ -720,15 +738,13 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			val view = slide.findViewOrThrow()
 
 			// restore the wildtype if needed
-			pos.confSpace.wildTypeFragment?.let { mutate(view, it) }
+			pos.confSpace.wildTypeFragment?.let { setConf(view, it, it.confs.values.first()) }
 
-			selectedFrag = null
+			selectedSeqInfo = null
 		}
 
-		private fun mutate(view: MoleculeRenderView, frag: ConfLib.Fragment) {
+		private fun setConf(view: MoleculeRenderView, frag: ConfLib.Fragment, conf: ConfLib.Conf) {
 
-			// pick an arbitrary conformation from the fragment
-			val conf = frag.confs.values.first()
 			pos.setConf(frag, conf)
 
 			// update the view
@@ -755,11 +771,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			numSequences = BigInteger.ONE
 
 			for (info in posInfos) {
-				numSequences *= info.pos.confSpace.mutations
-					.map { it.type }
-					.toSet()
-					.size
-					.toBigInteger()
+				numSequences *= info.pos.confSpace.mutations.size.toBigInteger()
 			}
 		}
 

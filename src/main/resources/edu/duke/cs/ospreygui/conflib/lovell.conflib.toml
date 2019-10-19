@@ -420,7 +420,7 @@ anchorCoords = [
 
 [frag.HID]
 name = "Histidine - HD1"
-type = "HID"
+type = "HIS"
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -839,7 +839,7 @@ anchorCoords = [
 
 [frag.HIE]
 name = "Histidine - HE2"
-type = "HIE"
+type = "HIS"
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -2517,7 +2517,7 @@ anchorCoords = [
 
 [frag.HIP]
 name = "Histidine - HD1,HE2"
-type = "HIP"
+type = "HIS"
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -5835,7 +5835,7 @@ anchorCoords = [
 
 [frag.HIDn]
 name = "Histidine - HD1, N-terminal"
-type = "HID"
+type = "HIS"
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -6220,7 +6220,7 @@ anchorCoords = [
 
 [frag.HIEn]
 name = "Histidine - HE2, N-terminal"
-type = "HIE"
+type = "HIS"
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -7711,7 +7711,7 @@ anchorCoords = [
 
 [frag.HIPn]
 name = "Histidine - HD1,HE2, N-terminal"
-type = "HIP"
+type = "HIS"
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },

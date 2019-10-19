@@ -52,8 +52,8 @@ class ConfSpacePrep(
 
 	class PositionConfSpace {
 		var wildTypeFragment: ConfLib.Fragment? = null
-		val mutations: MutableSet<ConfLib.Fragment> = identityHashSet()
-		val flexibility: MutableMap<ConfLib.Fragment,Set<ConfLib.Conf>> = IdentityHashMap()
+		val mutations: MutableSet<String> = HashSet()
+		val confs: MutableMap<ConfLib.Fragment,Set<ConfLib.Conf>> = IdentityHashMap()
 	}
 	class PositionConfSpaces {
 

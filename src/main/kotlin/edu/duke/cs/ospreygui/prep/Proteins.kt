@@ -33,6 +33,11 @@ object Proteins {
 		name = "${res.id} ${res.type}"
 		type = res.type
 
+		// map histidine variants back to plain ol' HIS
+		if (type in setOf("HID", "HIE", "HIP")) {
+			type = "HIS"
+		}
+
 		// get the backbone atoms
 		val resN = res.getProteinAtom("N")
 		val resCA = res.getProteinAtom("CA")
