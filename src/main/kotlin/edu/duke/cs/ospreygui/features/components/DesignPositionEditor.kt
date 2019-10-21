@@ -9,8 +9,9 @@ import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.gui.styleEnabledIf
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.RenderEffect
+import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.MoleculeRenderView
-import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
+import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
@@ -18,8 +19,7 @@ import edu.duke.cs.ospreygui.prep.Proteins
 
 class DesignPositionEditor(
 	val prep: ConfSpacePrep,
-	val pos: DesignPosition,
-	val molType: MoleculeType
+	val pos: DesignPosition
 ) {
 
 	val mol = pos.mol
@@ -162,7 +162,17 @@ class DesignPositionEditor(
 			}
 
 			// select the wild-type "mutation" by default, if possible
-			wildTypeFragment?.type?.let { mutations.add(it) }
+			wildTypeFragment?.let { mutations.add(it.type) }
+
+			// select all conformations by default
+			fun ConfLib.Fragment.addAllConfs() =
+				this@apply.confs
+					.getOrPut(this) { identityHashSet() }
+					.apply { addAll(confs.values) }
+			wildTypeFragment?.addAllConfs()
+			prep.conflibs
+				.flatMap { compatibleFragments(it) }
+				.forEach { it.addAllConfs() }
 		}
 	}
 

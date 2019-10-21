@@ -53,7 +53,7 @@ class ConfSpacePrep(
 
 		var wildTypeFragment: ConfLib.Fragment? = null
 		val mutations: MutableSet<String> = HashSet()
-		val confs: MutableMap<ConfLib.Fragment,Set<ConfLib.Conf>> = IdentityHashMap()
+		val confs: MutableMap<ConfLib.Fragment,MutableSet<ConfLib.Conf>> = IdentityHashMap()
 
 		/**
 		 * Returns true iff the position allows a sequence type other than the wildtype.
@@ -66,7 +66,7 @@ class ConfSpacePrep(
 	}
 	class PositionConfSpaces {
 
-		private val confSpaces: MutableMap<DesignPosition,PositionConfSpace> = HashMap()
+		private val confSpaces: MutableMap<DesignPosition,PositionConfSpace> = IdentityHashMap()
 
 		operator fun get(pos: DesignPosition) = confSpaces[pos]
 		fun getOrMake(pos: DesignPosition) = confSpaces.getOrPut(pos) { PositionConfSpace() }

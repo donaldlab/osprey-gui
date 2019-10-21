@@ -337,3 +337,11 @@ class ConfLib(
 		}
 	}
 }
+
+val ConfLib?.runtimeId get() = "__dynamic__"
+
+fun ConfLib?.fragRuntimeId(frag: ConfLib.Fragment) =
+	"$runtimeId.${frag.id}"
+
+fun ConfLib?.confRuntimeId(frag: ConfLib.Fragment, conf: ConfLib.Conf) =
+	"$runtimeId.${frag.id}.${conf.id}"

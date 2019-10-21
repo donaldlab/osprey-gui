@@ -35,6 +35,11 @@ class DesignPosition(
 	fun isFragmentCompatible(frag: ConfLib.Fragment) =
 		findAnchorMatch(frag) != null
 
+	fun compatibleFragments(conflib: ConfLib) =
+		conflib.fragments
+			.values
+			.filter { isFragmentCompatible(it) }
+
 	data class AnchorMatch(
 		val posAnchors: List<Anchor>,
 		val fragAnchors: List<ConfLib.Anchor>

@@ -37,7 +37,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		val winState = WindowState()
 			.apply { pOpen.value = true }
 
-		val posEditor = DesignPositionEditor(prep, pos, moltype)
+		val posEditor = DesignPositionEditor(prep, pos)
 		val mutationsTabState = Commands.TabState()
 		var resetTabSelection = true
 
@@ -199,7 +199,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			beginChild("mutations", 300f, 400f, true)
 			if (seqInfos.isNotEmpty()) {
 				for (info in seqInfos) {
-					if (radioButton("###radio-${info.type}", selectedSeqInfo == info)) {
+					if (radioButton("##radio-${info.type}", selectedSeqInfo == info)) {
 						selectedSeqInfo = info
 						setConf(view, info.frag, info.conf)
 					}

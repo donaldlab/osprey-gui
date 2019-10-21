@@ -8,11 +8,17 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
+import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.gui.styleEnabledIf
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.MoleculeRenderView
+import edu.duke.cs.ospreygui.features.components.ConfLibPicker
 import edu.duke.cs.ospreygui.features.components.DesignPositionEditor
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
+import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.io.confRuntimeId
+import edu.duke.cs.ospreygui.io.fragRuntimeId
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import java.math.BigInteger
@@ -29,9 +35,67 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		val winState = WindowState()
 			.apply { pOpen.value = true }
-		val posEditor = DesignPositionEditor(prep, posInfo.pos, molInfo.molType)
+		val posEditor = DesignPositionEditor(prep, posInfo.pos)
 		var resetTabSelection = true
 		val confsTabState = Commands.TabState()
+		val conflibPicker = ConfLibPicker(prep).apply {
+			onAdd = { resetInfos() }
+		}
+
+		inner class MutInfo(val type: String) {
+
+			inner class FragInfo(val conflib: ConfLib?, val frag: ConfLib.Fragment) {
+
+				val id = conflib.fragRuntimeId(frag)
+				val confs = posInfo.confSpace.confs.getOrPut(frag) { identityHashSet() }
+
+				inner class ConfInfo(val conf: ConfLib.Conf) {
+
+					val id = conflib.confRuntimeId(frag, conf)
+					val label = "${conf.name}##$id"
+
+					val pSelected = Ref.of(conf in confs)
+				}
+
+				// collect the conformations
+				val confInfos = frag.confs
+					.values
+					.map { ConfInfo(it) }
+
+				val numSelected = confInfos.count { it.pSelected.value }
+
+				val label = "${frag.name}, $numSelected/${confs.size} confs###$id"
+			}
+
+			// collect the fragments
+			val fragInfos = prep.conflibs
+				.flatMap { conflib ->
+					conflib.fragments
+						.values
+						.filter { it.type == type && posInfo.pos.isFragmentCompatible(it) }
+						.map { FragInfo(conflib, it) }
+				}
+				.let { fragInfos ->
+
+					// do we have a compatible wildtype fragment?
+					val wtFrag = posInfo.confSpace.wildTypeFragment
+						.takeIf { it?.type == type && posInfo.pos.isFragmentCompatible(it) }
+					return@let if (wtFrag != null) {
+						// yup, prepend it
+						listOf(FragInfo(null, wtFrag)) + fragInfos
+					} else {
+						// nope, keep the current fragments
+						fragInfos
+					}
+				}
+
+			val numSelected = fragInfos.sumBy { it.numSelected }
+			val numConfs = fragInfos.sumBy { it.confs.size }
+
+			val label = "$type, $numSelected/$numConfs confs###$type"
+		}
+		val mutInfos = ArrayList<MutInfo>()
+		var selectedConf: ConfLib.Conf? = null
 
 		fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
@@ -100,16 +164,109 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			)
 		}
 
+		fun resetInfos() {
+			mutInfos.clear()
+			for (mut in posInfo.confSpace.mutations) {
+				mutInfos.add(MutInfo(mut))
+			}
+		}
+
 		fun activateConfsTab() {
-			// TODO
+
+			resetInfos()
+
+			// find the wildtype conf info, if possible, and select it by default
+			selectedConf = posInfo.confSpace.wildTypeFragment
+				?.confs
+				?.values
+				?.firstOrNull()
 		}
 
 		fun renderConfsTab(imgui: Commands, slidewin: SlideCommands, view: MoleculeRenderView) = imgui.run {
-			// TODO
+
+			// show the conflib picker
+			conflibPicker.render(imgui)
+
+			var changed = false
+
+			text("Conformations:")
+			sameLine()
+			infoTip("""
+				|Select the conformations you want to include in your design by clicking the checkboxes.
+				|You can temporarily preview a conformation by selecting the radion button next to it.
+				|All temporary confomrations will be reverted when you're finished with the conformation editor.
+			""".trimMargin())
+			beginChild("confs", 300f, 400f, true)
+			for (mutInfo in mutInfos) {
+				treeNode(mutInfo.label) {
+					for (fragInfo in mutInfo.fragInfos) {
+						treeNode(fragInfo.label) {
+							for (confInfo in fragInfo.confInfos) {
+
+								if (radioButton("##radio-${confInfo.id}", selectedConf === confInfo.conf)) {
+									selectedConf = confInfo.conf
+									setConf(view, fragInfo.frag, confInfo.conf)
+								}
+								sameLine()
+								if (checkbox(confInfo.label, confInfo.pSelected)) {
+
+									// mark the conf as included or not in the design position conf space
+									if (confInfo.pSelected.value) {
+										fragInfo.confs.add(confInfo.conf)
+									} else {
+										fragInfo.confs.remove(confInfo.conf)
+									}
+
+									changed = true
+								}
+							}
+						}
+					}
+				}
+			}
+			if (mutInfos.isEmpty()) {
+				text("(No compatible conformations)")
+			}
+			endChild()
+
+			if (button("Select all")) {
+				for (mutInfo in mutInfos) {
+					for (fragInfo in mutInfo.fragInfos) {
+						fragInfo.confs.addAll(fragInfo.confInfos.map { it.conf })
+					}
+				}
+				changed = true
+			}
+			sameLine()
+			if (button("Deselect all")) {
+				for (mutInfo in mutInfos) {
+					for (fragInfo in mutInfo.fragInfos) {
+						fragInfo.confs.clear()
+					}
+				}
+				changed = true
+			}
+
+			// apply changes if needed
+			if (changed) {
+				resetInfos()
+				updateCounts()
+			}
 		}
 
 		fun deactivateConfsTab(view: MoleculeRenderView) {
-			// TODO
+
+			// restore the wildtype if needed
+			posInfo.confSpace.wildTypeFragment?.let { setConf(view, it, it.confs.values.first()) }
+		}
+
+		private fun setConf(view: MoleculeRenderView, frag: ConfLib.Fragment, conf: ConfLib.Conf) {
+
+			posInfo.pos.setConf(frag, conf)
+
+			// update the view
+			posEditor.refresh(view)
+			view.moleculeChanged()
 		}
 	}
 
@@ -160,8 +317,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		val pSelected = Ref.of(false)
 
-		val confSpace = prep.positionConfSpaces.getOrMake(pos)
-		val isMutable = confSpace.isMutable()
+		val confSpace get() = prep.positionConfSpaces.getOrMake(pos)
+		val isMutable get() = confSpace.isMutable()
 		val isFlexible get() = !isMutable
 	}
 
@@ -233,7 +390,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 						spacing()
 						columns(2)
 						indent(20f)
-						for (posInfo in molInfo.posInfos.filter { it.isMutable }) {
+						val mutInfos = molInfo.posInfos.filter { it.isMutable }
+						for (posInfo in mutInfos) {
 
 							selectable(posInfo.pos.name, posInfo.pSelected)
 							nextColumn()
@@ -241,6 +399,9 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 							nextColumn()
 						}
 						columns(1)
+						if (mutInfos.isEmpty()) {
+							text("(no mutable positions)")
+						}
 						unindent(20f)
 						spacing()
 
