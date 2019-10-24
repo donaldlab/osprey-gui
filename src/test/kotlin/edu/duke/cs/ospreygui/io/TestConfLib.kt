@@ -53,6 +53,25 @@ class TestConfLib : SharedSpec({
 				bonds.shouldContainExactlyInAnyOrder(h)
 			}
 
+			dofs.size shouldBe 1
+			dofs[0].shouldBeTypeOf<ConfLib.DegreeOfFreedom.DihedralAngle> { dof ->
+				dof.id shouldBe 1
+				dof.a.shouldBeTypeOf<ConfLib.AnchorAtomPointer> { a ->
+					a.anchor.id shouldBe 1
+					a.index shouldBe 1
+				}
+				dof.b.shouldBeTypeOf<ConfLib.AnchorAtomPointer> { b ->
+					b.anchor.id shouldBe 1
+					b.index shouldBe 0
+				}
+				dof.c.shouldBeTypeOf<ConfLib.AtomInfo> { c ->
+					c.name shouldBe "CB"
+				}
+				dof.d.shouldBeTypeOf<ConfLib.AtomInfo> { d ->
+					d.name shouldBe "HB1"
+				}
+			}
+
 			confs.size shouldBe 1
 			confs.getValue("ALA").run {
 
@@ -78,6 +97,7 @@ class TestConfLib : SharedSpec({
 			atoms.size shouldBe 12
 			bonds.size shouldBe 9
 			anchors.size shouldBe 2
+			dofs.size shouldBe 3
 
 			confs.size shouldBe 3
 			confs.getValue("p").run {
@@ -108,6 +128,8 @@ class TestConfLib : SharedSpec({
 				)
 			}
 
+			dofs.size shouldBe 0
+
 			confs.size shouldBe 2
 			confs.getValue("up").run {
 
@@ -130,6 +152,7 @@ class TestConfLib : SharedSpec({
 			atoms.size shouldBe 11
 			bonds.size shouldBe 9
 			anchors.size shouldBe 1
+			dofs.size shouldBe 3
 
 			confs.size shouldBe 3
 			confs.getValue("p").run {

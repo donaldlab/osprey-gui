@@ -45,6 +45,11 @@ class DesignPosition(
 		val fragAnchors: List<ConfLib.Anchor>
 	) {
 		val pairs = posAnchors.zip(fragAnchors)
+
+		fun findPosAnchor(fragAnchor: ConfLib.Anchor) =
+			pairs
+				.find { it.second === fragAnchor }
+				?.first
 	}
 
 	fun findAnchorMatch(frag: ConfLib.Fragment): AnchorMatch? =
@@ -70,11 +75,27 @@ class DesignPosition(
 	class IncompatibleAnchorsException(val pos: DesignPosition, val frag: ConfLib.Fragment) :
 		RuntimeException("design position ${pos.name} anchors are not compatible with fragment ${frag.id} anchors")
 
+	abstract inner class AtomResolver {
+
+		inner class NoAtomException(val p: ConfLib.AtomPointer)
+			: RuntimeException("can't find atom from pointer: $p at design position $name")
+
+		abstract fun resolve(p: ConfLib.AtomPointer): Atom?
+
+		fun resolveOrThrow(p: ConfLib.AtomPointer) =
+			resolve(p) ?: throw NoAtomException(p)
+	}
+	var atomResolver: AtomResolver? = null
+	val atomResolverOrThrow get() =
+		atomResolver ?: throw NoSuchElementException("design position currently has no atom resolver")
+
 	/**
 	 * Removes the current atoms from the molecule, including associated bonds.
 	 * Then adds the mutated atoms to the molecule, adding bonds and aligning to the anchor as necessary.
 	 *
-	 * If the molecule is a polymer, the new atoms are added to the residues of their anchor atoms
+	 * If the molecule is a polymer, the new atoms are added to the residues of their anchor atoms.
+	 *
+	 * Also set the atom pointer resolver.
 	 */
 	fun setConf(frag: ConfLib.Fragment, conf: ConfLib.Conf) {
 
@@ -130,6 +151,23 @@ class DesignPosition(
 
 			// align the conf coords
 			posAnchor.align(conf.anchorCoords.getValue(fragAnchor))
+		}
+
+		// set the atom pointer resolver
+		atomResolver = object : AtomResolver() {
+			override fun resolve(p: ConfLib.AtomPointer) =
+				when (p) {
+					is ConfLib.AtomInfo -> {
+						atomsByInfo[p]
+					}
+					is ConfLib.AnchorAtomPointer -> {
+						anchorMatch
+							.findPosAnchor(p.anchor)
+							?.anchorAtoms
+							?.get(p.index)
+					}
+					else -> throw IllegalArgumentException("unrecognized atom pointer type: ${p::class.simpleName}")
+				}
 		}
 	}
 
@@ -234,7 +272,8 @@ class DesignPosition(
 						}
 						.associate { it }
 				)
-			)
+			),
+			dofs = emptyList() // TODO: determine dofs?
 		)
 	}
 

@@ -46,7 +46,7 @@ class ConfLib(
 		val id: Int,
 		val name: String,
 		val element: Element
-	)
+	) : AtomPointer
 
 	data class Bond(
 		val a: AtomInfo,
@@ -150,6 +150,28 @@ class ConfLib(
 		val anchorCoords: Map<Anchor,AnchorCoords>
 	)
 
+	interface AtomPointer
+
+	data class AnchorAtomPointer(
+		val anchor: Anchor,
+		val index: Int
+	) : AtomPointer
+
+	sealed class DegreeOfFreedom {
+
+		abstract val id: Int
+
+		data class DihedralAngle(
+			override val id: Int,
+			val a: AtomPointer,
+			val b: AtomPointer,
+			val c: AtomPointer,
+			val d: AtomPointer
+		) : DegreeOfFreedom()
+
+		// TODO: other DoFs?
+	}
+
 	data class Fragment(
 		val id: String,
 		val name: String,
@@ -157,7 +179,8 @@ class ConfLib(
 		val atoms: List<AtomInfo>,
 		val bonds: List<Bond>,
 		val anchors: List<Anchor>,
-		val confs: Map<String,Conf>
+		val confs: Map<String,Conf>,
+		val dofs: List<DegreeOfFreedom>
 	) {
 
 		fun bondedAtoms(atom: AtomInfo): List<AtomInfo> =
@@ -322,6 +345,52 @@ class ConfLib(
 					confs[confId] = Conf(confId, name, desc, coords, anchorCoords)
 				}
 
+				fun makeAtomPointer(key: Any?, pos: TomlPosition): AtomPointer =
+					when (key) {
+						is Long -> {
+							// look up the atom info by index
+							getAtom(key.toInt(), pos)
+						}
+						is TomlArray -> {
+							// make an anchor atom pointer from the two indices
+							if (key.size() == 2 && key.containsLongs()) {
+								val anchorIndex = key.getInt(0)
+								val atomIndex = key.getInt(1)
+								AnchorAtomPointer(
+									getAnchor(anchorIndex),
+									atomIndex - 1
+								)
+							} else {
+								throw TomlParseException("atom pointer doesn't look like an anchor atom pointer: $key", pos)
+							}
+						}
+						else -> throw TomlParseException("unrecognized atom pointer: $key", pos)
+					}
+
+				// read the dofs
+				val dofs = HashMap<Int,DegreeOfFreedom>()
+				val dofsArray = fragTable.getArrayOrThrow("dofs", fragPos)
+				for (i in 0 until dofsArray.size()) {
+					val dofTable = dofsArray.getTable(i)
+					val pos = dofsArray.inputPositionOf(i)
+
+					val id = dofTable.getIntOrThrow("id", pos)
+					val type = dofTable.getStringOrThrow("type", pos)
+
+					when (type) {
+						"dihedral" -> {
+							dofs[id] = DegreeOfFreedom.DihedralAngle(
+								id,
+								makeAtomPointer(dofTable.get("a"), pos),
+								makeAtomPointer(dofTable.get("b"), pos),
+								makeAtomPointer(dofTable.get("c"), pos),
+								makeAtomPointer(dofTable.get("d"), pos)
+							)
+						}
+						else -> throw TomlParseException("unrecognized degree of freedom type: $type", pos)
+					}
+				}
+
 				frags[fragId] = Fragment(
 					fragId,
 					fragName,
@@ -329,7 +398,8 @@ class ConfLib(
 					atoms.map { (_, atom) -> atom },
 					bonds,
 					anchors.map { (_, anchor) -> anchor },
-					confs
+					confs,
+					dofs.map { (_, dof) -> dof }
 				)
 			}
 

@@ -12,8 +12,8 @@ Lovell, Word, Richardson, and Richardson.
 PROTEINS: Structure, Function, and Genetics, 40:389-408 (2000).'''
 
 [frag.VAL]
-name = "Valine"
-type = "VAL"
+name = 'Valine'
+type = 'VAL'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -40,8 +40,13 @@ bonds = [
 	[ 12,  9 ], # HG23 - CG2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 5 }, # N, CA, CB, CG1
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 5, d = 6 }, # CA, CB, CG1, HG11
+	{ id =  3, type = 'dihedral', a = [1,1], b = 3, c = 9, d = 10 }, # CA, CB, CG2, HG21
 ]
 [frag.VAL.conf.p]
 name = 'p'
@@ -108,8 +113,8 @@ anchorCoords = [
 ]
 
 [frag.SER]
-name = "Serine"
-type = "SER"
+name = 'Serine'
+type = 'SER'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -126,8 +131,12 @@ bonds = [
 	[  7,  6 ], #   HG - OG
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, OG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, OG, HG
 ]
 [frag.SER.conf.p_-60]
 name = 'p_-60'
@@ -419,8 +428,8 @@ anchorCoords = [
 ]
 
 [frag.HID]
-name = "Histidine - HD1"
-type = "HIS"
+name = 'Histidine - HD1'
+type = 'HIS'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -450,8 +459,12 @@ bonds = [
 	[ 13, 12 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, ND1
 ]
 [frag.HID.conf.p-80]
 name = 'p-80'
@@ -631,8 +644,8 @@ anchorCoords = [
 ]
 
 [frag.ILE]
-name = "Isoleucine"
-type = "ILE"
+name = 'Isoleucine'
+type = 'ILE'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -665,8 +678,14 @@ bonds = [
 	[ 15, 12 ], # HD13 - CD1
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 9 }, # N, CA, CB, CG1
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 9, d = 12 }, # CA, CB, CG1, CD1
+	{ id =  3, type = 'dihedral', a = 3, b = 9, c = 12, d = 13 }, # CB, CG1, CD1, HD11
+	{ id =  4, type = 'dihedral', a = [1,1], b = 3, c = 5, d = 6 }, # CA, CB, CG2, HG21
 ]
 [frag.ILE.conf.pp]
 name = 'pp'
@@ -838,8 +857,8 @@ anchorCoords = [
 ]
 
 [frag.HIE]
-name = "Histidine - HE2"
-type = "HIS"
+name = 'Histidine - HE2'
+type = 'HIS'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -869,8 +888,12 @@ bonds = [
 	[ 13, 12 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, ND1
 ]
 [frag.HIE.conf.p-80]
 name = 'p-80'
@@ -1050,8 +1073,8 @@ anchorCoords = [
 ]
 
 [frag.LYS]
-name = "Lysine"
-type = "LYS"
+name = 'Lysine'
+type = 'LYS'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -1090,8 +1113,15 @@ bonds = [
 	[ 18, 15 ], #  HZ3 - NZ
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 12 }, # CB, CG, CD, CE
+	{ id =  4, type = 'dihedral', a = 6, b = 9, c = 12, d = 15 }, # CG, CD, CE, NZ
+	{ id =  5, type = 'dihedral', a = 9, b = 12, c = 15, d = 16 }, # CD, CE, NZ, HZ1
 ]
 [frag.LYS.conf.ptpt]
 name = 'ptpt'
@@ -1824,8 +1854,8 @@ anchorCoords = [
 ]
 
 [frag.GLN]
-name = "Glutamine"
-type = "GLN"
+name = 'Glutamine'
+type = 'GLN'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -1854,8 +1884,13 @@ bonds = [
 	[ 13, 11 ], # HE22 - NE2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 10 }, # CB, CG, CD, OE1
 ]
 [frag.GLN.conf.pt20]
 name = 'pt20'
@@ -2057,8 +2092,8 @@ anchorCoords = [
 ]
 
 [frag.PRO]
-name = "Proline"
-type = "PRO"
+name = 'Proline'
+type = 'PRO'
 atoms = [
 	{ id =  1, name =    'CD', elem =  'C' },
 	{ id =  2, name =   'HD2', elem =  'H' },
@@ -2082,7 +2117,9 @@ bonds = [
 	[  9,  7 ], #  HB3 - CB
 ]
 anchors = [
-	{ id = 1, type = "double", bondsa = [ 7, 10 ], bondsb = [ 1 ] }, # CA - CB, HA; N - CD
+	{ id = 1, type = 'double', bondsa = [ 7, 10 ], bondsb = [ 1 ] }, # CA - CB, HA; N - CD
+]
+dofs = [
 ]
 [frag.PRO.conf.down]
 name = 'down'
@@ -2122,8 +2159,8 @@ anchorCoords = [
 ]
 
 [frag.PHE]
-name = "Phenylalanine"
-type = "PHE"
+name = 'Phenylalanine'
+type = 'PHE'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -2159,8 +2196,12 @@ bonds = [
 	[ 16, 15 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, CD1
 ]
 [frag.PHE.conf.p90]
 name = 'p90'
@@ -2264,8 +2305,8 @@ anchorCoords = [
 ]
 
 [frag.TYR]
-name = "Tryosine"
-type = "TYR"
+name = 'Tryosine'
+type = 'TYR'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -2303,8 +2344,13 @@ bonds = [
 	[ 17, 16 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, CD1
+	{ id =  3, type = 'dihedral', a = 9, b = 11, c = 12, d = 13 }, # CE1, CZ, OH, HH
 ]
 [frag.TYR.conf.p90_0]
 name = 'p90_0'
@@ -2516,8 +2562,8 @@ anchorCoords = [
 ]
 
 [frag.HIP]
-name = "Histidine - HD1,HE2"
-type = "HIS"
+name = 'Histidine - HD1,HE2'
+type = 'HIS'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -2549,8 +2595,12 @@ bonds = [
 	[ 14, 13 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, ND1
 ]
 [frag.HIP.conf.p-80]
 name = 'p-80'
@@ -2738,8 +2788,8 @@ anchorCoords = [
 ]
 
 [frag.GLU]
-name = "Glutamic Acid"
-type = "GLU"
+name = 'Glutamic Acid'
+type = 'GLU'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -2764,8 +2814,13 @@ bonds = [
 	[ 11,  9 ], #  OE2 - CD
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 10 }, # CB, CG, CD, OE1
 ]
 [frag.GLU.conf.pt-20]
 name = 'pt-20'
@@ -2929,8 +2984,8 @@ anchorCoords = [
 ]
 
 [frag.TRP]
-name = "Tryptophan"
-type = "TRP"
+name = 'Tryptophan'
+type = 'TRP'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -2975,8 +3030,12 @@ bonds = [
 	[ 20, 18 ], #  CD2 - CE3
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, CD1
 ]
 [frag.TRP.conf.p-90]
 name = 'p-90'
@@ -3183,8 +3242,8 @@ anchorCoords = [
 ]
 
 [frag.GLY]
-name = "Glycine"
-type = "GLY"
+name = 'Glycine'
+type = 'GLY'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =   'HA2', elem =  'H' },
@@ -3193,8 +3252,10 @@ atoms = [
 bonds = [
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA2, HA3
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA2, HA3
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
 ]
 [frag.GLY.conf.GLY]
 name = 'GLY'
@@ -3209,8 +3270,8 @@ anchorCoords = [
 ]
 
 [frag.ARG]
-name = "Arginine"
-type = "ARG"
+name = 'Arginine'
+type = 'ARG'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -3253,8 +3314,14 @@ bonds = [
 	[ 20, 18 ], # HH22 - NH2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 12 }, # CB, CG, CD, NE
+	{ id =  4, type = 'dihedral', a = 6, b = 9, c = 12, d = 14 }, # CG, CD, NE, CZ
 ]
 [frag.ARG.conf.ptp85]
 name = 'ptp85'
@@ -4244,8 +4311,8 @@ anchorCoords = [
 ]
 
 [frag.ALA]
-name = "Alanine"
-type = "ALA"
+name = 'Alanine'
+type = 'ALA'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -4260,8 +4327,11 @@ bonds = [
 	[  6,  3 ], #  HB3 - CB
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 4 }, # N, CA, CB, HB1
 ]
 [frag.ALA.conf.ALA]
 name = 'ALA'
@@ -4279,8 +4349,8 @@ anchorCoords = [
 ]
 
 [frag.CYS]
-name = "Cysteine"
-type = "CYS"
+name = 'Cysteine'
+type = 'CYS'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -4297,8 +4367,11 @@ bonds = [
 	[  7,  6 ], #   HG - SG
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, SG
 ]
 [frag.CYS.conf.p]
 name = 'p'
@@ -4350,8 +4423,8 @@ anchorCoords = [
 ]
 
 [frag.ASN]
-name = "Asparagine"
-type = "ASN"
+name = 'Asparagine'
+type = 'ASN'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -4374,8 +4447,12 @@ bonds = [
 	[ 10,  8 ], # HD22 - ND2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, OD1
 ]
 [frag.ASN.conf.p-10]
 name = 'p-10'
@@ -4512,8 +4589,8 @@ anchorCoords = [
 ]
 
 [frag.LEU]
-name = "Leucine"
-type = "LEU"
+name = 'Leucine'
+type = 'LEU'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -4546,8 +4623,14 @@ bonds = [
 	[ 15, 12 ], # HD23 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 8 }, # CA, CB, CG, CD1
+	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 8, d = 9 }, # CB, CG, CD1, HD11
+	{ id =  4, type = 'dihedral', a = 3, b = 6, c = 12, d = 13 }, # CB, CG, CD2, HD21
 ]
 [frag.LEU.conf.pp]
 name = 'pp'
@@ -4671,8 +4754,8 @@ anchorCoords = [
 ]
 
 [frag.MET]
-name = "Methionine"
-type = "MET"
+name = 'Methionine'
+type = 'MET'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -4701,8 +4784,14 @@ bonds = [
 	[ 13, 10 ], #  HE3 - CE
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, SD
+	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 10 }, # CB, CG, SD, CE
+	{ id =  4, type = 'dihedral', a = 6, b = 9, c = 10, d = 11 }, # CG, SD, CE, HE1
 ]
 [frag.MET.conf.ptp]
 name = 'ptp'
@@ -4992,8 +5081,8 @@ anchorCoords = [
 ]
 
 [frag.ASP]
-name = "Aspartic Acid"
-type = "ASP"
+name = 'Aspartic Acid'
+type = 'ASP'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -5012,8 +5101,12 @@ bonds = [
 	[  8,  6 ], #  OD2 - CG
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, OD1
 ]
 [frag.ASP.conf.p-10]
 name = 'p-10'
@@ -5102,8 +5195,8 @@ anchorCoords = [
 ]
 
 [frag.THR]
-name = "Threonine"
-type = "THR"
+name = 'Threonine'
+type = 'THR'
 atoms = [
 	{ id =  1, name =     'H', elem =  'H' },
 	{ id =  2, name =    'HA', elem =  'H' },
@@ -5126,8 +5219,13 @@ bonds = [
 	[ 10,  9 ], #  HG1 - OG1
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 2, 3 ] }, # CA - HA, CB
-	{ id = 2, type = "single", bonds = [ 1 ] }, # N - H
+	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
+	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 9 }, # N, CA, CB, OG1
+	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 9, d = 10 }, # CA, CB, OG1, HG1
+	{ id =  3, type = 'dihedral', a = [1,1], b = 3, c = 5, d = 6 }, # CA, CB, CG2, HG21
 ]
 [frag.THR.conf.p_-60]
 name = 'p_-60'
@@ -5473,8 +5571,8 @@ anchorCoords = [
 ]
 
 [frag.VALn]
-name = "Valine, N-terminal"
-type = "VAL"
+name = 'Valine, N-terminal'
+type = 'VAL'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -5500,7 +5598,12 @@ bonds = [
 	[ 11,  8 ], # HG23 - CG2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 4 }, # N, CA, CB, CG1
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 4, d = 5 }, # CA, CB, CG1, HG11
+	{ id =  3, type = 'dihedral', a = [1,1], b = 2, c = 8, d = 9 }, # CA, CB, CG2, HG21
 ]
 [frag.VALn.conf.p]
 name = 'p'
@@ -5561,8 +5664,8 @@ anchorCoords = [
 ]
 
 [frag.SERn]
-name = "Serine, N-terminal"
-type = "SER"
+name = 'Serine, N-terminal'
+type = 'SER'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -5578,7 +5681,11 @@ bonds = [
 	[  6,  5 ], #   HG - OG
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, OG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, OG, HG
 ]
 [frag.SERn.conf.p_-60]
 name = 'p_-60'
@@ -5834,8 +5941,8 @@ anchorCoords = [
 ]
 
 [frag.HIDn]
-name = "Histidine - HD1, N-terminal"
-type = "HIS"
+name = 'Histidine - HD1, N-terminal'
+type = 'HIS'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -5864,7 +5971,11 @@ bonds = [
 	[ 12, 11 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, ND1
 ]
 [frag.HIDn.conf.p-80]
 name = 'p-80'
@@ -6028,8 +6139,8 @@ anchorCoords = [
 ]
 
 [frag.ILEn]
-name = "Isoleucine, N-terminal"
-type = "ILE"
+name = 'Isoleucine, N-terminal'
+type = 'ILE'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -6061,7 +6172,13 @@ bonds = [
 	[ 14, 11 ], # HD13 - CD1
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 8 }, # N, CA, CB, CG1
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 8, d = 11 }, # CA, CB, CG1, CD1
+	{ id =  3, type = 'dihedral', a = 2, b = 8, c = 11, d = 12 }, # CB, CG1, CD1, HD11
+	{ id =  4, type = 'dihedral', a = [1,1], b = 2, c = 4, d = 5 }, # CA, CB, CG2, HG21
 ]
 [frag.ILEn.conf.pp]
 name = 'pp'
@@ -6219,8 +6336,8 @@ anchorCoords = [
 ]
 
 [frag.HIEn]
-name = "Histidine - HE2, N-terminal"
-type = "HIS"
+name = 'Histidine - HE2, N-terminal'
+type = 'HIS'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -6249,7 +6366,11 @@ bonds = [
 	[ 12, 11 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, ND1
 ]
 [frag.HIEn.conf.p-80]
 name = 'p-80'
@@ -6413,8 +6534,8 @@ anchorCoords = [
 ]
 
 [frag.LYSn]
-name = "Lysine, N-terminal"
-type = "LYS"
+name = 'Lysine, N-terminal'
+type = 'LYS'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -6452,7 +6573,14 @@ bonds = [
 	[ 17, 14 ], #  HZ3 - NZ
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 11 }, # CB, CG, CD, CE
+	{ id =  4, type = 'dihedral', a = 5, b = 8, c = 11, d = 14 }, # CG, CD, CE, NZ
+	{ id =  5, type = 'dihedral', a = 8, b = 11, c = 14, d = 15 }, # CD, CE, NZ, HZ1
 ]
 [frag.LYSn.conf.ptpt]
 name = 'ptpt'
@@ -7131,8 +7259,8 @@ anchorCoords = [
 ]
 
 [frag.GLNn]
-name = "Glutamine, N-terminal"
-type = "GLN"
+name = 'Glutamine, N-terminal'
+type = 'GLN'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -7160,7 +7288,12 @@ bonds = [
 	[ 12, 10 ], # HE22 - NE2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 9 }, # CB, CG, CD, OE1
 ]
 [frag.GLNn.conf.pt20]
 name = 'pt20'
@@ -7344,8 +7477,8 @@ anchorCoords = [
 ]
 
 [frag.PHEn]
-name = "Phenylalanine, N-terminal"
-type = "PHE"
+name = 'Phenylalanine, N-terminal'
+type = 'PHE'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -7380,7 +7513,11 @@ bonds = [
 	[ 15, 14 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, CD1
 ]
 [frag.PHEn.conf.p90]
 name = 'p90'
@@ -7476,8 +7613,8 @@ anchorCoords = [
 ]
 
 [frag.TYRn]
-name = "Tryosine, N-terminal"
-type = "TYR"
+name = 'Tryosine, N-terminal'
+type = 'TYR'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -7514,7 +7651,12 @@ bonds = [
 	[ 16, 15 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, CD1
+	{ id =  3, type = 'dihedral', a = 8, b = 10, c = 11, d = 12 }, # CE1, CZ, OH, HH
 ]
 [frag.TYRn.conf.p90_0]
 name = 'p90_0'
@@ -7710,8 +7852,8 @@ anchorCoords = [
 ]
 
 [frag.HIPn]
-name = "Histidine - HD1,HE2, N-terminal"
-type = "HIS"
+name = 'Histidine - HD1,HE2, N-terminal'
+type = 'HIS'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -7742,7 +7884,11 @@ bonds = [
 	[ 13, 12 ], #  HD2 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, ND1
 ]
 [frag.HIPn.conf.p-80]
 name = 'p-80'
@@ -7914,8 +8060,8 @@ anchorCoords = [
 ]
 
 [frag.GLUn]
-name = "Glutamic Acid, N-terminal"
-type = "GLU"
+name = 'Glutamic Acid, N-terminal'
+type = 'GLU'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -7939,7 +8085,12 @@ bonds = [
 	[ 10,  8 ], #  OE2 - CD
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 9 }, # CB, CG, CD, OE1
 ]
 [frag.GLUn.conf.pt-20]
 name = 'pt-20'
@@ -8087,8 +8238,8 @@ anchorCoords = [
 ]
 
 [frag.TRPn]
-name = "Tryptophan, N-terminal"
-type = "TRP"
+name = 'Tryptophan, N-terminal'
+type = 'TRP'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -8132,7 +8283,11 @@ bonds = [
 	[ 19, 17 ], #  CD2 - CE3
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, CD1
 ]
 [frag.TRPn.conf.p-90]
 name = 'p-90'
@@ -8325,8 +8480,8 @@ anchorCoords = [
 ]
 
 [frag.GLYn]
-name = "Glycine, N-terminal"
-type = "GLY"
+name = 'Glycine, N-terminal'
+type = 'GLY'
 atoms = [
 	{ id =  1, name =   'HA2', elem =  'H' },
 	{ id =  2, name =   'HA3', elem =  'H' },
@@ -8334,7 +8489,9 @@ atoms = [
 bonds = [
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA2, HA3
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA2, HA3
+]
+dofs = [
 ]
 [frag.GLYn.conf.GLY]
 name = 'GLYn'
@@ -8347,8 +8504,8 @@ anchorCoords = [
 ]
 
 [frag.ARGn]
-name = "Arginine, N-terminal"
-type = "ARG"
+name = 'Arginine, N-terminal'
+type = 'ARG'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -8390,7 +8547,13 @@ bonds = [
 	[ 19, 17 ], # HH22 - NH2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
+	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 11 }, # CB, CG, CD, NE
+	{ id =  4, type = 'dihedral', a = 5, b = 8, c = 11, d = 13 }, # CG, CD, NE, CZ
 ]
 [frag.ARGn.conf.ptp85]
 name = 'ptp85'
@@ -9312,8 +9475,8 @@ anchorCoords = [
 ]
 
 [frag.ALAn]
-name = "Alanine, N-terminal"
-type = "ALA"
+name = 'Alanine, N-terminal'
+type = 'ALA'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -9327,7 +9490,10 @@ bonds = [
 	[  5,  2 ], #  HB3 - CB
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 3 }, # N, CA, CB, HB1
 ]
 [frag.ALAn.conf.ALA]
 name = 'ALAn'
@@ -9343,8 +9509,8 @@ anchorCoords = [
 ]
 
 [frag.CYSn]
-name = "Cysteine, N-terminal"
-type = "CYS"
+name = 'Cysteine, N-terminal'
+type = 'CYS'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -9360,7 +9526,10 @@ bonds = [
 	[  6,  5 ], #   HG - SG
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, SG
 ]
 [frag.CYSn.conf.p]
 name = 'p'
@@ -9406,8 +9575,8 @@ anchorCoords = [
 ]
 
 [frag.ASNn]
-name = "Asparagine, N-terminal"
-type = "ASN"
+name = 'Asparagine, N-terminal'
+type = 'ASN'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -9429,7 +9598,11 @@ bonds = [
 	[  9,  7 ], # HD22 - ND2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, OD1
 ]
 [frag.ASNn.conf.p-10]
 name = 'p-10'
@@ -9552,8 +9725,8 @@ anchorCoords = [
 ]
 
 [frag.LEUn]
-name = "Leucine, N-terminal"
-type = "LEU"
+name = 'Leucine, N-terminal'
+type = 'LEU'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -9585,7 +9758,13 @@ bonds = [
 	[ 14, 11 ], # HD23 - CD2
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 7 }, # CA, CB, CG, CD1
+	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 7, d = 8 }, # CB, CG, CD1, HD11
+	{ id =  4, type = 'dihedral', a = 2, b = 5, c = 11, d = 12 }, # CB, CG, CD2, HD21
 ]
 [frag.LEUn.conf.pp]
 name = 'pp'
@@ -9699,8 +9878,8 @@ anchorCoords = [
 ]
 
 [frag.METn]
-name = "Methionine, N-terminal"
-type = "MET"
+name = 'Methionine, N-terminal'
+type = 'MET'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -9728,7 +9907,13 @@ bonds = [
 	[ 12,  9 ], #  HE3 - CE
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, SD
+	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 9 }, # CB, CG, SD, CE
+	{ id =  4, type = 'dihedral', a = 5, b = 8, c = 9, d = 10 }, # CG, SD, CE, HE1
 ]
 [frag.METn.conf.ptp]
 name = 'ptp'
@@ -9992,8 +10177,8 @@ anchorCoords = [
 ]
 
 [frag.ASPn]
-name = "Aspartic Acid, N-terminal"
-type = "ASP"
+name = 'Aspartic Acid, N-terminal'
+type = 'ASP'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -10011,7 +10196,11 @@ bonds = [
 	[  7,  5 ], #  OD2 - CG
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, OD1
 ]
 [frag.ASPn.conf.p-10]
 name = 'p-10'
@@ -10090,8 +10279,8 @@ anchorCoords = [
 ]
 
 [frag.THRn]
-name = "Threonine, N-terminal"
-type = "THR"
+name = 'Threonine, N-terminal'
+type = 'THR'
 atoms = [
 	{ id =  1, name =    'HA', elem =  'H' },
 	{ id =  2, name =    'CB', elem =  'C' },
@@ -10113,7 +10302,12 @@ bonds = [
 	[  9,  8 ], #  HG1 - OG1
 ]
 anchors = [
-	{ id = 1, type = "single", bonds = [ 1, 2 ] }, # CA - HA, CB
+	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
+]
+dofs = [
+	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 8 }, # N, CA, CB, OG1
+	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 8, d = 9 }, # CA, CB, OG1, HG1
+	{ id =  3, type = 'dihedral', a = [1,1], b = 2, c = 4, d = 5 }, # CA, CB, CG2, HG21
 ]
 [frag.THRn.conf.p_-60]
 name = 'p_-60'

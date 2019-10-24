@@ -4,6 +4,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
+import edu.duke.cs.ospreygui.dofs.dihedralAngle
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.show
@@ -521,6 +522,26 @@ class TestMutation : SharedSpec({
 			res.atoms.size shouldBe wtPositions.size
 			for ((atomName, atomPos) in wtPositions) {
 				res.shouldHaveAtomNear(atomName, atomPos)
+			}
+		}
+
+		test("glycine->valine chi1", /* TEMP */ focus=true) {
+
+			val (res, pos) = gly17()
+
+			// mutate to valine
+			val frag = conflib.fragments.getValue("VAL")
+			val conf = frag.confs.getValue("t")
+			pos.setConf(frag, conf)
+
+			// build the dihedral angle
+			val chi1 = frag.dofs[0] as ConfLib.DegreeOfFreedom.DihedralAngle
+			pos.dihedralAngle(frag, chi1).run {
+				mol shouldBe pos.mol
+				a.name shouldBe "N"
+				b.name shouldBe "CA"
+				c.name shouldBe "CB"
+				d.name shouldBe "CG1"
 			}
 		}
 	}
