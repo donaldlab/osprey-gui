@@ -66,74 +66,73 @@ class BondEditor : SlideFeature {
 				}
 
 				// draw the window
-				begin("Bond Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				window("Bond Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-				text("Tools:")
-				indent(10f)
+					text("Tools:")
+					indent(10f)
 
-				if (button("Clear all bonds")) {
-					clearBonds(molViews)
-				}
-
-				if (button("Add bonds automatically")) {
-					slidewin.showExceptions {
-						guessBonds(molViews)
+					if (button("Clear all bonds")) {
+						clearBonds(molViews)
 					}
-				}
-				sameLine()
-				infoTip("""
-					|This tool infers atom connectivity using a molecular mechanics forcefield.
-					|After bonds have been added automatically, feel free to use
-					|the fine-grained editing tools to add any missing bonds, or
-					|remove any extraneous bonds.
-				""".trimMargin())
 
-				unindent(10f)
-
-				val selection = selection
-
-				// show the selected atom
-				text("Selected:")
-				beginChild("selected", 300f, 30f, true)
-				if (selection != null) {
-					text(selection.atom.name)
-				} else {
-					text("(Click an atom to show bonding options.)")
-				}
-				endChild()
-
-				// show the nearby atoms
-				text("Nearby Atoms:")
-				beginChild("nearby", 300f, 300f, true)
-				if (selection != null) {
-
-					columns(2)
-					for (info in selection.nearbyAtoms) {
-
-						// show a checkbox to toggle the bond on/off
-						val isCheckHovered = renderBondCheck(imgui, info)
-						nextColumn()
-						renderBondLabel(imgui, info)
-						nextColumn()
-
-						// update atom selections
-						selection.view.renderEffects[info.atom] = if (isCheckHovered) {
-							// highlight the atom when we mouseover the checkbox
-							hoverEffect
-						} else {
-							// otherwise, color by range
-							if (info.dist in info.covalentRange) {
-								inRangeEffect
-							} else {
-								outOfRangeEffect
-							}
+					if (button("Add bonds automatically")) {
+						slidewin.showExceptions {
+							guessBonds(molViews)
 						}
 					}
-					columns(1)
-				}
-				endChild()
+					sameLine()
+					infoTip("""
+						|This tool infers atom connectivity using a molecular mechanics forcefield.
+						|After bonds have been added automatically, feel free to use
+						|the fine-grained editing tools to add any missing bonds, or
+						|remove any extraneous bonds.
+					""".trimMargin())
 
-				end()
+					unindent(10f)
+
+					val selection = selection
+
+					// show the selected atom
+					text("Selected:")
+					child("selected", 300f, 30f, true) {
+						if (selection != null) {
+							text(selection.atom.name)
+						} else {
+							text("(Click an atom to show bonding options.)")
+						}
+					}
+
+					// show the nearby atoms
+					text("Nearby Atoms:")
+					child("nearby", 300f, 300f, true) {
+						if (selection != null) {
+
+							columns(2)
+							for (info in selection.nearbyAtoms) {
+
+								// show a checkbox to toggle the bond on/off
+								val isCheckHovered = renderBondCheck(imgui, info)
+								nextColumn()
+								renderBondLabel(imgui, info)
+								nextColumn()
+
+								// update atom selections
+								selection.view.renderEffects[info.atom] = if (isCheckHovered) {
+									// highlight the atom when we mouseover the checkbox
+									hoverEffect
+								} else {
+									// otherwise, color by range
+									if (info.dist in info.covalentRange) {
+										inRangeEffect
+									} else {
+										outOfRangeEffect
+									}
+								}
+							}
+							columns(1)
+						}
+					}
+				}
 			},
 			onClose = {
 

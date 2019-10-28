@@ -52,100 +52,96 @@ class MinimizerTool : SlideFeature {
 			whenOpen = {
 
 				// draw the window
-				begin("Minimize##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				window("Minimize##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-				molViews
-					.forEach { view ->
+					molViews
+						.forEach { view ->
 
-						val mol = view.mol
-						val info = molInfos.getOrPut(mol) { MolInfo(view) }
+							val mol = view.mol
+							val info = molInfos.getOrPut(mol) { MolInfo(view) }
 
-						// show the molecule type
-						checkbox("$mol##${System.identityHashCode(mol)}", info.pSelected)
+							// show the molecule type
+							checkbox("$mol##${System.identityHashCode(mol)}", info.pSelected)
 
-						// show a context menu to center the camera on the molecule
-						if (beginPopupContextItem("centerCamera${System.identityHashCode(mol)}")) {
+							// show a context menu to center the camera on the molecule
+							popupContextItem("centerCamera${System.identityHashCode(mol)}") {
 
-							if (button("Center Camera")) {
+								if (button("Center Camera")) {
 
-								// center on the molecule centroid
-								val center = Vector3d().apply {
-									mol.atoms.forEach { add(it.pos) }
-									div(mol.atoms.size.toDouble())
+									// center on the molecule centroid
+									val center = Vector3d().apply {
+										mol.atoms.forEach { add(it.pos) }
+										div(mol.atoms.size.toDouble())
+									}
+									slidewin.camera.lookAt(center.toFloat())
+
+									closeCurrentPopup()
 								}
-								slidewin.camera.lookAt(center.toFloat())
-
-								closeCurrentPopup()
 							}
 
-							endPopup()
+							// add buttons to set coords
+							val unminimizedCoords = info.minInfo.unminimizedCoords
+							val minimizedCoords = info.minInfo.minimizedCoords
+							text("Set Coords:")
+							sameLine()
+							styleDisabledIf(unminimizedCoords == null) {
+								if (button("Unminimized") && unminimizedCoords != null) {
+									info.minInfo.setCoords(unminimizedCoords)
+									info.view.moleculeChanged()
+								}
+							}
+							sameLine()
+							styleDisabledIf(minimizedCoords == null) {
+								if (button("Minimized") && minimizedCoords != null) {
+									info.minInfo.setCoords(minimizedCoords)
+									info.view.moleculeChanged()
+								}
+							}
+
+							// let the entries breathe a little
+							spacing()
+							spacing()
+							separator()
+							spacing()
+							spacing()
 						}
 
-						// add buttons to set coords
-						val unminimizedCoords = info.minInfo.unminimizedCoords
-						val minimizedCoords = info.minInfo.minimizedCoords
-						text("Set Coords:")
-						sameLine()
-						styleDisabledIf(unminimizedCoords == null) {
-							if (button("Unminimized") && unminimizedCoords != null) {
-								info.minInfo.setCoords(unminimizedCoords)
+					val job = job
+					if (job == null) {
+
+						sliderInt("Num Steps", pNumSteps, 1, 1000)
+
+						if (button("Minimize Selected Molecules")) {
+							this@MinimizerTool.job = Job(
+								molInfos.values.filter { it.pSelected.value },
+								pNumSteps.value
+							)
+						}
+
+					} else {
+
+						text("Minimizing...")
+						// TODO: show minimization progress
+						// TODO: cancel button?
+
+						if (job.isFinished.get()) {
+
+							// report any errors
+							job.throwable?.let { t ->
+								slidewin.showExceptions { throw t }
+							}
+
+							// set the minmized coords now
+							for (info in job.infos) {
+								info.minInfo.minimizedCoords?.let { info.minInfo.setCoords(it) }
 								info.view.moleculeChanged()
 							}
+
+							// cleanup the finished job
+							this@MinimizerTool.job = null
 						}
-						sameLine()
-						styleDisabledIf(minimizedCoords == null) {
-							if (button("Minimized") && minimizedCoords != null) {
-								info.minInfo.setCoords(minimizedCoords)
-								info.view.moleculeChanged()
-							}
-						}
-
-						// let the entries breathe a little
-						spacing()
-						spacing()
-						separator()
-						spacing()
-						spacing()
-					}
-
-				val job = job
-				if (job == null) {
-
-					sliderInt("Num Steps", pNumSteps, 1, 1000)
-
-					if (button("Minimize Selected Molecules")) {
-						this@MinimizerTool.job = Job(
-							molInfos.values.filter { it.pSelected.value },
-							pNumSteps.value
-						)
-					}
-
-				} else {
-
-					text("Minimizing...")
-					// TODO: show minimization progress
-					// TODO: cancel button?
-
-					if (job.isFinished.get()) {
-
-						// report any errors
-						job.throwable?.let { t ->
-							slidewin.showExceptions { throw t }
-						}
-
-						// set the minmized coords now
-						for (info in job.infos) {
-							info.minInfo.minimizedCoords?.let { info.minInfo.setCoords(it) }
-							info.view.moleculeChanged()
-						}
-
-						// cleanup the finished job
-						this@MinimizerTool.job = null
 					}
 				}
-
-				end()
-
 			},
 			onClose = {
 				// cleanup our mol infos

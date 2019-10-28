@@ -28,13 +28,12 @@ class AboutOspreyGui : WindowFeature {
 			openPopup(popupId)
 		}
 
-		if (beginPopup(popupId)) {
+		popup(popupId) {
 			text(OspreyGui.name)
 			text("v${OspreyGui.version}")
 			spacing()
 			text("Developed by the Donald Lab")
 			text("at Duke University")
-			endPopup()
 		}
 	}
 }

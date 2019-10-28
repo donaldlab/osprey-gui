@@ -44,81 +44,78 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 
 				var hoveredMol: Molecule? = null
 
-				begin("Filter##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				window("Filter##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-				// show the molecule partition
-				prep.partition.forEachIndexed { i, (type, mol) ->
+					// show the molecule partition
+					prep.partition.forEachIndexed { i, (type, mol) ->
 
-					if (i > 0) {
-						// let the entries breathe
-						spacing()
-						spacing()
-						separator()
-						spacing()
-						spacing()
-					}
-
-					// show the molecule type
-					selectable("$mol##${System.identityHashCode(mol)}", highlightedMol == mol)
-					if (isItemHovered()) {
-						hoveredMol = mol
-					}
-
-					// show a context menu to center the camera on the molecule
-					if (beginPopupContextItem("centerCamera${System.identityHashCode(mol)}")) {
-
-						if (button("Center Camera")) {
-
-							// center on the molecule centroid
-							val center = Vector3d().apply {
-								mol.atoms.forEach { add(it.pos) }
-								div(mol.atoms.size.toDouble())
-							}
-							slidewin.camera.lookAt(center.toFloat())
-
-							closeCurrentPopup()
+						if (i > 0) {
+							// let the entries breathe
+							spacing()
+							spacing()
+							separator()
+							spacing()
+							spacing()
 						}
 
-						endPopup()
-					}
+						// show the molecule type
+						selectable("$mol##${System.identityHashCode(mol)}", highlightedMol == mol)
+						if (isItemHovered()) {
+							hoveredMol = mol
+						}
 
-					indent(10f)
+						// show a context menu to center the camera on the molecule
+						popupContextItem("centerCamera${System.identityHashCode(mol)}") {
 
-					when (type) {
-						MoleculeType.Protein -> {
-							mol as Polymer
-							for (chain in mol.chains) {
-								text("chain ${chain.id}: ${chain.residues.size} amino acids")
+							if (button("Center Camera")) {
+
+								// center on the molecule centroid
+								val center = Vector3d().apply {
+									mol.atoms.forEach { add(it.pos) }
+									div(mol.atoms.size.toDouble())
+								}
+								slidewin.camera.lookAt(center.toFloat())
+
+								closeCurrentPopup()
 							}
 						}
-						MoleculeType.DNA,
-						MoleculeType.RNA -> {
-							mol as Polymer
-							for (chain in mol.chains) {
-								text("chain ${chain.id}: ${chain.residues.size} bases")
+
+						indent(10f)
+
+						when (type) {
+							MoleculeType.Protein -> {
+								mol as Polymer
+								for (chain in mol.chains) {
+									text("chain ${chain.id}: ${chain.residues.size} amino acids")
+								}
 							}
+							MoleculeType.DNA,
+							MoleculeType.RNA -> {
+								mol as Polymer
+								for (chain in mol.chains) {
+									text("chain ${chain.id}: ${chain.residues.size} bases")
+								}
+							}
+							MoleculeType.SmallMolecule,
+							MoleculeType.AtomicIon -> {
+								text("${mol.atoms.size} atoms")
+							}
+							MoleculeType.Solvent -> {
+								mol as Polymer
+								text("${mol.chains.first().residues.size} molecules")
+							}
+							else -> Unit
 						}
-						MoleculeType.SmallMolecule,
-						MoleculeType.AtomicIon -> {
-							text("${mol.atoms.size} atoms")
-						}
-						MoleculeType.Solvent -> {
-							mol as Polymer
-							text("${mol.chains.first().residues.size} molecules")
-						}
-						else -> Unit
-					}
 
-					// checkbox to include the molecule in the prep or not
-					val pInclude = inclusionChecks.getValue(mol)
-					if (checkbox("Include##${System.identityHashCode(mol)}", pInclude)) {
-						prep.setIncluded(mol, pInclude.value, slide)
-					}
+						// checkbox to include the molecule in the prep or not
+						val pInclude = inclusionChecks.getValue(mol)
+						if (checkbox("Include##${System.identityHashCode(mol)}", pInclude)) {
+							prep.setIncluded(mol, pInclude.value, slide)
+						}
 
-					unindent(10f)
+						unindent(10f)
+					}
 				}
-
-				end()
 
 				updateHighlight(slide, slidewin.mouseTarget, hoveredMol)
 			},

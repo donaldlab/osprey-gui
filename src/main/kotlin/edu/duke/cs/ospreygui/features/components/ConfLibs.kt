@@ -69,24 +69,23 @@ class ConfLibPicker(val prep: ConfSpacePrep) {
 
 		// show available libraries
 		text("Conformation Libraries")
-		beginChild("libs", 300f, 100f, true)
-		for (conflib in prep.conflibs) {
-			text(conflib.name)
-			conflibTooltip(conflib.name, conflib.description, conflib.citation)
+		child("libs", 300f, 100f, true) {
+			for (conflib in prep.conflibs) {
+				text(conflib.name)
+				conflibTooltip(conflib.name, conflib.description, conflib.citation)
+			}
 		}
-		endChild()
 
 		if (button("Add")) {
 			openPopup("addlib")
 		}
-		if (beginPopup("addlib")) {
+		popup("addlib") {
 			for (info in ConfLibs.infos) {
 				if (menuItem(info.name)) {
 					addLib(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
 				}
 				conflibTooltip(null, info.description, info.citation)
 			}
-			endPopup()
 		}
 
 		sameLine()

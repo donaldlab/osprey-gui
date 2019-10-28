@@ -52,36 +52,35 @@ class ClashViewer : SlideFeature {
 
 				// draw the window
 				setNextWindowSize(300f, 0f)
-				begin("Clashes##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				window("Clashes##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-				if (button("Refresh")) {
-					unloadClashes()
-					loadClashes(molViews)
-				}
-
-				// show the counts, with toggles to show/hide
-				if (countsByType.isNotEmpty()) {
-
-					columns(2)
-					for ((type, counts) in countsByType) {
-
-						checkbox(type, counts.pVisible)
-						nextColumn()
-
-						if (counts.dots > 0) {
-							text("${counts.dots} dots")
-						} else if (counts.vectors > 0) {
-							text("${counts.vectors} vectors")
-						}
-						nextColumn()
+					if (button("Refresh")) {
+						unloadClashes()
+						loadClashes(molViews)
 					}
-					columns(1)
 
-				} else {
-					text("(no clash information)")
+					// show the counts, with toggles to show/hide
+					if (countsByType.isNotEmpty()) {
+
+						columns(2)
+						for ((type, counts) in countsByType) {
+
+							checkbox(type, counts.pVisible)
+							nextColumn()
+
+							if (counts.dots > 0) {
+								text("${counts.dots} dots")
+							} else if (counts.vectors > 0) {
+								text("${counts.vectors} vectors")
+							}
+							nextColumn()
+						}
+						columns(1)
+
+					} else {
+						text("(no clash information)")
+					}
 				}
-
-				end()
 
 			},
 			onClose = {

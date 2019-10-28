@@ -55,75 +55,70 @@ class MissingAtomsEditor : SlideFeature {
 			whenOpen = {
 
 				// draw the window
-				begin("Missing Atom Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				window("Missing Atom Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-				text("Tools:")
-				indent(10f)
+					text("Tools:")
+					indent(10f)
 
-				if (button("Add missing atoms automatically")) {
-					slidewin.showExceptions {
-						addedAtoms = guessAtoms(molViews)
+					if (button("Add missing atoms automatically")) {
+						slidewin.showExceptions {
+							addedAtoms = guessAtoms(molViews)
+						}
 					}
-				}
-				sameLine()
-				infoTip("""
-					|This tool infers the positions of missing heavy atoms for molecules
-					|with regular structure, such as proteins and nucleic acids,
-					|based on definitions in the AmberTools package.
-				""".trimMargin())
+					sameLine()
+					infoTip("""
+						|This tool infers the positions of missing heavy atoms for molecules
+						|with regular structure, such as proteins and nucleic acids,
+						|based on definitions in the AmberTools package.
+					""".trimMargin())
 
-				unindent(10f)
+					unindent(10f)
 
-				addedAtoms?.let { addedAtoms ->
+					addedAtoms?.let { addedAtoms ->
 
-					text("Added Atoms:")
-					beginChild("addedAtoms", 300f, 200f, true)
+						text("Added Atoms:")
+						child("addedAtoms", 300f, 200f, true) {
 
-					if (addedAtoms.isNotEmpty()) {
+							if (addedAtoms.isNotEmpty()) {
 
-						// show a checkbox to toggle the atom on/off
-						for (addedAtom in addedAtoms) {
+								// show a checkbox to toggle the atom on/off
+								for (addedAtom in addedAtoms) {
 
-							val location = addedAtom.location
-							val label = if (location != null) {
-								"${addedAtom.atom.name} @ $location"
-							} else {
-								addedAtom.atom.name
-							}
+									val location = addedAtom.location
+									val label = if (location != null) {
+										"${addedAtom.atom.name} @ $location"
+									} else {
+										addedAtom.atom.name
+									}
 
-							if (checkbox(label, addedAtom.pIncluded)) {
-								updateAtom(molViews, addedAtom)
-							}
+									if (checkbox(label, addedAtom.pIncluded)) {
+										updateAtom(molViews, addedAtom)
+									}
 
-							// show a context menu for the checkbox
-							if (beginPopupContextItem("addedAtom:$label")) {
+									// show a context menu for the checkbox
+									popupContextItem("addedAtom:$label") {
 
-								if (button("Center Camera")) {
-									slidewin.camera.lookAt(addedAtom.atom.pos.toFloat())
-									closeCurrentPopup()
+										if (button("Center Camera")) {
+											slidewin.camera.lookAt(addedAtom.atom.pos.toFloat())
+											closeCurrentPopup()
+										}
+									}
 								}
 
-								endPopup()
+							} else {
+
+								text("no missing atoms were added")
 							}
 						}
 
-					} else {
-
-						text("no missing atoms were added")
-					}
-
-					endChild()
-
-					if (addedAtoms.isNotEmpty()) {
-						if (button("Clear all automatically-added atoms")) {
-							clearAtoms(addedAtoms, molViews)
-							this@MissingAtomsEditor.addedAtoms = null
+						if (addedAtoms.isNotEmpty()) {
+							if (button("Clear all automatically-added atoms")) {
+								clearAtoms(addedAtoms, molViews)
+								this@MissingAtomsEditor.addedAtoms = null
+							}
 						}
 					}
 				}
-
-				end()
-
 			},
 			onClose = {
 				// clear any previous state

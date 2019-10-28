@@ -272,18 +272,18 @@ class DesignPositionEditor(
 
 		// show all the residues as radios
 		text("Residues:")
-		beginChild("residues", 500f, 400f, true)
-		columns(5)
-		for (res in selectedChain.residues) {
-			if (radioButton("${res.id} ${res.type}", res == selectedRes || res == hoveredRes)) {
-				slidewin.showExceptions {
-					selectResidue(view, res)
+		child("residues", 500f, 400f, true) {
+			columns(5)
+			for (res in selectedChain.residues) {
+				if (radioButton("${res.id} ${res.type}", res == selectedRes || res == hoveredRes)) {
+					slidewin.showExceptions {
+						selectResidue(view, res)
+					}
 				}
+				nextColumn()
 			}
-			nextColumn()
+			columns(1)
 		}
-		columns(1)
-		endChild()
 	}
 
 	private fun selectResidue(view: MoleculeRenderView, res: Polymer.Residue) {
@@ -334,11 +334,11 @@ class DesignPositionEditor(
 		}
 		indent(20f)
 		checkbox("Automatically select hydrogens", autoSelectHydrogens)
-		beginChild("currentAtoms", 300f, 200f, true)
-		for (info in currentAtoms) {
-			selectable(info.label, info.pSelected)
+		child("currentAtoms", 300f, 200f, true) {
+			for (info in currentAtoms) {
+				selectable(info.label, info.pSelected)
+			}
 		}
-		endChild()
 
 		styleEnabledIf(currentAtoms.any { it.pSelected.value }) {
 			if (button("Remove")) {

@@ -62,42 +62,41 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				whenOpen = {
 
 					// draw the window
-					begin("Design Position Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+					window("Design Position Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-					// if we need to reset the tab selection, make the flags for the first tab
-					fun makeFlags() =
-						if (resetTabSelection) {
-							resetTabSelection = false
-							IntFlags.of(Commands.TabItemFlags.SetSelected)
-						} else {
-							IntFlags.of(Commands.TabItemFlags.None)
-						}
+						// if we need to reset the tab selection, make the flags for the first tab
+						fun makeFlags() =
+							if (resetTabSelection) {
+								resetTabSelection = false
+								IntFlags.of(Commands.TabItemFlags.SetSelected)
+							} else {
+								IntFlags.of(Commands.TabItemFlags.None)
+							}
 
-					tabBar("tabs") {
-						when (moltype) {
-							MoleculeType.Protein -> tabItem("Protein", flags = makeFlags()) {
-								posEditor.guiProtein(imgui, slidewin, view)
+						tabBar("tabs") {
+							when (moltype) {
+								MoleculeType.Protein -> tabItem("Protein", flags = makeFlags()) {
+									posEditor.guiProtein(imgui, slidewin, view)
+								}
+								// TODO: others?
+								else -> Unit
 							}
-							// TODO: others?
-							else -> Unit
-						}
-						tabItem("Atoms", flags = makeFlags()) {
-							posEditor.guiAtoms(imgui, slidewin, view)
-						}
-						tabItem(mutationsTabState, "Mutations",
-							onActivated = {
-								activateMutationsTab()
-							},
-							whenActive = {
-								renderMutationsTab(imgui, view)
-							},
-							onDeactivated = {
-								deactivateMutationsTab(view)
+							tabItem("Atoms", flags = makeFlags()) {
+								posEditor.guiAtoms(imgui, slidewin, view)
 							}
-						)
+							tabItem(mutationsTabState, "Mutations",
+								onActivated = {
+									activateMutationsTab()
+								},
+								whenActive = {
+									renderMutationsTab(imgui, view)
+								},
+								onDeactivated = {
+									deactivateMutationsTab(view)
+								}
+							)
+						}
 					}
-
-					end()
 				},
 				onClose = {
 
@@ -196,31 +195,31 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				|You can temporarily preview a mutation by selecting the radion button next to a mutation.
 				|All temporary mutations will be reverted when you're finished with the mutation editor.
 			""".trimMargin())
-			beginChild("mutations", 300f, 400f, true)
-			if (seqInfos.isNotEmpty()) {
-				for (info in seqInfos) {
-					if (radioButton("##radio-${info.type}", selectedSeqInfo == info)) {
-						selectedSeqInfo = info
-						setConf(view, info.frag, info.conf)
-					}
-					sameLine()
-					if (checkbox("${info.label}##check-${info.type}", info.pSelected)) {
-
-						// mark the mutation as included or not in the design position conf space
-						if (info.pSelected.value) {
-							pos.confSpace.mutations.add(info.type)
-						} else {
-							pos.confSpace.mutations.remove(info.type)
+			child("mutations", 300f, 400f, true) {
+				if (seqInfos.isNotEmpty()) {
+					for (info in seqInfos) {
+						if (radioButton("##radio-${info.type}", selectedSeqInfo == info)) {
+							selectedSeqInfo = info
+							setConf(view, info.frag, info.conf)
 						}
+						sameLine()
+						if (checkbox("${info.label}##check-${info.type}", info.pSelected)) {
 
-						// update the sequence count
-						updateSequenceCounts()
+							// mark the mutation as included or not in the design position conf space
+							if (info.pSelected.value) {
+								pos.confSpace.mutations.add(info.type)
+							} else {
+								pos.confSpace.mutations.remove(info.type)
+							}
+
+							// update the sequence count
+							updateSequenceCounts()
+						}
 					}
+				} else {
+					text("(no compatible mutations)")
 				}
-			} else {
-				text("(no compatible mutations)")
 			}
-			endChild()
 		}
 
 		private fun deactivateMutationsTab(view: MoleculeRenderView) {
@@ -335,80 +334,79 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			whenOpen = {
 
 				// draw the window
-				begin("Mutation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				window("Mutation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-				for ((i, molInfo) in molInfos.withIndex()) {
-					withId(i) {
+					for ((i, molInfo) in molInfos.withIndex()) {
+						withId(i) {
 
-						if (i > 0) {
-							// let the entries breathe
-							spacing()
-							spacing()
-							separator()
-							spacing()
-							spacing()
-						}
+							if (i > 0) {
+								// let the entries breathe
+								spacing()
+								spacing()
+								separator()
+								spacing()
+								spacing()
+							}
 
-						text("${molInfo.mol}: ${molInfo.posInfos.size} positions(s)")
-						beginChild("positions", 300f, 200f, true)
-						for (posInfo in molInfo.posInfos) {
-							selectable(posInfo.pos.name, posInfo.pSelected)
-						}
-						endChild()
+							text("${molInfo.mol}: ${molInfo.posInfos.size} positions(s)")
+							child("positions", 300f, 200f, true) {
+								for (posInfo in molInfo.posInfos) {
+									selectable(posInfo.pos.name, posInfo.pSelected)
+								}
+							}
 
-						if (button("Add")) {
-
-							// start the position editor
-							mutEditor = MutEditor(molInfo.makeNewPosition())
-						}
-
-						sameLine()
-
-						val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
-						styleEnabledIf(canEdit) {
-							if (button("Edit") && canEdit) {
+							if (button("Add")) {
 
 								// start the position editor
-								molInfo.posInfos
-									.find { it.pSelected.value }
-									?.let { mutEditor = MutEditor(it) }
+								mutEditor = MutEditor(molInfo.makeNewPosition())
 							}
-						}
 
-						sameLine()
+							sameLine()
 
-						styleEnabledIf(molInfo.posInfos.any { it.pSelected.value }) {
-							if (button("Remove")) {
-								molInfo.posInfos
-									.filter { it.pSelected.value }
-									.forEach {
-										molInfo.posInfos.remove(it)
-										prep.designPositionsByMol[molInfo.mol]?.remove(it.pos)
-										prep.positionConfSpaces.remove(it.pos)
-									}
-								updateSequenceCounts()
+							val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
+							styleEnabledIf(canEdit) {
+								if (button("Edit") && canEdit) {
+
+									// start the position editor
+									molInfo.posInfos
+										.find { it.pSelected.value }
+										?.let { mutEditor = MutEditor(it) }
+								}
 							}
+
+							sameLine()
+
+							styleEnabledIf(molInfo.posInfos.any { it.pSelected.value }) {
+								if (button("Remove")) {
+									molInfo.posInfos
+										.filter { it.pSelected.value }
+										.forEach {
+											molInfo.posInfos.remove(it)
+											prep.designPositionsByMol[molInfo.mol]?.remove(it.pos)
+											prep.positionConfSpaces.remove(it.pos)
+										}
+									updateSequenceCounts()
+								}
+							}
+
+							spacing()
+
+							// show the number of sequences so far
+							text("Sequences: ${sequenceFormatter.format(molInfo.numSequences)}")
 						}
+					}
+
+					// for multiple molecules, show the combined sequence count
+					if (molInfos.size > 1) {
 
 						spacing()
 
-						// show the number of sequences so far
-						text("Sequences: ${sequenceFormatter.format(molInfo.numSequences)}")
+						text("Combined Sequences: ${sequenceFormatter.format(numSequences)}")
 					}
+
+					// render the position editor, when active
+					mutEditor?.gui(imgui, slide, slidewin)
 				}
-
-				// for multiple molecules, show the combined sequence count
-				if (molInfos.size > 1) {
-
-					spacing()
-
-					text("Combined Sequences: ${sequenceFormatter.format(numSequences)}")
-				}
-
-				// render the position editor, when active
-				mutEditor?.gui(imgui, slide, slidewin)
-
-				end()
 			},
 			onClose = {
 

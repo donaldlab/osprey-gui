@@ -71,95 +71,94 @@ class ProtonationEditor : SlideFeature {
 				}
 
 				// draw the window
-				begin("Protonation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize))
+				window("Protonation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-				text("Tools:")
-				indent(10f)
+					text("Tools:")
+					indent(10f)
 
-				if (button("Clear all Hydrogens")) {
-					clearAll(molViews)
-				}
-
-				// TODO: Reduce
-
-				if (button("Add Hydrogens automatically")) {
-					slidewin.showExceptions {
-						autoProtonate(molViews)
+					if (button("Clear all Hydrogens")) {
+						clearAll(molViews)
 					}
-				}
-				sameLine()
-				infoTip("""
-					|This tool adds Hydrogen atoms to heavy atoms based on inferred
-					|forcefield atom types and bond types. Atom and bond type inference
-					|on unprotonated molecules is very error-prone, so feel free to use
-					|the fine-grained editing tools to add any missing Hydrogen atoms,
-					|removea any extraneous Hydrogen atoms, or change hybridizations and geometry.
-				""".trimMargin())
 
-				unindent(10f)
+					// TODO: Reduce
 
-				val selection = selection
-
-				// show the selected atom
-				text("Selected:")
-				beginChild("selected", 300f, 30f, true)
-				if (selection != null) {
-					text(selection.atom.name)
-				} else {
-					text("(Click a heavy atom to show protonation options.)")
-				}
-				endChild()
-
-				// show the nearby atoms
-				if (selection != null) {
-
-					// show a list box to pick the protonation state
-					text("Protonation states:")
-
-					val numItems = selection.protonations.size + 1
-					if (listBoxHeader("", numItems)) {
-
-						// always add an option for no hydrogens
-						if (selectable("0 H", selection.current == null)) {
-							selection.set(null)
+					if (button("Add Hydrogens automatically")) {
+						slidewin.showExceptions {
+							autoProtonate(molViews)
 						}
+					}
+					sameLine()
+					infoTip("""
+						|This tool adds Hydrogen atoms to heavy atoms based on inferred
+						|forcefield atom types and bond types. Atom and bond type inference
+						|on unprotonated molecules is very error-prone, so feel free to use
+						|the fine-grained editing tools to add any missing Hydrogen atoms,
+						|removea any extraneous Hydrogen atoms, or change hybridizations and geometry.
+					""".trimMargin())
 
-						for (protonation in selection.protonations) {
-							if (selectable("${protonation.numH} H, ${protonation.hybridization}", selection.current == protonation)) {
-								selection.set(protonation)
+					unindent(10f)
+
+					val selection = selection
+
+					// show the selected atom
+					text("Selected:")
+					child("selected", 300f, 30f, true) {
+						if (selection != null) {
+							text(selection.atom.name)
+						} else {
+							text("(Click a heavy atom to show protonation options.)")
+						}
+					}
+
+					// show the nearby atoms
+					if (selection != null) {
+
+						// show a list box to pick the protonation state
+						text("Protonation states:")
+
+						val numItems = selection.protonations.size + 1
+						if (listBoxHeader("", numItems)) {
+
+							// always add an option for no hydrogens
+							if (selectable("0 H", selection.current == null)) {
+								selection.set(null)
 							}
-						}
 
-						listBoxFooter()
-					}
-
-					// if hydrogens are rotatable, show a slider to pick the dihedral angle
-					if (selection.rotator?.rotationH != null) {
-						val rotator = selection.rotator
-
-						spacing()
-
-						text("Rotation")
-						if (sliderFloat("Dihedral angle", rotator.pDihedral, -180f, 180f, "%.1f")) {
-							rotator.set()
-						}
-						sameLine()
-						infoTip("Ctrl-click to type angle exactly")
-
-						if (rotator.rotationHeavies.size > 1) {
-							if (listBoxHeader("Anchor Heavy Atom", rotator.rotationHeavies.size)) {
-								for (atom in rotator.rotationHeavies) {
-									if (selectable(atom.name, rotator.rotationHeavy == atom)) {
-										rotator.rotationHeavy = atom
-									}
+							for (protonation in selection.protonations) {
+								if (selectable("${protonation.numH} H, ${protonation.hybridization}", selection.current == protonation)) {
+									selection.set(protonation)
 								}
-								listBoxFooter()
+							}
+
+							listBoxFooter()
+						}
+
+						// if hydrogens are rotatable, show a slider to pick the dihedral angle
+						if (selection.rotator?.rotationH != null) {
+							val rotator = selection.rotator
+
+							spacing()
+
+							text("Rotation")
+							if (sliderFloat("Dihedral angle", rotator.pDihedral, -180f, 180f, "%.1f")) {
+								rotator.set()
+							}
+							sameLine()
+							infoTip("Ctrl-click to type angle exactly")
+
+							if (rotator.rotationHeavies.size > 1) {
+								if (listBoxHeader("Anchor Heavy Atom", rotator.rotationHeavies.size)) {
+									for (atom in rotator.rotationHeavies) {
+										if (selectable(atom.name, rotator.rotationHeavy == atom)) {
+											rotator.rotationHeavy = atom
+										}
+									}
+									listBoxFooter()
+								}
 							}
 						}
 					}
 				}
-
-				end()
 			},
 			onClose = {
 
