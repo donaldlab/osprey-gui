@@ -63,6 +63,16 @@ class ConfSpacePrep(
 
 		fun numConfs() =
 			confs.values.sumBy { it.size }
+
+		class DofSettings(
+			var includeHGroupRotations: Boolean,
+			var dihedralRadiusDegrees: Double
+		) {
+			companion object {
+				// blank for now, but defined so it can be extended
+			}
+		}
+		val dofSettings: MutableMap<ConfLib.Fragment,DofSettings> = IdentityHashMap()
 	}
 	class PositionConfSpaces {
 

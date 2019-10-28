@@ -205,7 +205,13 @@ class DesignPosition(
 	/**
 	 * Makes a fragment from the existing atoms and coords.
 	 */
-	fun makeFragment(fragId: String, fragName: String, confId: String = fragId, confName: String = fragName): ConfLib.Fragment {
+	fun makeFragment(
+		fragId: String,
+		fragName: String,
+		confId: String = fragId,
+		confName: String = fragName,
+		dofs: List<ConfLib.DegreeOfFreedom> = emptyList()
+	): ConfLib.Fragment {
 
 		val posAnchors = getCurrentAnchorGroups()
 			.let { groups ->
@@ -233,13 +239,17 @@ class DesignPosition(
 			posAnchor.translate(nextAnchorId++) { atom -> atom.info() }
 		}
 
+		val atoms = atomInfos.values
+			.sortedBy { it.id }
+			.toList()
+		val anchors = anchorsFragByPos.values
+			.sortedBy { it.id }
+
 		return ConfLib.Fragment(
 			id = fragId,
 			name = fragName,
 			type = type,
-			atoms = atomInfos.values
-				.sortedBy { it.id }
-				.toList(),
+			atoms = atoms,
 			bonds = currentAtoms
 				.flatMap { atom ->
 					val atomInfo = atom.info()
@@ -255,8 +265,7 @@ class DesignPosition(
 							}
 						}
 				},
-			anchors = anchorsFragByPos.values
-				.sortedBy { it.id },
+			anchors = anchors,
 			confs = mapOf(
 				confId to ConfLib.Conf(
 					id = confId,
@@ -273,7 +282,8 @@ class DesignPosition(
 						.associate { it }
 				)
 			),
-			dofs = emptyList() // TODO: determine dofs?
+			dofs = dofs
+				.map { it.copyTo(atoms, anchors, it.id) }
 		)
 	}
 

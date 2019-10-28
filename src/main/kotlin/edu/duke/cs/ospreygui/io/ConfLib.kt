@@ -46,7 +46,11 @@ class ConfLib(
 		val id: Int,
 		val name: String,
 		val element: Element
-	) : AtomPointer
+	) : AtomPointer {
+
+		override fun matchIn(atoms: List<AtomInfo>, anchors: List<Anchor>) =
+			atoms.find { it.name == name }
+	}
 
 	data class Bond(
 		val a: AtomInfo,
@@ -57,6 +61,8 @@ class ConfLib(
 
 		abstract val id: Int
 
+		abstract fun matchIn(atoms: List<AtomInfo>, anchors: List<Anchor>): Anchor?
+
 		/**
 		 * Find all atoms bonded to this anchor.
 		 */
@@ -66,6 +72,11 @@ class ConfLib(
 			override val id: Int,
 			val bonds: List<AtomInfo>
 		) : Anchor() {
+
+			override fun matchIn(atoms: List<AtomInfo>, anchors: List<Anchor>) =
+				anchors
+					.filterIsInstance<Single>()
+					.find { it.bonds.all { it.matchIn(atoms, anchors) != null } }
 
 			override fun findAtoms(frag: Fragment) =
 				this.bonds
@@ -79,6 +90,14 @@ class ConfLib(
 			val bondsa: List<AtomInfo>,
 			val bondsb: List<AtomInfo>
 		) : Anchor() {
+
+			override fun matchIn(atoms: List<AtomInfo>, anchors: List<Anchor>) =
+				anchors
+					.filterIsInstance<Double>()
+					.find {
+						it.bondsa.all { it.matchIn(atoms, anchors) != null }
+						&& it.bondsb.all { it.matchIn(atoms, anchors) != null }
+					}
 
 			override fun findAtoms(frag: Fragment) =
 				listOf(bondsa, bondsb)
@@ -150,16 +169,42 @@ class ConfLib(
 		val anchorCoords: Map<Anchor,AnchorCoords>
 	)
 
-	interface AtomPointer
+	interface AtomPointer {
+
+		/**
+		 * Returns a new atom pointer that pointes to an equivalent same atom in a specified fragment.
+		 */
+		fun matchIn(atoms: List<AtomInfo>, anchors: List<Anchor>): AtomPointer?
+
+		fun matchInOrThrow(atoms: List<AtomInfo>, anchors: List<Anchor>): AtomPointer =
+			matchIn(atoms, anchors) ?: throw NoSuchElementException("no match found for $this")
+	}
 
 	data class AnchorAtomPointer(
 		val anchor: Anchor,
 		val index: Int
-	) : AtomPointer
+	) : AtomPointer {
+
+		@Suppress("UselessCallOnCollection") // IntelliJ warning on filterIsInstance() is incorrect here T_T
+		override fun matchIn(atoms: List<AtomInfo>, anchors: List<Anchor>) =
+			anchor.matchIn(atoms, anchors)
+				?.let {
+					AnchorAtomPointer(it, index)
+				}
+
+		override fun toString() = "${this::class.simpleName}[${anchor.id},$index]"
+	}
 
 	sealed class DegreeOfFreedom {
 
 		abstract val id: Int
+		abstract fun affectedAtoms(frag: Fragment): List<AtomInfo>
+
+		/**
+		 * Make a copy of this degree of freedom, but pointing to the given atoms and anchors,
+		 * instead of the atoms and anchors it already has.
+		 */
+		abstract fun copyTo(atoms: List<AtomInfo>, anchors: List<Anchor>, id: Int): DegreeOfFreedom
 
 		data class DihedralAngle(
 			override val id: Int,
@@ -167,7 +212,34 @@ class ConfLib(
 			val b: AtomPointer,
 			val c: AtomPointer,
 			val d: AtomPointer
-		) : DegreeOfFreedom()
+		) : DegreeOfFreedom() {
+
+			override fun affectedAtoms(frag: Fragment): List<AtomInfo> {
+
+				// b might be an anchor atom
+				val b = b as? AtomInfo
+
+				// but if c is an anchor atom, that means all the sidechain atoms move, right?
+				val c = c as? AtomInfo
+					?: return frag.atoms
+
+				// grab all the atoms connected to c not through b-c
+				return frag.bfs(
+					source = c,
+					visitSource = false,
+					shouldVisit = { from, to -> to !== b }
+				).toList()
+			}
+
+			override fun copyTo(atoms: List<AtomInfo>, anchors: List<Anchor>, id: Int) =
+				DihedralAngle(
+					id,
+					a.matchInOrThrow(atoms, anchors),
+					b.matchInOrThrow(atoms, anchors),
+					c.matchInOrThrow(atoms, anchors),
+					d.matchInOrThrow(atoms, anchors)
+				)
+		}
 
 		// TODO: other DoFs?
 	}
@@ -199,6 +271,57 @@ class ConfLib(
 			atomsByAnchor.getOrPut(anchor) {
 				anchor.findAtoms(this)
 			}
+
+		/**
+		 * Walk the bond graph using breadth-first search.
+		 */
+		fun bfs(
+			source: AtomInfo,
+			visitSource: Boolean = false,
+			shouldVisit: (fromAtom: AtomInfo, toAtom: AtomInfo) -> Boolean = { _, _ -> true }
+		) = object : Iterable<AtomInfo> {
+
+			override fun iterator() = object : Iterator<AtomInfo> {
+
+				// track the atom visitation schedule
+				val toVisit = ArrayDeque<AtomInfo>()
+				val visitScheduled = identityHashSet<AtomInfo>()
+
+				fun scheduleVisit(atom: AtomInfo) {
+					toVisit.add(atom)
+					visitScheduled.add(atom)
+				}
+
+				override fun hasNext() = toVisit.isNotEmpty()
+
+				override fun next(): AtomInfo {
+
+					// take the next step
+					val atom = toVisit.pollFirst()
+						?: throw NoSuchElementException("no more atoms to visit")
+
+					// schedule visits to neighbors
+					for (neighbor in bondedAtoms(atom)) {
+						if (neighbor !in visitScheduled && shouldVisit(atom, neighbor)) {
+							scheduleVisit(neighbor)
+						}
+					}
+
+					return atom
+				}
+
+				init {
+
+					// seed with the source atom
+					scheduleVisit(source)
+
+					// skip the source atom, if need
+					if (!visitSource) {
+						next()
+					}
+				}
+			}
+		}
 	}
 
 	companion object {

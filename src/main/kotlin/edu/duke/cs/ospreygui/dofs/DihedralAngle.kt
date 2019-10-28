@@ -9,6 +9,7 @@ import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import org.joml.Quaterniond
 import org.joml.Vector3d
+import org.joml.Vector3dc
 import kotlin.math.PI
 import kotlin.math.atan2
 
@@ -31,7 +32,6 @@ class DihedralAngle(
 		.map { it.atom }
 		.toList()
 
-
 	/**
 	 * Returns the dihedral angle in degrees in the interval (-180,180]
 	 */
@@ -41,31 +41,8 @@ class DihedralAngle(
 	/**
 	 * Returns the dihedral angle in radians in the interval (-pi,pi]
 	 */
-	fun measureRadians(): Double {
-
-		val a = Vector3d(a.pos)
-		val c = Vector3d(c.pos)
-		val d = Vector3d(d.pos)
-
-		// translate so b is at the origin
-		b.pos.let {
-			a.sub(it)
-			c.sub(it)
-			d.sub(it)
-		}
-
-		// rotate into a coordinate system where:
-		//   b->c is along the -z axis
-		//   b->a is in the yz plane
-		Quaterniond()
-			.lookAlong(c, a)
-			.let {
-				d.rotate(it)
-			}
-
-		return (PI/2 - atan2(d.y, d.x))
-			.normalizeMinusPIToPI()
-	}
+	fun measureRadians() =
+		measureRadians(a.pos, b.pos, c.pos, d.pos)
 
 	fun setDegrees(degrees: Double) =
 		setRadians(degrees.toRadians())
@@ -107,9 +84,51 @@ class DihedralAngle(
 			rotatedAtoms.forEach { it.pos.add(t) }
 		}
 	}
+
+	companion object {
+
+		/**
+		 * Returns the dihedral angle in radians in the interval (-180,180]
+		 */
+		fun measureDegrees(a: Vector3dc, b: Vector3dc, c: Vector3dc, d: Vector3dc) =
+			measureRadians(a, b, c, d).toDegrees()
+
+		/**
+		 * Returns the dihedral angle in radians in the interval (-pi,pi]
+		 */
+		fun measureRadians(a: Vector3dc, b: Vector3dc, c: Vector3dc, d: Vector3dc): Double {
+
+			// make mutable copies of the positions
+			@Suppress("NAME_SHADOWING")
+			val a = Vector3d(a)
+			@Suppress("NAME_SHADOWING")
+			val c = Vector3d(c)
+			@Suppress("NAME_SHADOWING")
+			val d = Vector3d(d)
+
+			// translate so b is at the origin
+			b.let {
+				a.sub(it)
+				c.sub(it)
+				d.sub(it)
+			}
+
+			// rotate into a coordinate system where:
+			//   b->c is along the -z axis
+			//   b->a is in the yz plane
+			Quaterniond()
+				.lookAlong(c, a)
+				.let {
+					d.rotate(it)
+				}
+
+			return (PI/2 - atan2(d.y, d.x))
+				.normalizeMinusPIToPI()
+		}
+	}
 }
 
-fun DesignPosition.dihedralAngle(frag: ConfLib.Fragment, dihedral: ConfLib.DegreeOfFreedom.DihedralAngle) =
+fun DesignPosition.dihedralAngle(dihedral: ConfLib.DegreeOfFreedom.DihedralAngle) =
 	DihedralAngle(
 		mol,
 		atomResolverOrThrow.resolveOrThrow(dihedral.a),
@@ -117,3 +136,9 @@ fun DesignPosition.dihedralAngle(frag: ConfLib.Fragment, dihedral: ConfLib.Degre
 		atomResolverOrThrow.resolveOrThrow(dihedral.c),
 		atomResolverOrThrow.resolveOrThrow(dihedral.d)
 	)
+
+fun DesignPosition.supportsDihedralAngle(dihedral: ConfLib.DegreeOfFreedom.DihedralAngle) =
+	listOf(dihedral.a, dihedral.b, dihedral.c, dihedral.c)
+		.all {
+			atomResolver?.resolve(it) != null
+		}

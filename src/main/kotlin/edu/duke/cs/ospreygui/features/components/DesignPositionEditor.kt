@@ -154,9 +154,20 @@ class DesignPositionEditor(
 		// make a new conf space
 		confSpace.apply {
 
+			// find dofs for the wildtype fragment, by finding a similar fragment from the library
+			val wtDofs = prep.conflibs
+				.flatMap { it.fragments.values }
+				.firstOrNull {
+					// grab the first compatible fragment with the same seqeuence type
+					// TODO: do some kind of more rigorous check that the DoFs themselves are compatible?
+					it.type == pos.type && pos.isFragmentCompatible(it)
+				}
+				?.dofs
+				?: emptyList()
+
 			// make a new wildtype fragment, if possible
 			wildTypeFragment = try {
-				pos.makeFragment("wt-$name", "WildType")
+				pos.makeFragment("wt-$name", "WildType", dofs = wtDofs)
 			} catch (ex: DesignPosition.IllegalAnchorsException) {
 				null
 			}
@@ -164,15 +175,25 @@ class DesignPositionEditor(
 			// select the wild-type "mutation" by default, if possible
 			wildTypeFragment?.let { mutations.add(it.type) }
 
-			// select all conformations by default
-			fun ConfLib.Fragment.addAllConfs() =
-				this@apply.confs
-					.getOrPut(this) { identityHashSet() }
-					.apply { addAll(confs.values) }
-			wildTypeFragment?.addAllConfs()
-			prep.conflibs
-				.flatMap { compatibleFragments(it) }
-				.forEach { it.addAllConfs() }
+			// gather all the possible fragments
+			val frags = ArrayList<ConfLib.Fragment>().apply {
+				wildTypeFragment
+					?.let { add(it) }
+				prep.conflibs
+					.flatMap { compatibleFragments(it) }
+					.forEach { add(it) }
+			}
+
+			for (frag in frags) {
+
+				// select all conformations by default
+				confs[frag] = identityHashSet<ConfLib.Conf>().apply {
+					addAll(frag.confs.values)
+				}
+
+				// make the default dof settings for each included framgent
+				dofSettings[frag] = ConfSpacePrep.PositionConfSpace.DofSettings.default()
+			}
 		}
 	}
 
@@ -545,6 +566,13 @@ class DesignPositionEditor(
 		currentAtoms.clear()
 	}
 }
+
+
+fun ConfSpacePrep.PositionConfSpace.DofSettings.Companion.default() =
+	ConfSpacePrep.PositionConfSpace.DofSettings(
+		includeHGroupRotations = false,
+		dihedralRadiusDegrees = 9.0
+	)
 
 private val selectedEffect = RenderEffect(
 	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
