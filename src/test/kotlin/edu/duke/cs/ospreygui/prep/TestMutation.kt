@@ -525,7 +525,7 @@ class TestMutation : SharedSpec({
 			}
 		}
 
-		test("glycine->valine chi1", /* TEMP */ focus=true) {
+		test("glycine->valine chi1") {
 
 			val (res, pos) = gly17()
 
@@ -536,7 +536,7 @@ class TestMutation : SharedSpec({
 
 			// build the dihedral angle
 			val chi1 = frag.dofs[0] as ConfLib.DegreeOfFreedom.DihedralAngle
-			pos.dihedralAngle(frag, chi1).run {
+			pos.dihedralAngle(chi1).run {
 				mol shouldBe pos.mol
 				a.name shouldBe "N"
 				b.name shouldBe "CA"
