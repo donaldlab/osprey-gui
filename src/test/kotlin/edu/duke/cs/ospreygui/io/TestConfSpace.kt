@@ -189,11 +189,6 @@ class TestConfSpace : SharedSpec({
 
 		val toml = expConfSpace.toToml()
 
-		// TEMP
-		toml
-			.lines()
-			.forEachIndexed { i, line -> println("%5d: %s".format(i + 1, line)) }
-
 		val obsConfSpace = ConfSpace.fromToml(toml)
 
 		// make sure we got the same conf space back
