@@ -33,9 +33,13 @@ class ConfSpacePrep(
 				throw DuplicateConfLibException(conflib)
 			}
 
-			conflibs.add(conflib)
+			add(conflib)
 
 			return conflib
+		}
+
+		fun add(confLib: ConfLib) {
+			conflibs.add(confLib)
 		}
 	}
 	val conflibs = ConfLibs()
@@ -53,7 +57,7 @@ class ConfSpacePrep(
 			s.camera.lookAtEverything()
 
 			s.features.menu("File") {
-				// TODO: save conf space
+				add(SaveConfSpace(confSpace))
 				addSeparator()
 				// TODO: export compiled conf space
 				addSeparator()

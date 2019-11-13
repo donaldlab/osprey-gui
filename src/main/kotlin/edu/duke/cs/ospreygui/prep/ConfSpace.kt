@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.prep
 
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
 import java.util.*
@@ -13,11 +14,27 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 
 	val designPositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = HashMap()
 
-	val positions: List<DesignPosition> get() =
+	/**
+	 * Collect all the positions for all the molecules in a stable order.
+	 */
+	fun positions(): List<DesignPosition> =
 		designPositionsByMol
 			.toList()
 			.sortedBy { (mol, _) -> mol.name }
 			.flatMap { (_, positions) -> positions }
+
+	/**
+	 * Collect all the unique fragments from the conf space.
+	 */
+	fun fragments(): List<ConfLib.Fragment> =
+		designPositionsByMol
+			.values
+			.flatten()
+			.mapNotNull { positionConfSpaces[it] }
+			.flatMap { it.confs.keys + it.wildTypeFragment }
+			.filterNotNull()
+			.toCollection(identityHashSet())
+			.sortedBy { it.id }
 
 	class PositionConfSpace {
 

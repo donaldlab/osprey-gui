@@ -208,8 +208,8 @@ class TestConfSpace : SharedSpec({
 			)
 
 		// check the design positions
-		obsConfSpace.positions.size shouldBe expConfSpace.positions.size
-		for ((obsPos, expPos) in obsConfSpace.positions.zip(expConfSpace.positions)) {
+		obsConfSpace.positions().size shouldBe expConfSpace.positions().size
+		for ((obsPos, expPos) in obsConfSpace.positions().zip(expConfSpace.positions())) {
 
 			obsPos.name shouldBe expPos.name
 			obsPos.type shouldBe expPos.type

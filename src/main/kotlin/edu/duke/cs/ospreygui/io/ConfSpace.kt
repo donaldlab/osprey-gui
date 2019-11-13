@@ -26,16 +26,8 @@ fun ConfSpace.toToml(): String {
 		indicesByAtom[this]
 			?: throw NoSuchElementException("no index for atom $this")
 
-	// collect all the unique fragments from the conf space
-	val frags = designPositionsByMol.values
-		.flatten()
-		.mapNotNull { positionConfSpaces[it] }
-		.flatMap { it.confs.keys + it.wildTypeFragment }
-		.filterNotNull()
-		.toCollection(identityHashSet())
-		.sortedBy { it.id }
-
 	// write down all the fragments
+	val frags = fragments()
 	write("\n")
 	val (fragsToml, idsByFrag) = frags.toToml(resolveIdCollisions = true)
 	write(fragsToml)

@@ -15,10 +15,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.render.RenderSettings
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.ospreygui.features.slide.ClashViewer
-import edu.duke.cs.ospreygui.features.win.AboutOspreyGui
-import edu.duke.cs.ospreygui.features.win.ImportPDB
-import edu.duke.cs.ospreygui.features.win.NewConfSpace
-import edu.duke.cs.ospreygui.features.win.OpenOMOL
+import edu.duke.cs.ospreygui.features.win.*
 import org.joml.AABBf
 
 
@@ -38,7 +35,7 @@ fun main() = autoCloser {
 			add(OpenOMOL())
 			addSeparator()
 			add(NewConfSpace())
-			// TODO: open conf space
+			add(OpenConfSpace())
 			addSeparator()
 			add(Exit())
 		}
