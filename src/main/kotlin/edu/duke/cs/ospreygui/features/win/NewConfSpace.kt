@@ -10,6 +10,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.forcefield.amber.partition
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.io.read
+import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -39,6 +40,6 @@ class NewConfSpace : WindowFeature {
 			// be generous in the GUI and don't crash, sometimes users edit these files by hand
 			throwOnMissingAtoms = false
 		)
-		ConfSpacePrep(win, mols.partition(combineSolvent = true))
+		ConfSpacePrep(win, ConfSpace(mols.partition(combineSolvent = true)))
 	}
 }

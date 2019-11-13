@@ -5,16 +5,33 @@ import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import org.tomlj.Toml
+import org.tomlj.TomlParseResult
 import org.tomlj.TomlPosition
 
 
 /**
  * Save the molecules to the OMOL (OSPREY molecule) format.
  */
-fun List<Molecule>.toOMOL(): String {
+fun List<Molecule>.toOMOL(): String =
+	toOMOLMapped().toml
+
+data class OMOLMapped(
+	val toml: String,
+	val indicesByAtom: Map<Atom,Int>
+)
+
+fun List<Molecule>.toOMOLMapped(
+	/**
+	 * If true, use contiguously increasing numbers for atom indices across all molecules.
+	 * If false, start each molecule at atom index 0.
+	 */
+	flattenAtomIndices: Boolean = false
+): OMOLMapped {
 
 	val buf = StringBuilder()
 	fun write(str: String, vararg args: Any) = buf.append(String.format(str, *args))
+
+	val indicesByAtom = HashMap<Atom,Int>()
 
 	forEachIndexed { moli, mol ->
 
@@ -35,9 +52,12 @@ fun List<Molecule>.toOMOL(): String {
 		write("\n")
 
 		// write the atoms
-		val indicesByAtom = HashMap<Atom,Int>()
 		write("atoms = [\n")
-		var atomi = 0
+		var atomi = if (flattenAtomIndices) {
+			indicesByAtom.size
+		} else {
+			0
+		}
 		for (atom in mol.atoms) {
 			write("\t{ i=%5d, name=%7s, x=%12.6f, y=%12.6f, z=%12.6f, elem=%3s },\n",
 				atomi,
@@ -86,7 +106,10 @@ fun List<Molecule>.toOMOL(): String {
 		}
 	}
 
-	return buf.toString()
+	return OMOLMapped(
+		buf.toString(),
+		indicesByAtom
+	)
 }
 
 fun Molecule.toOMOL() = listOf(this).toOMOL()
@@ -97,10 +120,15 @@ private fun String.quote() =
 		.let { str -> "\"$str\"" }
 
 
+private const val DefaultThrowOnMissingAtoms = true
+
 /**
  * Read molecules from the OMOL (OSPREY molecule) format.
  */
-fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = true): List<Molecule> {
+fun Molecule.Companion.fromOMOL(
+	toml: String,
+	throwOnMissingAtoms: Boolean = DefaultThrowOnMissingAtoms
+): List<Molecule> {
 
 	// parse the TOML
 	val doc = Toml.parse(toml)
@@ -108,11 +136,26 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 		throw TomlParseException("TOML parsing failure:\n${doc.errors().joinToString("\n")}")
 	}
 
-	val molsTable = doc.getTable("molecule") ?: throw TomlParseException("molecule table not found")
+	return fromOMOL(doc, throwOnMissingAtoms)
+}
+
+fun Molecule.Companion.fromOMOL(
+	doc: TomlParseResult,
+	throwOnMissingAtoms: Boolean = DefaultThrowOnMissingAtoms
+) =
+	fromOMOLWithAtoms(doc, throwOnMissingAtoms)
+		.map { (mol, _) -> mol }
+
+fun Molecule.Companion.fromOMOLWithAtoms(
+	doc: TomlParseResult,
+	throwOnMissingAtoms: Boolean = DefaultThrowOnMissingAtoms
+): List<Pair<Molecule,Map<Int,Atom>>> {
+
+	val molsTable = doc.getTableOrThrow("molecule")
 	val molIndices = molsTable.keySet()
 		.map { it.toIntOrNull() ?: throw TomlParseException("molecule index $it is not a number") }
 
-	val mols = ArrayList<Molecule>()
+	val out = ArrayList<Pair<Molecule,Map<Int,Atom>>>()
 
 	for (moli in molIndices) {
 		val molTable = molsTable.getTable("$moli")!!
@@ -129,7 +172,6 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 		} else {
 			Molecule(name, type)
 		}
-		mols.add(mol)
 
 		val atoms = HashMap<Int,Atom>()
 		fun getAtom(i: Int, pos: TomlPosition? = null): Atom? =
@@ -138,6 +180,8 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 			} else {
 				null
 			}
+
+		out.add(mol to atoms)
 
 		// read the atoms
 		val atomsArray = molTable.getArrayOrThrow("atoms")
@@ -218,5 +262,5 @@ fun Molecule.Companion.fromOMOL(toml: String, throwOnMissingAtoms: Boolean = tru
 		}
 	}
 
-	return mols
+	return out
 }

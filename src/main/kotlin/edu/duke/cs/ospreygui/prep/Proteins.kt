@@ -75,12 +75,12 @@ object Proteins {
 
 				// add the pair of single anchors
 				add(mutableListOf(
-					SingleAnchor(
+					anchorSingle(
 						a = resCA,
 						b = resN,
 						c = resC
 					),
-					SingleAnchor(
+					anchorSingle(
 						a = resN,
 						b = prevC,
 						c = resCA
@@ -89,7 +89,7 @@ object Proteins {
 
 				// add the double anchor
 				add(mutableListOf(
-					DoubleAnchor(
+					anchorDouble(
 						a = resCA,
 						b = resN,
 						c = prevC,
@@ -113,7 +113,7 @@ object Proteins {
 
 				// add just the one single anchor
 				add(mutableListOf(
-					SingleAnchor(
+					anchorSingle(
 						a = resCA,
 						b = resN,
 						c = resC

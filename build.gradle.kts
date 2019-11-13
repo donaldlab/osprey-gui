@@ -17,6 +17,7 @@ repositories {
 dependencies {
 	
 	implementation(kotlin("stdlib-jdk8"))
+	implementation(kotlin("reflect"))
 	implementation("edu.duke.cs:molscope")
 	implementation("edu.duke.cs:osprey3")
 

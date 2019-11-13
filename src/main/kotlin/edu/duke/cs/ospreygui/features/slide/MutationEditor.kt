@@ -246,7 +246,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		val pSelected = Ref.of(false)
 	}
 
-	private val DesignPosition.confSpace get() = prep.positionConfSpaces.getOrMake(this)
+	private val DesignPosition.confSpace get() = prep.confSpace.positionConfSpaces.getOrMake(this)
 
 	private inner class MolInfo(val molType: MoleculeType, val mol: Molecule) {
 
@@ -266,7 +266,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		fun makeNewPosition(): PosInfo {
 
-			val positions = prep.designPositionsByMol
+			val positions = prep.confSpace.designPositionsByMol
 				.getOrPut(mol) { ArrayList() }
 
 			// choose a default but unique name
@@ -320,10 +320,10 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 				// reset infos
 				molInfos.clear()
-				for ((moltype, mol) in prep.mols) {
+				for ((moltype, mol) in prep.confSpace.mols) {
 					MolInfo(moltype, mol).apply {
 						molInfos.add(this)
-						prep.designPositionsByMol[mol]?.forEach { pos ->
+						prep.confSpace.designPositionsByMol[mol]?.forEach { pos ->
 							posInfos.add(PosInfo(pos, moltype))
 						}
 					}
@@ -382,8 +382,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 										.filter { it.pSelected.value }
 										.forEach {
 											molInfo.posInfos.remove(it)
-											prep.designPositionsByMol[molInfo.mol]?.remove(it.pos)
-											prep.positionConfSpaces.remove(it.pos)
+											prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(it.pos)
+											prep.confSpace.positionConfSpaces.remove(it.pos)
 										}
 									updateSequenceCounts()
 								}

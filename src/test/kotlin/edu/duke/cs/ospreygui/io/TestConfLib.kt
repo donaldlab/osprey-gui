@@ -3,11 +3,14 @@ package edu.duke.cs.ospreygui.io
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
+import io.kotlintest.matchers.collections.shouldContainExactly
 import io.kotlintest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotlintest.matchers.collections.shouldExist
+import io.kotlintest.matchers.maps.shouldContainExactly
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import io.kotlintest.shouldBe
 import io.kotlintest.shouldNotBe
+import io.kotlintest.shouldThrow
 import org.joml.Vector3d
 
 
@@ -163,4 +166,117 @@ class TestConfLib : SharedSpec({
 			}
 		}
 	}
+
+	test("fragments list roundtrip") {
+
+		// get a list of fragments
+		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+		val expFrags = conflib.fragments
+			.values
+			.sortedBy { it.id }
+
+		val (toml, idsByFrag) = expFrags.toToml(resolveIdCollisions = false)
+
+		// check the ids
+		for (frag in expFrags) {
+			idsByFrag[frag] shouldBe frag.id
+		}
+
+		// do the roundtrip
+		val obsFrags = ConfLib.fragmentsFrom(toml)
+			.values
+			.sortedBy { it.id }
+
+		// see if we got the same frags
+		obsFrags.size shouldBe expFrags.size
+		for ((obsFrag, expFrag) in obsFrags.zip(expFrags)) {
+			obsFrag shouldBeFrag expFrag
+		}
+	}
+
+	fun emptyFrag(id: String) =
+		ConfLib.Fragment(
+			id = id,
+			name = "Foo",
+			type = "foo",
+			atoms = emptyList(),
+			bonds = emptyList(),
+			anchors = emptyList(),
+			confs = emptyMap(),
+			dofs = emptyList()
+		)
+
+	test("fragment name collision") {
+		shouldThrow<IllegalArgumentException> {
+
+			listOf(emptyFrag("foo"), emptyFrag("foo"))
+				.toToml(resolveIdCollisions = false)
+		}
+	}
+
+	test("fragment name collision resolved") {
+
+		val frag1 = emptyFrag("foo")
+		val frag2 = emptyFrag("foo")
+		val frag3 = emptyFrag("foo")
+
+		val (toml, idsByFrag) = listOf(frag1, frag2, frag3)
+			.toToml(resolveIdCollisions = true)
+
+		idsByFrag[frag1] shouldBe "foo"
+		idsByFrag[frag2] shouldBe "foo2"
+		idsByFrag[frag3] shouldBe "foo3"
+	}
 })
+
+infix fun ConfLib.Fragment?.shouldBeFrag(exp: ConfLib.Fragment?) {
+
+	// it's ok if they're both null
+	if (this == null) {
+		exp shouldBe null
+	} else {
+
+		// but otherwise they should both be not null
+		exp shouldNotBe null
+		val obsFrag = this
+		val expFrag = exp!!
+
+		obsFrag.id shouldBe expFrag.id
+		obsFrag.name shouldBe expFrag.name
+		obsFrag.type shouldBe expFrag.type
+
+		obsFrag.atoms shouldContainExactly expFrag.atoms
+		obsFrag.bonds shouldContainExactly expFrag.bonds
+		obsFrag.anchors shouldContainExactly expFrag.anchors
+
+		obsFrag.confs.keys shouldBe expFrag.confs.keys
+		for ((obsConf, expConf) in obsFrag.confs.values.zip(expFrag.confs.values)) {
+			obsConf shouldBeConf expConf
+		}
+
+		obsFrag.dofs shouldContainExactly expFrag.dofs
+	}
+}
+
+infix fun ConfLib.Conf?.shouldBeConf(exp: ConfLib.Conf?) {
+
+	// it's ok if they're both null
+	if (this == null) {
+		exp shouldBe null
+	} else {
+
+		// but otherwise they should both be not null
+		exp shouldNotBe null
+		val obsConf = this
+		val expConf = exp!!
+
+		obsConf.id shouldBe expConf.id
+		obsConf.name shouldBe expConf.name
+		obsConf.description shouldBe expConf.description
+
+		// re-map these to replace the identity maps with regular maps
+		// for value comparison instead of identity comparison
+		obsConf.coords.toMap() shouldContainExactly expConf.coords.toMap()
+		obsConf.anchorCoords.toMap() shouldContainExactly expConf.anchorCoords.toMap()
+	}
+}

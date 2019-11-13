@@ -1,11 +1,13 @@
 package edu.duke.cs.ospreygui.io
 
+import cuchaz.kludge.tools.x
+import cuchaz.kludge.tools.y
+import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.tools.identityHashSet
 import org.joml.Vector3d
-import org.tomlj.Toml
-import org.tomlj.TomlArray
-import org.tomlj.TomlPosition
+import org.joml.Vector3dc
+import org.tomlj.*
 import java.util.*
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
@@ -342,8 +344,27 @@ class ConfLib(
 			val citation = doc.getString("citation")
 
 			// read the fragments
-			val fragsTable = doc.getTableOrThrow("frag")
+			val frags = fragmentsFrom(doc)
+
+			return ConfLib(libName, frags, libDesc, citation)
+		}
+
+		fun fragmentsFrom(toml: String): Map<String,Fragment> {
+
+			// parse the TOML
+			val doc = Toml.parse(toml)
+			if (doc.hasErrors()) {
+				throw TomlParseException("TOML parsing failure:\n${doc.errors().joinToString("\n")}")
+			}
+
+			return fragmentsFrom(doc)
+		}
+
+		fun fragmentsFrom(doc: TomlParseResult): Map<String,Fragment> {
+
 			val frags = HashMap<String,Fragment>()
+
+			val fragsTable = doc.getTableOrThrow("frag")
 			for (fragId in fragsTable.keySet()) {
 				val fragTable = fragsTable.getTableOrThrow(fragId)
 				val fragPos = fragsTable.inputPositionOf(fragId)
@@ -526,7 +547,7 @@ class ConfLib(
 				)
 			}
 
-			return ConfLib(libName, frags, libDesc, citation)
+			return frags
 		}
 	}
 }
@@ -538,3 +559,192 @@ fun ConfLib?.fragRuntimeId(frag: ConfLib.Fragment) =
 
 fun ConfLib?.confRuntimeId(frag: ConfLib.Fragment, conf: ConfLib.Conf) =
 	"$runtimeId.${frag.id}.${conf.id}"
+
+
+data class FragmentsTOML(
+	val toml: String,
+	val idsByFrag: Map<ConfLib.Fragment,String>
+)
+
+
+/**
+ * Writes out a list of fragments to TOML
+ */
+fun List<ConfLib.Fragment>.toToml(
+	/**
+	 * If true, appends sequence numbers to fragment ids to avoid collisions.
+	 * If false, throws an exception when an id collision is found.
+	 */
+	resolveIdCollisions: Boolean = false
+): FragmentsTOML {
+
+	val buf = StringBuilder()
+	fun write(str: String, vararg args: Any) = buf.append(String.format(str, *args))
+
+	val fragIds = HashSet<String>()
+	val idsByFrag = IdentityHashMap<ConfLib.Fragment,String>()
+
+	for (frag in this) {
+
+		// find the id, resolving collisions if desired
+		val id = when {
+			frag.id !in fragIds -> frag.id
+			resolveIdCollisions -> {
+				val num = fragIds
+					.filter { it.startsWith(frag.id) }
+					.map {
+						it.substring(frag.id.length)
+							.filter { it.isDigit() }
+							.toIntOrNull()
+							?: 1
+					}
+					.max()
+					?: 1
+				"${frag.id}${num + 1}"
+			}
+			else -> throw IllegalArgumentException("multiple fragments with id: ${frag.id}")
+		}
+		fragIds.add(id)
+		idsByFrag[frag] = id
+
+		write("\n")
+		write("[frag.$id]\n")
+		write("name = %s\n", frag.name.quote())
+		write("type = %s\n", frag.type.quote())
+
+		// write the atoms
+		write("atoms = [\n")
+		for (atom in frag.atoms) {
+			write("\t{ id = %2d, name = %6s, elem = %s },\n",
+				atom.id,
+				atom.name.quote(),
+				atom.element.symbol.quote()
+			)
+		}
+		write("]\n")
+
+		// write the bonds
+		write("bonds = [\n")
+		for (bond in frag.bonds) {
+			write("\t[ %2d, %2d ], # %4s - %-4s\n",
+				bond.a.id,
+				bond.b.id,
+				bond.a.name,
+				bond.b.name
+			)
+		}
+		write("]\n")
+
+		// write the anchors
+		write("anchors = [\n")
+		for (anchor in frag.anchors) {
+			when (anchor) {
+				is ConfLib.Anchor.Single -> {
+					write("\t{ id = %2d, type = %s, bonds = [ %s ] }, # %s\n",
+						anchor.id,
+						"single".quote(),
+						anchor.bonds.joinToString(", ") { it.id.toString() },
+						anchor.bonds.joinToString(", ") { it.name }
+					)
+				}
+				is ConfLib.Anchor.Double -> {
+					write("\t{ id = %2d, type = %s, bondsa=[ %s ], bondsb=[ %s ] }, # %s; %s\n",
+						anchor.id,
+						"double".quote(),
+						anchor.bondsa.joinToString(", ") { it.id.toString() },
+						anchor.bondsb.joinToString(", ") { it.id.toString() },
+						anchor.bondsa.joinToString(", ") { it.name },
+						anchor.bondsb.joinToString(", ") { it.name }
+
+					)
+				}
+			}
+		}
+		write("]\n")
+
+		fun ConfLib.AtomPointer.name() =
+			when (this) {
+				is ConfLib.AtomInfo -> name
+				is ConfLib.AnchorAtomPointer -> "A$index"
+				else -> "?"
+			}
+
+		// write the dofs
+		write("dofs = [\n")
+		for (dof in frag.dofs) {
+			when (dof) {
+				is ConfLib.DegreeOfFreedom.DihedralAngle ->
+					write("\t{ id = %2d, type = %s, a = %s, b = %s, c = %s, d = %s }, # %s, %s, %s, %s\n",
+						dof.id,
+						"dihedral".quote(),
+						dof.a.toToml(),
+						dof.b.toToml(),
+						dof.c.toToml(),
+						dof.d.toToml(),
+						dof.a.name(),
+						dof.b.name(),
+						dof.c.name(),
+						dof.d.name()
+					)
+			}
+		}
+		write("]\n")
+
+		// write the confs
+		for ((confId, conf) in frag.confs) {
+
+			write("[frag.$id.conf.$confId]\n")
+			write("name = %s\n", conf.name.quote())
+			conf.description?.let { write("description = %s\n", it.quote()) }
+
+			write("coords = [\n")
+			for ((atom, pos) in conf.coords) {
+				write("\t{ id = %2d, xyz = %s }, # %s\n",
+					atom.id,
+					pos.toToml(),
+					atom.name
+				)
+			}
+			write("]\n")
+
+			write("anchorCoords = [\n")
+			for ((anchor, coords) in conf.anchorCoords) {
+				when (coords) {
+					is ConfLib.AnchorCoords.Single ->
+						write("\t{ id = %2d, a = %s, b = %s, c = %s },\n",
+							anchor.id,
+							coords.a.toToml(),
+							coords.b.toToml(),
+							coords.c.toToml()
+						)
+					is ConfLib.AnchorCoords.Double ->
+						write("\t{ id = %2d, a = %s, b = %s, c = %s, d = %s },\n",
+							anchor.id,
+							coords.a.toToml(),
+							coords.b.toToml(),
+							coords.c.toToml(),
+							coords.d.toToml()
+						)
+				}
+			}
+			write("]\n")
+		}
+	}
+
+	return FragmentsTOML(
+		buf.toString(),
+		idsByFrag
+	)
+}
+
+private fun String.quote() = "'$this'"
+
+private fun Vector3dc.toToml() =
+	"[ %12.6f, %12.6f, %12.6f ]".format(x, y, z)
+
+private fun ConfLib.AtomPointer.toToml() =
+	when (this) {
+		is ConfLib.AtomInfo -> id.toString()
+		is ConfLib.AnchorAtomPointer -> "[ %d, %d ]".format(anchor.id, index + 1)
+		else -> throw IllegalArgumentException("unkown atom pointer: $this")
+	}

@@ -12,6 +12,8 @@ import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.io.toTomlKey
+import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
@@ -144,12 +146,12 @@ class DesignPositionEditor(
 		return label
 	}
 
-	private val DesignPosition.confSpace get() = prep.positionConfSpaces.getOrMake(this)
+	private val DesignPosition.confSpace get() = prep.confSpace.positionConfSpaces.getOrMake(this)
 
 	private fun DesignPosition.resetConfSpace() {
 
 		// delete the old conf space
-		prep.positionConfSpaces.remove(pos)
+		prep.confSpace.positionConfSpaces.remove(pos)
 
 		// make a new conf space
 		confSpace.apply {
@@ -167,7 +169,7 @@ class DesignPositionEditor(
 
 			// make a new wildtype fragment, if possible
 			wildTypeFragment = try {
-				pos.makeFragment("wt-$name", "WildType", dofs = wtDofs)
+				pos.makeFragment("wt-${name.toTomlKey()}", "WildType", dofs = wtDofs)
 			} catch (ex: DesignPosition.IllegalAnchorsException) {
 				null
 			}
@@ -192,7 +194,7 @@ class DesignPositionEditor(
 				}
 
 				// make the default dof settings for each included framgent
-				dofSettings[frag] = ConfSpacePrep.PositionConfSpace.DofSettings.default()
+				dofSettings[frag] = ConfSpace.PositionConfSpace.DofSettings.default()
 			}
 		}
 	}
@@ -458,7 +460,7 @@ class DesignPositionEditor(
 						}
 
 						when (anchorInfo.anchor) {
-							is DesignPosition.SingleAnchor -> {
+							is DesignPosition.Anchor.Single -> {
 								text("Single Anchor")
 								sameLine()
 								infoTip("""
@@ -482,7 +484,7 @@ class DesignPositionEditor(
 									anchorInfo.anchor.copy(c = pickedAtom)
 								}
 							}
-							is DesignPosition.DoubleAnchor -> {
+							is DesignPosition.Anchor.Double -> {
 								text("Double Anchor")
 								sameLine()
 								infoTip("""
@@ -515,7 +517,7 @@ class DesignPositionEditor(
 
 				if (button("Add Single Anchor")) {
 					slidewin.showExceptions {
-						anchorGroupInfo.anchors.add(pos.SingleAnchor(
+						anchorGroupInfo.anchors.add(pos.anchorSingle(
 							// pick dummy atoms for now
 							a = mol.atoms[0],
 							b = mol.atoms[1],
@@ -529,7 +531,7 @@ class DesignPositionEditor(
 
 				if (button("Add Double Anchor")) {
 					slidewin.showExceptions {
-						anchorGroupInfo.anchors.add(pos.DoubleAnchor(
+						anchorGroupInfo.anchors.add(pos.anchorDouble(
 							// pick dummy atoms for now
 							a = mol.atoms[0],
 							b = mol.atoms[1],
@@ -568,8 +570,8 @@ class DesignPositionEditor(
 }
 
 
-fun ConfSpacePrep.PositionConfSpace.DofSettings.Companion.default() =
-	ConfSpacePrep.PositionConfSpace.DofSettings(
+fun ConfSpace.PositionConfSpace.DofSettings.Companion.default() =
+	ConfSpace.PositionConfSpace.DofSettings(
 		includeHGroupRotations = false,
 		dihedralRadiusDegrees = 9.0
 	)

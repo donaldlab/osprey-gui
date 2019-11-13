@@ -108,7 +108,7 @@ class TestMutation : SharedSpec({
 			pairs.size shouldBe 2
 
 			val (posAnchorCA, fragAnchorCA) = pairs[0]
-			posAnchorCA.shouldBeTypeOf<DesignPosition.SingleAnchor> {
+			posAnchorCA.shouldBeTypeOf<DesignPosition.Anchor.Single> {
 				it.a.name shouldBe "CA"
 				it.getConnectedAtoms().map { it.name }.toSet() shouldBe namesCA
 			}
@@ -117,7 +117,7 @@ class TestMutation : SharedSpec({
 			}
 
 			val (posAnchorN, fragAnchorN) = pairs[1]
-			posAnchorN.shouldBeTypeOf<DesignPosition.SingleAnchor> {
+			posAnchorN.shouldBeTypeOf<DesignPosition.Anchor.Single> {
 				it.a.name shouldBe "N"
 				it.getConnectedAtoms().map { it.name }.toSet() shouldBe namesN
 			}
@@ -132,7 +132,7 @@ class TestMutation : SharedSpec({
 			pairs.size shouldBe 1
 
 			val (posAnchorCA, fragAnchorCA) = pairs[0]
-			posAnchorCA.shouldBeTypeOf<DesignPosition.SingleAnchor> {
+			posAnchorCA.shouldBeTypeOf<DesignPosition.Anchor.Single> {
 				it.a.name shouldBe "CA"
 				it.getConnectedAtoms().map { it.name }.toSet() shouldBe namesCA
 			}
@@ -147,7 +147,7 @@ class TestMutation : SharedSpec({
 			pairs.size shouldBe 1
 
 			val (posAnchor, fragAnchor) = pairs[0]
-			posAnchor.shouldBeTypeOf<DesignPosition.DoubleAnchor> {
+			posAnchor.shouldBeTypeOf<DesignPosition.Anchor.Double> {
 				it.a.name shouldBe "CA"
 				it.b.name shouldBe "N"
 				it.getConnectedAtoms().map { it.name }.toSet() shouldBe names

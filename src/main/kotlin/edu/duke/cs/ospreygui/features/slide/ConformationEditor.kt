@@ -21,6 +21,7 @@ import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.confRuntimeId
 import edu.duke.cs.ospreygui.io.fragRuntimeId
+import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import org.joml.Vector3d
@@ -59,7 +60,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				val confs = posInfo.confSpace.confs
 					.getOrPut(frag) { identityHashSet() }
 				val dofSettings = posInfo.confSpace.dofSettings
-					.getOrPut(frag) { ConfSpacePrep.PositionConfSpace.DofSettings.default() }
+					.getOrPut(frag) { ConfSpace.PositionConfSpace.DofSettings.default() }
 
 				inner class ConfInfo(val conf: ConfLib.Conf) {
 
@@ -559,7 +560,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		fun makeNewPosition(): PosInfo {
 
-			val positions = prep.designPositionsByMol
+			val positions = prep.confSpace.designPositionsByMol
 				.getOrPut(mol) { ArrayList() }
 
 			// choose a default but unique name
@@ -589,7 +590,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		val pSelected = Ref.of(false)
 
-		val confSpace get() = prep.positionConfSpaces.getOrMake(pos)
+		val confSpace get() = prep.confSpace.positionConfSpaces.getOrMake(pos)
 		val isMutable get() = confSpace.isMutable()
 		val isFlexible get() = !isMutable
 	}
@@ -626,9 +627,9 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 				// update infos
 				molInfos.clear()
-				for ((moltype, mol) in prep.mols) {
+				for ((moltype, mol) in prep.confSpace.mols) {
 					molInfos.getOrPut(mol) { MolInfo(mol, moltype) }.apply {
-						prep.designPositionsByMol[mol]?.forEach { pos ->
+						prep.confSpace.designPositionsByMol[mol]?.forEach { pos ->
 							posInfos.add(PosInfo(pos))
 						}
 					}
@@ -720,8 +721,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 										.filter { it.pSelected.value && it.isFlexible }
 										.forEach {
 											molInfo.posInfos.remove(it)
-											prep.designPositionsByMol[molInfo.mol]?.remove(it.pos)
-											prep.positionConfSpaces.remove(it.pos)
+											prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(it.pos)
+											prep.confSpace.positionConfSpaces.remove(it.pos)
 										}
 									updateCounts()
 								}
