@@ -324,6 +324,11 @@ class ConfLib(
 				}
 			}
 		}
+
+		fun getConfs(vararg id: String): MutableSet<Conf> =
+			id
+				.map { confs.getValue(it) }
+				.toCollection(identityHashSet())
 	}
 
 	companion object {

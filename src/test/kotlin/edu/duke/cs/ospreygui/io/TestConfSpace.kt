@@ -16,179 +16,179 @@ import io.kotlintest.shouldBe
 import org.joml.Vector3d
 
 
-class TestConfSpace : SharedSpec({
+/** This conf space has a little bit of everything! */
+fun makeTestConfSpace(): ConfSpace {
 
-	fun ConfLib.Fragment.getConfs(vararg id: String): MutableSet<ConfLib.Conf> =
-		id
-			.map { confs.getValue(it) }
-			.toCollection(identityHashSet())
+	// load some molecules
+	val protein = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
+	val smallmol = Molecule.fromOMOL(OspreyGui.getResourceAsString("benzamidine.omol.toml"))[0]
 
-	test("roundtrip") {
+	// load some confs
+	val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
 
-		// load some molecules
-		val protein = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
-		val smallmol = Molecule.fromOMOL(OspreyGui.getResourceAsString("benzamidine.omol.toml"))[0]
+	// make the conf space
+	return ConfSpace(listOf(
+		MoleculeType.Protein to protein,
+		MoleculeType.SmallMolecule to smallmol
+	)).apply {
 
-		// load some confs
-		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+		name = "The Awesomest Conformation Space Evarrrr!!!"
 
-		// make the conf space
-		val expConfSpace = ConfSpace(listOf(
-			MoleculeType.Protein to protein,
-			MoleculeType.SmallMolecule to smallmol
-		)).apply {
+		// add some positions to the protein
+		val leu26 = protein.findChainOrThrow("A").findResidueOrThrow("26")
+		val thr27 = protein.findChainOrThrow("A").findResidueOrThrow("27")
+		val pos1 = Proteins.makeDesignPosition(protein, leu26, "Pos1")
+		val pos2 = Proteins.makeDesignPosition(protein, thr27, "Pos2")
+		designPositionsByMol[protein] = mutableListOf(pos1, pos2)
 
-			name = "The Awesomest Conformation Space Evarrrr!!!"
+		// set the pos conf spaces
+		positionConfSpaces.getOrMake(pos1).apply {
 
-			// add some positions to the protein
-			val leu26 = protein.findChainOrThrow("A").findResidueOrThrow("26")
-			val thr27 = protein.findChainOrThrow("A").findResidueOrThrow("27")
-			val pos1 = Proteins.makeDesignPosition(protein, leu26, "Pos1")
-			val pos2 = Proteins.makeDesignPosition(protein, thr27, "Pos2")
-			designPositionsByMol[protein] = mutableListOf(pos1, pos2)
+			val leu = conflib.fragments.getValue("LEU")
+			val ala = conflib.fragments.getValue("ALA")
+			val pro = conflib.fragments.getValue("PRO")
 
-			// set the pos conf spaces
-			positionConfSpaces.getOrMake(pos1).apply {
+			// add the wt frag
+			val wtFrag = pos1.makeFragment("wt-${pos1.name.toTomlKey()}", "WildType", dofs = leu.dofs)
+			wildTypeFragment = wtFrag
 
-				val leu = conflib.fragments.getValue("LEU")
-				val ala = conflib.fragments.getValue("ALA")
-				val pro = conflib.fragments.getValue("PRO")
+			// add some mutations
+			mutations.add(ala.type)
+			mutations.add(pro.type)
 
-				// add the wt frag
-				val wtFrag = pos1.makeFragment("wt-${pos1.name.toTomlKey()}", "WildType", dofs = leu.dofs)
-				wildTypeFragment = wtFrag
+			// add some confs
+			confs[wtFrag] = wtFrag.confs.values.toCollection(identityHashSet())
+			confs[leu] = leu.getConfs("pp", "tp", "tt")
+			confs[ala] = ala.getConfs("ALA")
+			confs[pro] = pro.getConfs("down", "up")
 
-				// add some mutations
-				mutations.add(ala.type)
-				mutations.add(pro.type)
+			// add some continuous flexibility
+			dofSettings[wtFrag] = ConfSpace.PositionConfSpace.DofSettings(
+				includeHGroupRotations = false,
+				dihedralRadiusDegrees = 9.0
+			)
+			dofSettings[leu] = ConfSpace.PositionConfSpace.DofSettings(
+				includeHGroupRotations = false,
+				dihedralRadiusDegrees = 9.0
+			)
+			dofSettings[ala] = ConfSpace.PositionConfSpace.DofSettings(
+				includeHGroupRotations = true,
+				dihedralRadiusDegrees = 30.0
+			)
+		}
+		positionConfSpaces.getOrMake(pos2).apply {
 
-				// add some confs
-				confs[wtFrag] = wtFrag.confs.values.toCollection(identityHashSet())
-				confs[leu] = leu.getConfs("pp", "tp", "tt")
-				confs[ala] = ala.getConfs("ALA")
-				confs[pro] = pro.getConfs("down", "up")
+			val gly = conflib.fragments.getValue("GLY")
 
-				// add some continuous flexibility
-				dofSettings[wtFrag] = ConfSpace.PositionConfSpace.DofSettings(
-					includeHGroupRotations = false,
-					dihedralRadiusDegrees = 9.0
+			// set only one mutation
+			mutations.add(gly.type)
+
+			// add the conf
+			confs[gly] = gly.getConfs("GLY")
+
+			// no continuous flexibility, it's glycine ...
+		}
+
+		// add a position to the small mol
+		val pos3 = DesignPosition(
+			name = "Pos3",
+			type = "FOO",
+			mol = smallmol
+		).apply {
+
+			// add a single anchor
+			anchorGroups.add(mutableListOf(
+				anchorSingle(
+					smallmol.atoms.findOrThrow("C2"),
+					smallmol.atoms.findOrThrow("C1"),
+					smallmol.atoms.findOrThrow("C3")
 				)
-				dofSettings[leu] = ConfSpace.PositionConfSpace.DofSettings(
-					includeHGroupRotations = false,
-					dihedralRadiusDegrees = 9.0
-				)
-				dofSettings[ala] = ConfSpace.PositionConfSpace.DofSettings(
-					includeHGroupRotations = true,
-					dihedralRadiusDegrees = 30.0
-				)
-			}
-			positionConfSpaces.getOrMake(pos2).apply {
+			))
 
-				val gly = conflib.fragments.getValue("GLY")
+			// add the current atom
+			currentAtoms.add(smallmol.atoms.findOrThrow("H10"))
+		}
+		designPositionsByMol[smallmol] = mutableListOf(pos3)
 
-				// set only one mutation
-				mutations.add(gly.type)
+		// set the pos conf spaces
+		positionConfSpaces.getOrMake(pos3).apply {
 
-				// add the conf
-				confs[gly] = gly.getConfs("GLY")
+			// add the wt frag
+			val wtFrag = pos3.makeFragment("wt-${pos3.name.toTomlKey()}", "WildType")
+			wildTypeFragment = wtFrag
 
-				// no continuous flexibility, it's glycine ...
-			}
+			// add a mutation
+			mutations.add("BAR")
 
-			// add a position to the small mol
-			val pos3 = DesignPosition(
-				name = "Pos3",
-				type = "FOO",
-				mol = smallmol
-			).apply {
-
-				// add a single anchor
-				anchorGroups.add(mutableListOf(
-					anchorSingle(
-						smallmol.atoms.findOrThrow("C2"),
-						smallmol.atoms.findOrThrow("C1"),
-						smallmol.atoms.findOrThrow("C3")
-					)
-				))
-
-				// add the current atom
-				currentAtoms.add(smallmol.atoms.findOrThrow("H10"))
-			}
-			designPositionsByMol[smallmol] = mutableListOf(pos3)
-
-			// set the pos conf spaces
-			positionConfSpaces.getOrMake(pos3).apply {
-
-				// add the wt frag
-				val wtFrag = pos3.makeFragment("wt-${pos3.name.toTomlKey()}", "WildType")
-				wildTypeFragment = wtFrag
-
-				// add a mutation
-				mutations.add("BAR")
-
-				// make a fragment with a silly oxygen triangle
-				val ha1 = ConfLib.AtomInfo(1, "OA1", Element.Oxygen)
-				val ha2 = ConfLib.AtomInfo(2, "OA2", Element.Oxygen)
-				val anchor = ConfLib.Anchor.Single(
-					id = 1,
-					bonds = listOf(ha1, ha2)
-				)
-				val bar = ConfLib.Fragment(
-					id = "bar",
-					name = "Bar",
-					type = "BAR",
-					atoms = listOf(ha1, ha2),
-					bonds = listOf(ConfLib.Bond(ha1, ha2)),
-					anchors = listOf(anchor),
-					confs = mapOf(
-						"bar1" to ConfLib.Conf(
-							id = "bar1",
-							name = "Bar 1",
-							description = null,
-							coords = identityHashMapOf(
-								// none of the actual coords matter at all
-								ha1 to Vector3d(1.0, 2.0, 3.0),
-								ha2 to Vector3d(4.0, 5.0, 6.0)
-							),
-							anchorCoords = identityHashMapOf(
-								anchor to ConfLib.AnchorCoords.Single(
-									a = Vector3d(1.2, 1.3, 1.4),
-									b = Vector3d(2.2, 2.3, 2.4),
-									c = Vector3d(3.2, 3.3, 3.4)
-								)
-							)
+			// make a fragment with a silly oxygen triangle
+			val ha1 = ConfLib.AtomInfo(1, "OA1", Element.Oxygen)
+			val ha2 = ConfLib.AtomInfo(2, "OA2", Element.Oxygen)
+			val anchor = ConfLib.Anchor.Single(
+				id = 1,
+				bonds = listOf(ha1, ha2)
+			)
+			val bar = ConfLib.Fragment(
+				id = "bar",
+				name = "Bar",
+				type = "BAR",
+				atoms = listOf(ha1, ha2),
+				bonds = listOf(ConfLib.Bond(ha1, ha2)),
+				anchors = listOf(anchor),
+				confs = mapOf(
+					"bar1" to ConfLib.Conf(
+						id = "bar1",
+						name = "Bar 1",
+						description = null,
+						coords = identityHashMapOf(
+							// none of the actual coords matter at all
+							ha1 to Vector3d(1.0, 2.0, 3.0),
+							ha2 to Vector3d(4.0, 5.0, 6.0)
 						),
-						"bar2" to ConfLib.Conf(
-							id = "bar2",
-							name = "Bar 2",
-							description = "Bar 2 description, yup",
-							coords = identityHashMapOf(
-								// none of the actual coords matter at all
-								ha1 to Vector3d(1.5, 2.5, 3.5),
-								ha2 to Vector3d(4.5, 5.5, 6.5)
-							),
-							anchorCoords = identityHashMapOf(
-								anchor to ConfLib.AnchorCoords.Single(
-									a = Vector3d(4.2, 4.3, 4.4),
-									b = Vector3d(5.2, 5.3, 5.4),
-									c = Vector3d(6.2, 6.3, 6.4)
-								)
+						anchorCoords = identityHashMapOf(
+							anchor to ConfLib.AnchorCoords.Single(
+								a = Vector3d(1.2, 1.3, 1.4),
+								b = Vector3d(2.2, 2.3, 2.4),
+								c = Vector3d(3.2, 3.3, 3.4)
 							)
 						)
 					),
-					dofs = emptyList()
-				)
+					"bar2" to ConfLib.Conf(
+						id = "bar2",
+						name = "Bar 2",
+						description = "Bar 2 description, yup",
+						coords = identityHashMapOf(
+							// none of the actual coords matter at all
+							ha1 to Vector3d(1.5, 2.5, 3.5),
+							ha2 to Vector3d(4.5, 5.5, 6.5)
+						),
+						anchorCoords = identityHashMapOf(
+							anchor to ConfLib.AnchorCoords.Single(
+								a = Vector3d(4.2, 4.3, 4.4),
+								b = Vector3d(5.2, 5.3, 5.4),
+								c = Vector3d(6.2, 6.3, 6.4)
+							)
+						)
+					)
+				),
+				dofs = emptyList()
+			)
 
-				// add some confs
-				confs[wtFrag] = wtFrag.confs.values.toMutableSet()
-				confs[bar] = bar.getConfs("bar1", "bar2")
+			// add some confs
+			confs[wtFrag] = wtFrag.confs.values.toMutableSet()
+			confs[bar] = bar.getConfs("bar1", "bar2")
 
-				// no DoF settings, ie no continuous flexibility
-			}
-		} // conf space
+			// no DoF settings, ie no continuous flexibility
+		}
+	}
+}
 
+class TestConfSpace : SharedSpec({
+
+	test("roundtrip") {
+
+		// do the roundtrip
+		val expConfSpace = makeTestConfSpace()
 		val toml = expConfSpace.toToml()
-
 		val obsConfSpace = ConfSpace.fromToml(toml)
 
 		// make sure we got the same conf space back

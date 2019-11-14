@@ -90,17 +90,13 @@ fun ConfSpace.toToml(): String {
 				write("wtfrag = %s\n", it.resolvedId().quote())
 			}
 			write("mutations = [ %s ]\n",
-				posConfSpace.mutations
-					.map { it.quote() }
-					.joinToString(", ")
+				posConfSpace.mutations.joinToString(", ") { it.quote() }
 			)
 			write("confs = [\n")
 			for ((frag, confs) in posConfSpace.confs) {
 				write("\t{ frag = %12s, confs = [ %s ] },\n",
 					frag.id.quote(),
-					confs
-						.map { it.id.quote() }
-						.joinToString(", ")
+					confs.joinToString(", ") { it.id.quote() }
 				)
 			}
 			write("]\n")
@@ -140,7 +136,7 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 
 	// build the atom lookup
 	val atomIndices = HashMap<Int,Atom>().apply {
-		for ((mol, atomIndices) in molsAndAtoms) {
+		for ((_, atomIndices) in molsAndAtoms) {
 			for ((i, atomA) in atomIndices) {
 				val atomB = partitionAtomMap.getBOrThrow(atomA)
 				put(i, atomB)
