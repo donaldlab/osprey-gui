@@ -4,11 +4,14 @@ import cuchaz.kludge.tools.x
 import cuchaz.kludge.tools.y
 import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.tools.identityHashMapOf
+import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
+import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
+import edu.duke.cs.ospreygui.forcefield.eef1.EEF1ConfSpaceParams
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import org.joml.Vector3dc
 import java.util.*
@@ -23,16 +26,16 @@ import kotlin.collections.ArrayList
  */
 class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
-	private val params: MutableList<ForcefieldParams> = ArrayList()
+	private val ffparams: MutableList<ForcefieldParams> = ArrayList()
 
 	fun addForcefield(ff: Forcefield) {
 		if (ff !in forcefields) {
-			params.add(ff.parameterizer())
+			ffparams.add(ff.parameterizer())
 		}
 	}
 
 	val forcefields: List<Forcefield> get() =
-		params
+		ffparams
 			.map { it.forcefield }
 
 
@@ -83,34 +86,64 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		try {
 
-			// TODO: check for missing forcefield params and issue warnings/errors
-
-			// TODO: NEXTTIME: confs can change the atom types of the fixed atoms!!
-			//   how to fix? Move the changed atoms into the confs??
-			//   !!!!!!!!!!!!!!!
-
 			write("\n")
 			write("name = %s\n", confSpace.name.quote())
 			write("forcefields = [ %s ]\n",
 				forcefields.joinToString(", ") { it.name.toLowerCase().quote() }
 			)
 
-			// write out the fixed atoms in order
+			// TODO: issues warnings/errors for:
+			//   missing forcefield params
+			//   invalid (eg NaN) coords for atoms
+
+			// get the authoritative list of conf space positions in order
+			val positions = confSpace.positions()
+
+			// find out what fixed atoms have ff params that are affected by changes in conformations
+			// and add them to the atoms list for all the conformations at that design position
+			// and also subtract them from the list of fixed atoms
+
+			// first, analyze the current atoms
+			val fixedAtoms = confSpace.fixedAtoms()
+			val analyses = ffparams.associateWith { it.analyze(fixedAtoms) }
+
+			// then look through all the confs to find the changed atoms
+			val dynamicFixedAtoms = positions
+				.associateWith { pos ->
+					val changedAtoms = identityHashSet<Atom>()
+					confSpace.forEachConf(pos) { frag, conf ->
+						for ((ff, analysis) in analyses) {
+							changedAtoms.addAll(analysis.findChangedAtoms(ff.analyze(fixedAtoms)))
+						}
+					}
+					return@associateWith changedAtoms
+				}
+			fun Atom.isDynamic() =
+				dynamicFixedAtoms.values.any { this in it }
+
+			// static atoms are the subset of fixed atoms that don't change forcefield params
+			// collect all the static atoms
+			val staticAtomsByMol = fixedAtoms
+				.mapValues { (_, atoms) ->
+					atoms.filter { !it.isDynamic() }
+				}
+
+			// TODO: if positions share any dynamic fixed atoms, throw an error
+
+			// write out the static atoms in order
 			write("\n")
-			write("[fixed]\n")
+			write("[static]\n")
 			write("atoms = [\n")
-			val fixedAtomsByMol = confSpace.fixedAtoms()
-				.mapValues { (_, atoms) -> atoms.toList() }
-			val fixedAtomIndices = IdentityHashMap<Atom,Int>()
-			val fixedAtomNames = IdentityHashMap<Atom,String>()
-			for ((mol, atoms) in confSpace.fixedAtoms()) {
+			val staticAtomIndices = IdentityHashMap<Atom,Int>()
+			val staticAtomNames = IdentityHashMap<Atom,String>()
+			for ((mol, atoms) in staticAtomsByMol) {
 				for (atom in atoms) {
 
 					// assign the atom index
-					val index = fixedAtomIndices.size
-					fixedAtomIndices[atom] = index
+					val index = staticAtomIndices.size
+					staticAtomIndices[atom] = index
 
-					// make a globally-unique atom name
+					// make a globally-unique atom name, since static atoms can come from different molecules
 					val resName = (mol as? Polymer)
 						?.let {
 							it.findChainAndResidue(atom)?.let { (chain, res) ->
@@ -119,23 +152,23 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						}
 						?: ""
 					val atomName = "${mol.name}$resName-${atom.name}"
-					fixedAtomNames[atom] = atomName
+					staticAtomNames[atom] = atomName
 
-					write("\t{ xyz = %s, name = %20s }, # %-6d\n",
+					write("\t{ xyz = %s, name = %20s }, # %d\n",
 						atom.pos.toToml(),
-						fixedAtomNames.getValue(atom),
-						fixedAtomIndices.getValue(atom)
+						staticAtomNames.getValue(atom),
+						staticAtomIndices.getValue(atom)
 					)
 				}
 			}
 			write("]\n")
 
-			// write out the internal energies
-			write("[fixed.energy]\n")
-			for ((ffi, ff) in params.withIndex()) {
+			// write out the internal energies for the static atoms
+			write("[static.energy]\n")
+			for ((ffi, ff) in ffparams.withIndex()) {
 				write("%d = %f\n",
 					ffi,
-					ff.calcEnergy(fixedAtomsByMol)
+					ff.calcEnergy(staticAtomsByMol)
 				)
 			}
 
@@ -161,13 +194,12 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				}
 			}
 			val paramsCaches = ArrayList<ParamsCache>().apply {
-				for (ff in params) {
+				for (ff in ffparams) {
 					add(ParamsCache())
 				}
 			}
 
 			// write the design positions and conformations
-			val positions = confSpace.positions()
 			for ((posi, pos) in positions.withIndex()) {
 
 				write("\n")
@@ -185,16 +217,19 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						pos.name, frag.id, conf.id
 					)
 					write("id = %s\n", conf.id.quote())
+					write("type = %s\n", frag.type.quote())
 
 					// write the atoms, and track the indices
-					val posAtomIndices = IdentityHashMap<Atom,Int>()
+					val confAtoms = dynamicFixedAtoms.getValue(pos) +
+						frag.atoms.map { pos.atomResolverOrThrow.resolveOrThrow(it) }
+					val confAtomIndices = confAtoms
+						.withIndex()
+						.associateIdentity { (i, atom) -> atom to i }
 					write("atoms = [\n")
-					for ((atomi, atomInfo) in frag.atoms.withIndex()) {
-						val atom = pos.atomResolverOrThrow.resolveOrThrow(atomInfo)
-						posAtomIndices[atom] = atomi
-						write("\t{ xyz = %s, name = %8s }, # %-2d\n",
+					for ((atomi, atom) in confAtoms.withIndex()) {
+						write("\t{ xyz = %s, name = %8s }, # %d, dynamic\n",
 							atom.pos.toToml(),
-							atomInfo.name.quote(),
+							atom.name.quote(),
 							atomi
 						)
 					}
@@ -204,9 +239,9 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					write("[pos.$posi.conf.$confi.params.internal] # %s:%s:%s\n",
 						pos.name, frag.id, conf.id
 					)
-					for ((ffi, ff) in params.withIndex()) {
+					for ((ffi, ff) in ffparams.withIndex()) {
 						write("%d = [\n", ffi)
-						for (atom in pos.currentAtoms) {
+						for (atom in confAtoms) {
 							val p = ff.singleParams(pos.mol, atom) ?: continue
 							write("\t%d, # %s\n",
 								paramsCaches[ffi].index(p),
@@ -216,29 +251,29 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						write("]\n")
 					}
 
-					val posAtomsByMol = identityHashMapOf(pos.mol to pos.currentAtoms.toList())
+					val confAtomsByMol = identityHashMapOf(pos.mol to confAtoms.toList())
 
-					// write the pos-fixed params
-					write("[pos.$posi.conf.$confi.params.fixed] # %s:%s:%s\n",
+					// write the pos-static params
+					write("[pos.$posi.conf.$confi.params.static] # %s:%s:%s\n",
 						pos.name, frag.id, conf.id
 					)
-					for ((ffi, ff) in params.withIndex()) {
+					for ((ffi, ff) in ffparams.withIndex()) {
 						write("%d = [\n", ffi)
-						ForcefieldParams.forEachPair(posAtomsByMol, fixedAtomsByMol) { molp, atomp, molf, atomf, dist ->
-							ff.pairParams(molp, atomp, molf, atomf, dist)?.let { p ->
+						ForcefieldParams.forEachPair(confAtomsByMol, staticAtomsByMol) { cmol, catom, smol, satom, dist ->
+							ff.pairParams(cmol, catom, smol, satom, dist)?.let { params ->
 								write("\t[ %2d, %6d, %6d ], # %s, %s\n",
-									posAtomIndices.getValue(atomp),
-									fixedAtomIndices.getValue(atomf),
-									paramsCaches[ffi].index(p),
-									atomp.name,
-									fixedAtomNames.getValue(atomf)
+									confAtomIndices.getValue(catom),
+									staticAtomIndices.getValue(satom), // TODO: error here
+									paramsCaches[ffi].index(params),
+									catom.name,
+									staticAtomNames.getValue(satom)
 								)
 							}
 						}
 						write("]\n")
 					}
 
-					// write the pos-fixed params
+					// write the pos-pos params
 					for (posbi in 0 until posi) {
 						val posb = positions[posbi]
 
@@ -252,10 +287,10 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 								pos.name, frag.id, conf.id,
 								posb.name, fragb.id, confb.id
 							)
-							for ((ffi, ff) in params.withIndex()) {
+							for ((ffi, ff) in ffparams.withIndex()) {
 								write("%d = [\n", ffi)
-								ForcefieldParams.forEachPair(posAtomsByMol, posbAtomsByMol) { mola, atoma, molb, atomb, dist ->
-									ff.pairParams(mola, atoma, molb, atomb, dist)?.let { p ->
+								ForcefieldParams.forEachPair(confAtomsByMol, posbAtomsByMol) { mola, atoma, molb, atomb, dist ->
+									ff.pairParams(mola, atoma, molb, atomb, dist)?.let { params ->
 
 										val atombi = fragb.atoms
 											.indexOfFirst { it.name == atomb.name }
@@ -263,9 +298,9 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 											?: throw RuntimeException("can't find atom $atomb in fragment $fragb")
 
 										write("\t[ %2d, %2d, %6d ], # %s, %s\n",
-											posAtomIndices.getValue(atoma),
+											confAtomIndices.getValue(atoma),
 											atombi,
-											paramsCaches[ffi].index(p),
+											paramsCaches[ffi].index(params),
 											atoma.name,
 											atomb.name
 										)
@@ -285,7 +320,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			// write all the collected forcefield params
 			write("\n")
 			write("[ffparams]\n")
-			for (ffi in params.indices) {
+			for (ffi in ffparams.indices) {
 				write("%d = [\n", ffi)
 				val paramsCache = paramsCaches[ffi]
 				for ((i, params) in paramsCache.paramsList.withIndex()) {
@@ -296,6 +331,11 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				}
 				write("]\n")
 			}
+
+		} catch (t: Throwable) {
+
+			t.printStackTrace(System.err)
+			error(t.message ?: "Error")
 
 		} finally {
 

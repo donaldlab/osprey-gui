@@ -2,9 +2,12 @@ package edu.duke.cs.ospreygui.forcefield.eef1
 
 import cuchaz.kludge.tools.sqrt
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
+import java.util.*
 import kotlin.math.PI
 import kotlin.math.exp
 
@@ -119,5 +122,28 @@ class EEF1ConfSpaceParams : ForcefieldParams {
 		}
 
 		return energy
+	}
+
+	class Analysis : ForcefieldParams.Analysis {
+
+		val types = IdentityHashMap<Atom,EEF1.AtomType>()
+
+		override fun findChangedAtoms(originalAnalysis: ForcefieldParams.Analysis): Set<Atom> {
+			originalAnalysis as Analysis
+			return originalAnalysis.types
+				.filter { (atom, originalType) ->
+					types.getValue(atom) != originalType
+				}
+				.map { (atom, _) -> atom }
+				.toIdentitySet()
+		}
+	}
+
+	override fun analyze(atomsByMol: Map<Molecule,Set<Atom>>) = Analysis().apply {
+		for ((mol, atoms) in atomsByMol) {
+			for (atom in atoms) {
+				types[atom] = atom.atomTypeEEF1(mol)
+			}
+		}
 	}
 }

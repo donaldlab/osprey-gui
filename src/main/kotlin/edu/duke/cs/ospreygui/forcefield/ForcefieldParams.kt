@@ -31,6 +31,16 @@ interface ForcefieldParams {
 	fun calcEnergy(atomsByMol: Map<Molecule,List<Atom>>): Double
 
 
+	/**
+	 * An opaque type a forcefield can use to determine when
+	 * conformation changes cause changes in forcefield parameters.
+	 */
+	interface Analysis {
+		fun findChangedAtoms(originalAnalysis: Analysis): Set<Atom>
+	}
+	fun analyze(atomsByMol: Map<Molecule,Set<Atom>>): Analysis
+
+
 	open class ParamsList(val params: List<Double>) : List<Double> by params {
 
 		constructor (vararg params: Double) : this(params.toList())
@@ -85,6 +95,9 @@ interface ForcefieldParams {
 						visitSource = false,
 						shouldVisit = { _, toAtom, dist -> toAtom in lookupa || toAtom in lookupb }
 					)
+					.filter { (atomb, _) ->
+						atomb in lookupb
+					}
 					.forEach { (atomb, dist) ->
 						func(mol, atoma, mol, atomb, dist)
 					}
