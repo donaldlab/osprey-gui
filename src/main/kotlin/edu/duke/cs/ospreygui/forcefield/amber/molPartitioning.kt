@@ -70,6 +70,8 @@ data class ForcefieldName(
 	val atomTypesOrThrow get() =
 		atomTypes ?: throw NoSuchElementException("forcefield $name doesn't have atom types for Antechamber")
 
+	override fun toString() = name
+
 	companion object {
 
 		val ff96 = ForcefieldName("ff96", Antechamber.AtomTypes.Amber)
@@ -144,6 +146,36 @@ enum class MoleculeType(
 				else -> SmallMolecule
 			}
 	}
+}
+
+/**
+ * Returns the types of the molecule
+ * based on AMBER rules for residue classification.
+ */
+fun Molecule.findTypes(): Set<MoleculeType> {
+
+	// for non-polymers, assume the whole molecule is a small molecule
+	if (this !is Polymer) {
+		return setOf(MoleculeType.SmallMolecule)
+	}
+
+	return chains
+		.flatMap { it.residues }
+		.map { MoleculeType[it.type] }
+		.toSet()
+}
+
+/**
+ * Returns the type of the molecule
+ * based on AMBER rules for residue classification,
+ * or throws an exception.
+ */
+fun Molecule.findTypeOrThrow(): MoleculeType {
+	val types = findTypes()
+	if (types.size == 1) {
+		return types.first()
+	}
+	throw NoSuchElementException("No unique molecule type found in $types")
 }
 
 /**

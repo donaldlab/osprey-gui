@@ -13,6 +13,11 @@ interface ForcefieldParams {
 	val forcefield: Forcefield
 
 	/**
+	 * Let the parameterizer know what molecules we want to parameterize next
+	 */
+	fun setMolecules(mols: List<Molecule>)
+
+	/**
 	 * Return the internal energy for this atom, if any.
 	 */
 	fun internalEnergy(mol: Molecule, atom: Atom): Double?
@@ -20,7 +25,7 @@ interface ForcefieldParams {
 	/**
 	 * Return the forcefield parameters for this atom pair interaction, if any.
 	 */
-	fun pairParams(mola: Molecule, atoma: Atom, molb: Molecule, atomb: Atom, dist: Int?): List<Double>?
+	fun pairParams(mola: Molecule, atoma: Atom, molb: Molecule, atomb: Atom, dist: Int?): ParamsList?
 
 	/**
 	 * Calculate the forcefield energy of the selected atoms directly, rather than
@@ -41,11 +46,9 @@ interface ForcefieldParams {
 	fun analyze(atomsByMol: Map<Molecule,Set<Atom>>): Analysis
 
 
-	open class ParamsList(val params: List<Double>) : List<Double> by params {
-
-		constructor (vararg params: Double) : this(params.toList())
+	interface ParamsList {
+		val list: List<Double>
 	}
-
 
 	class AtomParams<T> {
 

@@ -23,6 +23,7 @@ class TestAmberIO : SharedSpec({
 			.filter { (type, _) -> type in setOf(MoleculeType.Protein) }
 			.map { (_, mol) -> mol }
 			.combine("1CC8").first
+			as Polymer
 
 		// verify initial sizes
 		mol.atoms.size shouldBe 567
@@ -34,7 +35,7 @@ class TestAmberIO : SharedSpec({
 
 		val numAtomsBefore = mol.atoms.size
 
-		top.mapTo(mol).apply {
+		top.mapTo(listOf(mol)).apply {
 			val numAtomsAdded = addMissingAtoms(crd)
 			val numBondsAdded = setBonds()
 

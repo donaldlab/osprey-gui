@@ -11,16 +11,12 @@ class TestConfSpaceCompiler : SharedSpec({
 	test("EEF1") {
 
 		ConfSpaceCompiler(makeTestConfSpace()).apply {
+			addForcefield(Forcefield.Amber96)
 			addForcefield(Forcefield.EEF1)
 			compile().run {
-				// TEMP
-				toml
-					?.lines()
-					?.withIndex()
-					?.forEach { (i, line) -> println("%6d: %s".format(i + 1, line)) }
-				errors.forEach { println(it) }
 
 				// TEMP
+				errors.forEach { println(it) }
 				toml?.write(Paths.get("test.ccs.toml"))
 
 				// no errors

@@ -166,8 +166,6 @@ data class AmberParams(
 	val crd: String
 ) {
 
-	// TODO: parse the top file for forcefield params?
-
 	companion object {
 
 		fun from(mol2s: List<String>, ffnames: List<ForcefieldName>, frcmods: List<String> = emptyList()): AmberParams {

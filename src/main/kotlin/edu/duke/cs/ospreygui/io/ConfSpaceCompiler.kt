@@ -101,8 +101,14 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			// and also subtract them from the list of fixed atoms
 
 			// first, analyze the current atoms
+			val allMols = confSpace.mols
+				.map { (_, mol) -> mol }
 			val fixedAtoms = confSpace.fixedAtoms()
-			val analyses = ffparams.associateWith { it.analyze(fixedAtoms) }
+			val analyses = ffparams
+				.associateWith { ff ->
+					ff.setMolecules(allMols)
+					ff.analyze(fixedAtoms)
+				}
 
 			// then look through all the confs to find the changed atoms
 			val dynamicFixedAtoms = positions
@@ -110,6 +116,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					val changedAtoms = identityHashSet<Atom>()
 					confSpace.forEachConf(pos) { frag, conf ->
 						for ((ff, analysis) in analyses) {
+							ff.setMolecules(allMols)
 							changedAtoms.addAll(analysis.findChangedAtoms(ff.analyze(fixedAtoms)))
 						}
 					}
@@ -237,6 +244,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						pos.name, frag.id, conf.id
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
+						ff.setMolecules(listOf(pos.mol))
 						write("%d = %f\n",
 							ffi,
 							confAtoms
@@ -252,13 +260,14 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						pos.name, frag.id, conf.id
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
+						ff.setMolecules(allMols)
 						write("%d = [\n", ffi)
 						ForcefieldParams.forEachPair(confAtomsByMol, staticAtomsByMol) { cmol, catom, smol, satom, dist ->
 							ff.pairParams(cmol, catom, smol, satom, dist)?.let { params ->
 								write("\t[ %2d, %6d, %6d ], # %s, %s\n",
 									confAtomIndices.getValue(catom),
 									staticAtomIndices.getValue(satom),
-									paramsCaches[ffi].index(params),
+									paramsCaches[ffi].index(params.list),
 									catom.name,
 									staticAtomNames.getValue(satom)
 								)
@@ -283,6 +292,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 							)
 							for ((ffi, ff) in ffparams.withIndex()) {
 								write("%d = [\n", ffi)
+								ff.setMolecules(listOf(pos.mol, posb.mol))
 								ForcefieldParams.forEachPair(confAtomsByMol, posbAtomsByMol) { mola, atoma, molb, atomb, dist ->
 									ff.pairParams(mola, atoma, molb, atomb, dist)?.let { params ->
 
@@ -294,7 +304,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 										write("\t[ %2d, %2d, %6d ], # %s, %s\n",
 											confAtomIndices.getValue(atoma),
 											atombi,
-											paramsCaches[ffi].index(params),
+											paramsCaches[ffi].index(params.list),
 											atoma.name,
 											atomb.name
 										)
