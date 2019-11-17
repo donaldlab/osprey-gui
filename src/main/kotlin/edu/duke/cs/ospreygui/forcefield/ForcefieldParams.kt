@@ -13,9 +13,9 @@ interface ForcefieldParams {
 	val forcefield: Forcefield
 
 	/**
-	 * Return the forcefield parameters for this atom, if any.
+	 * Return the internal energy for this atom, if any.
 	 */
-	fun singleParams(mol: Molecule, atom: Atom): List<Double>?
+	fun internalEnergy(mol: Molecule, atom: Atom): Double?
 
 	/**
 	 * Return the forcefield parameters for this atom pair interaction, if any.
@@ -84,9 +84,6 @@ interface ForcefieldParams {
 			val lookupb = atomsb.toIdentitySet()
 
 			for (atoma in atomsa) {
-
-				// single energy
-				func(mol, atoma, mol, atoma, 0)
 
 				// pair energies, by bonded distance
 				mol

@@ -232,21 +232,17 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					}
 					write("]\n")
 
-					// write the internal params
-					write("[pos.$posi.conf.$confi.params.internal] # %s:%s:%s\n",
+					// write the internal energy
+					write("[pos.$posi.conf.$confi.energy] # %s:%s:%s\n",
 						pos.name, frag.id, conf.id
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
-						write("%d = [\n", ffi)
-						for ((atomi, atom) in confAtoms.withIndex()) {
-							val p = ff.singleParams(pos.mol, atom) ?: continue
-							write("\t[ %2d, %6d ], # %s\n",
-								atomi,
-								paramsCaches[ffi].index(p),
-								atom.name
-							)
-						}
-						write("]\n")
+						write("%d = %f\n",
+							ffi,
+							confAtoms
+								.mapNotNull { atom -> ff.internalEnergy(pos.mol, atom) }
+								.sum()
+						)
 					}
 
 					val confAtomsByMol = identityHashMapOf(pos.mol to confAtoms.toList())

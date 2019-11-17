@@ -20,23 +20,9 @@ class EEF1ConfSpaceParams : ForcefieldParams {
 
 	override val forcefield = Forcefield.EEF1
 
-	data class SingleParams(
-		val dGref: Double
-	) : ForcefieldParams.ParamsList(
-		dGref
-	) {
-
-		constructor (type: EEF1.AtomType) : this(
-			type.dGref
-		)
-
-		fun calcEnergy(): Double =
-			dGref
-	}
-
-	override fun singleParams(mol: Molecule, atom: Atom): SingleParams? {
+	override fun internalEnergy(mol: Molecule, atom: Atom): Double? {
 		val type = atom.atomTypeEEF1(mol) ?: return null
-		return SingleParams(type)
+		return type.dGref
 	}
 
 	data class PairParams(
@@ -99,22 +85,20 @@ class EEF1ConfSpaceParams : ForcefieldParams {
 
 		var energy = 0.0
 
+		// add the internal energies
+		for ((mol, atoms) in atomsByMol) {
+			for (atom in atoms) {
+				val internalEnergy = internalEnergy(mol, atom) ?: continue
+				energy += internalEnergy
+			}
+		}
+
+		// add the pair energies
 		ForcefieldParams.forEachPair(atomsByMol, atomsByMol) { mola, atoma, molb, atomb, dist ->
-			if (atoma === atomb) {
-
-				// single energy
-				types[mola, atoma]?.let { type ->
-					energy += SingleParams(type).calcEnergy()
-				}
-
-			} else {
-
-				// pair energy
-				if (inRange(dist)) {
-					types[mola, atoma]?.let { typea ->
-						types[molb, atomb]?.let { typeb ->
-							energy += PairParams(typea, typeb).calcEnergy(atoma.pos.distance(atomb.pos))
-						}
+			if (inRange(dist)) {
+				types[mola, atoma]?.let { typea ->
+					types[molb, atomb]?.let { typeb ->
+						energy += PairParams(typea, typeb).calcEnergy(atoma.pos.distance(atomb.pos))
 					}
 				}
 			}
