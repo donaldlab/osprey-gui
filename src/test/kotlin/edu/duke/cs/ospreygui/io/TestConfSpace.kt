@@ -146,9 +146,10 @@ fun makeTestConfSpace(): ConfSpace {
 						),
 						anchorCoords = identityHashMapOf(
 							anchor to ConfLib.AnchorCoords.Single(
+								// NOTE: don't make anchor atoms co-linear
 								a = Vector3d(1.2, 1.3, 1.4),
 								b = Vector3d(2.2, 2.3, 2.4),
-								c = Vector3d(3.2, 3.3, 3.4)
+								c = Vector3d(3.2, 3.3, 0.4)
 							)
 						)
 					),
@@ -163,9 +164,10 @@ fun makeTestConfSpace(): ConfSpace {
 						),
 						anchorCoords = identityHashMapOf(
 							anchor to ConfLib.AnchorCoords.Single(
+								// NOTE: don't make anchor atoms co-linear
 								a = Vector3d(4.2, 4.3, 4.4),
 								b = Vector3d(5.2, 5.3, 5.4),
-								c = Vector3d(6.2, 6.3, 6.4)
+								c = Vector3d(6.2, 6.3, 3.4)
 							)
 						)
 					)

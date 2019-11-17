@@ -10,8 +10,6 @@ import edu.duke.cs.molscope.tools.identityHashMapOf
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
-import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
-import edu.duke.cs.ospreygui.forcefield.eef1.EEF1ConfSpaceParams
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import org.joml.Vector3dc
 import java.util.*
@@ -41,8 +39,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 	data class Message(
 		val type: Type,
-		val message: String,
-		val context: Any? = null
+		val message: String
 	) {
 
 		enum class Type {
@@ -50,15 +47,11 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			Error
 		}
 
-		private val contextMsg: String =
-			context
-				?.toString()
-				?.let { "; ctx=$it" }
-				?: ""
-
 		override fun toString() =
-			"$type: $message$contextMsg"
+			"$type: $message"
 	}
+
+	private class CompilerError(val msg: String) : RuntimeException(msg)
 
 	data class Report(
 		val messages: List<Message>,
@@ -79,10 +72,15 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		fun write(str: String, vararg args: Any) = buf.append(String.format(str, *args))
 
 		val messages = ArrayList<Message>()
-		fun warn(msg: String, context: Any? = null) =
-			messages.add(Message(Message.Type.Warning, msg, context))
-		fun error(msg: String, context: Any? = null) =
-			messages.add(Message(Message.Type.Error, msg, context))
+		fun warn(msg: String) =
+			messages.add(Message(Message.Type.Warning, msg))
+
+		fun Vector3dc.checkForErrors(source: String): Vector3dc = apply {
+			// check that all the coords are valid (ie, not NaN)
+			if (!x.isFinite() || !y.isFinite() || !z.isFinite()) {
+				throw CompilerError("Coordinates at '$source' have bad values: [%12.6f,%12.6f,%12.6f]".format(x, y, z))
+			}
+		}
 
 		try {
 
@@ -94,7 +92,6 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 			// TODO: issues warnings/errors for:
 			//   missing forcefield params
-			//   invalid (eg NaN) coords for atoms
 
 			// get the authoritative list of conf space positions in order
 			val positions = confSpace.positions()
@@ -155,8 +152,8 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					staticAtomNames[atom] = atomName
 
 					write("\t{ xyz = %s, name = %20s }, # %d\n",
-						atom.pos.toToml(),
-						staticAtomNames.getValue(atom),
+						atom.pos.checkForErrors(atomName).toToml(),
+						staticAtomNames.getValue(atom).quote(),
 						staticAtomIndices.getValue(atom)
 					)
 				}
@@ -227,8 +224,8 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						.associateIdentity { (i, atom) -> atom to i }
 					write("atoms = [\n")
 					for ((atomi, atom) in confAtoms.withIndex()) {
-						write("\t{ xyz = %s, name = %8s }, # %d, dynamic\n",
-							atom.pos.toToml(),
+						write("\t{ xyz = %s, name = %8s }, # %d\n",
+							atom.pos.checkForErrors("frag=${frag.id}, conf=${conf.id}, atom=${atom.name} after alignment").toToml(),
 							atom.name.quote(),
 							atomi
 						)
@@ -241,9 +238,10 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
 						write("%d = [\n", ffi)
-						for (atom in confAtoms) {
+						for ((atomi, atom) in confAtoms.withIndex()) {
 							val p = ff.singleParams(pos.mol, atom) ?: continue
-							write("\t%d, # %s\n",
+							write("\t[ %2d, %6d ], # %s\n",
+								atomi,
 								paramsCaches[ffi].index(p),
 								atom.name
 							)
@@ -263,7 +261,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 							ff.pairParams(cmol, catom, smol, satom, dist)?.let { params ->
 								write("\t[ %2d, %6d, %6d ], # %s, %s\n",
 									confAtomIndices.getValue(catom),
-									staticAtomIndices.getValue(satom), // TODO: error here
+									staticAtomIndices.getValue(satom),
 									paramsCaches[ffi].index(params),
 									catom.name,
 									staticAtomNames.getValue(satom)
@@ -332,10 +330,24 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				write("]\n")
 			}
 
+			// TODO: write the DoFs
+
+		} catch (err: CompilerError) {
+
+			messages.add(Message(Message.Type.Error, err.msg))
+
 		} catch (t: Throwable) {
 
 			t.printStackTrace(System.err)
-			error(t.message ?: "Error")
+
+			// collect all the error messages from all the exceptions in the chain
+			val msgs = ArrayList<String>()
+			var cause: Throwable? = t
+			while (cause != null) {
+				msgs.add(cause.message ?: t.javaClass.simpleName)
+				cause = cause.cause
+			}
+			messages.add(Message(Message.Type.Error, msgs.joinToString("\n")))
 
 		} finally {
 

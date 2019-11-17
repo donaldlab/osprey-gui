@@ -2,7 +2,6 @@ package edu.duke.cs.ospreygui.forcefield.eef1
 
 import cuchaz.kludge.tools.sqrt
 import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.ospreygui.forcefield.Forcefield

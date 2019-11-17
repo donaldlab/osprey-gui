@@ -1,5 +1,7 @@
 package edu.duke.cs.ospreygui.prep
 
+import cuchaz.kludge.tools.isFinite
+import cuchaz.kludge.tools.toString
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.tools.normalizeZeroToTwoPI
 import edu.duke.cs.ospreygui.io.ConfLib
@@ -143,18 +145,24 @@ class DesignPosition(
 			mol.bonds.add(atoma, atomb)
 		}
 
-		for ((posAnchor, fragAnchor) in anchorMatch.pairs) {
+		try {
+			for ((posAnchor, fragAnchor) in anchorMatch.pairs) {
 
-			// add the anchor bonds
-			posAnchor.bondToAnchors(fragAnchor) { atomInfos, anchorAtom ->
-				for (bondedInfo in atomInfos) {
-					val atom = atomsByInfo.getValue(bondedInfo)
-					mol.bonds.add(anchorAtom, atom)
+				// add the anchor bonds
+				posAnchor.bondToAnchors(fragAnchor) { atomInfos, anchorAtom ->
+					for (bondedInfo in atomInfos) {
+						val atom = atomsByInfo.getValue(bondedInfo)
+						mol.bonds.add(anchorAtom, atom)
+					}
 				}
-			}
 
-			// align the conf coords
-			posAnchor.align(conf.anchorCoords.getValue(fragAnchor))
+				// align the conf coords
+				posAnchor.align(conf.anchorCoords.getValue(fragAnchor))
+			}
+		} catch (ex: IllegalAlignmentException) {
+
+			// add extra information to the exception before passing it along
+			throw IllegalConformationException(this, frag, conf, "Can't set conformation, bad alignment", ex)
 		}
 
 		// set the atom pointer resolver
@@ -395,12 +403,28 @@ class DesignPosition(
 							Vector3d(coords.b).sub(coords.a),
 							Vector3d(coords.c).sub(coords.a)
 						)
+						.apply {
+							if (!isFinite()) {
+								throw IllegalAlignmentException("conformation anchors a,b,c must not be co-linear, or nearly co-linear:\n\t" +
+									listOf("a" to coords.a, "b" to coords.b, "c" to coords.c)
+										.joinToString("\n\t") { (name, pos) -> "$name = ${pos.toString(2)}" }
+								)
+							}
+						}
 						.premul(
 							Quaterniond()
 								.lookAlong(
 									Vector3d(b.pos).sub(a.pos),
 									Vector3d(c.pos).sub(a.pos)
 								)
+								.apply {
+									if (!isFinite()) {
+										throw IllegalAlignmentException("design position anchor atoms a,b,c must not be co-linear, or nearly co-linear:\n\t" +
+											listOf("a" to a, "b" to b, "c" to c)
+												.joinToString("\n\t") { (name, atom) -> "$name = ${atom.name} ${atom.pos.toString(2)}" }
+										)
+									}
+								}
 								.conjugate()
 						)
 				)
@@ -502,11 +526,27 @@ class DesignPosition(
 						Vector3d(coords.b).sub(coords.a),
 						Vector3d(coords.c).sub(coords.a)
 					)
+					.apply {
+						if (!isFinite()) {
+							throw IllegalAlignmentException("conformation anchors a,b,c must not be co-linear, or nearly co-linear:\n\t" +
+								listOf("a" to coords.a, "b" to coords.b, "c" to coords.c)
+									.joinToString("\n\t") { (name, pos) -> "$name = ${pos.toString(2)}" }
+							)
+						}
+					}
 				val posQ = Quaterniond()
 					.lookAlong(
 						Vector3d(b.pos).sub(a.pos),
 						Vector3d(c.pos).sub(a.pos)
 					)
+					.apply {
+						if (!isFinite()) {
+							throw IllegalAlignmentException("design position anchor atoms a,b,c must not be co-linear, or nearly co-linear:\n\t" +
+								listOf("a" to a, "b" to b, "c" to c)
+									.joinToString("\n\t") { (name, atom) -> "$name = ${atom.name} ${atom.pos.toString(2)}" }
+							)
+						}
+					}
 				connectedAtoms.rotate(coordsQ)
 
 				// measure the c->a->b->d dihedral angles in [0,2pi)
@@ -577,4 +617,15 @@ class DesignPosition(
 	// convience shortcuts to emulate inner classes
 	fun anchorSingle(a: Atom, b: Atom, c: Atom) = Anchor.Single(this, a, b, c)
 	fun anchorDouble(a: Atom, b: Atom, c: Atom, d: Atom) = Anchor.Double(this, a, b, c, d)
+
+	class IllegalAlignmentException(msg: String)
+		: IllegalArgumentException("Can't align conformation to anchor:\n$msg")
+
+	class IllegalConformationException(
+		val pos: DesignPosition,
+		val frag: ConfLib.Fragment,
+		val conf: ConfLib.Conf,
+		msg: String,
+		cause: Throwable? = null
+	) : IllegalArgumentException("Design position ${pos.name} can't set conformation:\n\tfragment = ${frag.id}\n\tconformation = ${conf.id}\n$msg", cause)
 }
