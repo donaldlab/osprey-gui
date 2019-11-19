@@ -9,6 +9,7 @@ import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.tools.identityHashMapOf
 import edu.duke.cs.molscope.tools.identityHashSet
+import edu.duke.cs.molscope.tools.mapValuesIdentity
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
@@ -269,7 +270,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			// static atoms are the subset of fixed atoms that don't change forcefield params
 			// collect all the static atoms
 			val staticAtomsByMol = fixedAtoms
-				.mapValues { (_, atoms) ->
+				.mapValuesIdentity { (_, atoms) ->
 					atoms.filter { !it.isDynamic() }
 				}
 

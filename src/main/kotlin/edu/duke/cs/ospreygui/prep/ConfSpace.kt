@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.prep
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.toIdentitySet
+import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
@@ -14,7 +15,7 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 	// TODO: edit the name in the UI somewhere?
 	var name = "Conformation Space"
 
-	val designPositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = HashMap()
+	val designPositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = IdentityHashMap()
 
 	/**
 	 * Collect all the positions for all the molecules in a stable order.
@@ -78,7 +79,7 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 	 */
 	fun fixedAtoms(): Map<Molecule,Set<Atom>> =
 		mols
-			.associate { (_, mol) ->
+			.associateIdentity { (_, mol) ->
 				val posAtoms = (designPositionsByMol[mol]
 					?.flatMap { it.currentAtoms }
 					?: emptyList())

@@ -9,6 +9,7 @@ import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.show
 import io.kotlintest.matchers.beLessThanOrEqualTo
+import io.kotlintest.matchers.types.shouldBeSameInstanceAs
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import io.kotlintest.should
 import io.kotlintest.shouldBe
@@ -549,7 +550,7 @@ class TestMutation : SharedSpec({
 			// build the dihedral angle
 			val chi1 = frag.dofs[0] as ConfLib.DegreeOfFreedom.DihedralAngle
 			pos.dihedralAngle(chi1).run {
-				mol shouldBe pos.mol
+				mol shouldBeSameInstanceAs pos.mol
 				a.name shouldBe "N"
 				b.name shouldBe "CA"
 				c.name shouldBe "CB"
