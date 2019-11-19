@@ -5,6 +5,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
+import java.math.RoundingMode
 import java.util.*
 
 
@@ -65,57 +66,7 @@ abstract class AmberConfSpaceParams(val ffnameOverrides: Map<MoleculeType,Forcef
 		topology ?: throw IllegalStateException("call setMolecules() before calling other methods")
 
 
-	private data class TypesKey(val mol: String, val netCharge: Int?) {
-
-		companion object {
-
-			// TODO: shouldn't this really be some kind of molecule equals() function??
-			//   then we could just make the Molecule itself part of the key rather than this string
-			/**
-			 * Render the molecule into a string we can use as a hash table key.
-			 * The key should uniquely describe the molecule, but be insensitive
-			 * to nuisance factors like atom or bond orders.
-			 */
-			private fun Molecule.toKeyString(): String {
-				val buf = StringBuilder()
-
-				// sort the atoms and positions
-				val sortedAtoms = atoms
-					.sortedBy { it.pos.z }
-					.sortedBy { it.pos.y }
-					.sortedBy { it.pos.x }
-					.sortedBy { it.name }
-				val atomIndices = sortedAtoms
-					.mapIndexed { i, atom -> atom to i }
-					.associate { (atom, i) -> atom to i }
-
-				// write the atoms and positions
-				sortedAtoms.forEach {
-					buf.append("${it.name}_${it.pos.x}_${it.pos.y}_${it.pos.z}\n")
-				}
-
-				// sort the bonds
-				data class Bond(val i1: Int, val i2: Int)
-				val sortedBonds = atoms
-					.flatMap { a1 ->
-						bonds.bondedAtoms(a1).map { a2 ->
-							Bond(atomIndices.getValue(a1), atomIndices.getValue(a2))
-						}
-					}
-					.sortedBy { it.i2 }
-					.sortedBy { it.i1 }
-
-				// write out the bonds
-				sortedBonds.forEach {
-					buf.append("${it.i1}_${it.i2}\n")
-				}
-
-				return buf.toString()
-			}
-		}
-
-		constructor(mol: Molecule, netCharge: Int?) : this(mol.toKeyString(), netCharge)
-	}
+	private data class TypesKey(val mol: Molecule, val netCharge: Int?)
 	private val typesCache = HashMap<TypesKey,AmberTypes>()
 
 	override fun setMolecules(mols: List<Molecule>, smallMolNetCharges: Map<Molecule,Int>) {
@@ -137,7 +88,7 @@ abstract class AmberConfSpaceParams(val ffnameOverrides: Map<MoleculeType,Forcef
 				else -> null to null
 			}
 
-			// get the amber types
+			// get the amber types for the molecule
 			try {
 
 				/* NOTE:
@@ -150,14 +101,42 @@ abstract class AmberConfSpaceParams(val ffnameOverrides: Map<MoleculeType,Forcef
 					same molecules, and re-use them across different conformations of the other molecules.
 				*/
 
-				// check the cache first
-				val types = typesCache.getOrPut(TypesKey(mol, netCharge)) {
+				return@map mol to run {
 
-					// cache miss, run amber to calculate
-					mol.calcTypesAmber(mol.findTypeOrThrow(), ffname, chargeMethod, netCharge)
+					// The tiniest bit of roundoff error in the atom positions (eg 1e-14) will cause cache misses. =(
+					// So truncate the atom positions by a tiny bit of precision loss to compensate.
+					fun Double.truncate() =
+						toBigDecimal()
+							.setScale(14, RoundingMode.HALF_UP)
+							.toDouble()
+					fun Molecule.copyForCache() = copy().apply {
+						for (atom in atoms) {
+							atom.pos.run {
+								x = x.truncate()
+								y = y.truncate()
+								z = z.truncate()
+							}
+						}
+					}
+
+					// check the cache first
+					val key = TypesKey(mol.copyForCache(), netCharge)
+					@Suppress("ReplaceSingleLineLet")
+					typesCache[key]
+						?.let { types ->
+
+							// cache hit, remap to the current molecule
+							types.transferTo(mol)
+
+						}
+						?: run {
+
+							// cache miss, run amber to calculate
+							mol
+								.calcTypesAmber(mol.findTypeOrThrow(), ffname, chargeMethod, netCharge)
+								.also { typesCache[key] = it }
+						}
 				}
-
-				mol to types
 
 			} catch (ex: Antechamber.Exception) {
 

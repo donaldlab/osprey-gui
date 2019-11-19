@@ -35,6 +35,33 @@ data class AmberTypes(
 
 		return metadata
 	}
+
+	/**
+	 * Returns a copy of this class, but keys all the maps
+	 * with equivalent atoms in the destination molecule.
+	 */
+	fun transferTo(dst: Molecule): AmberTypes {
+
+		val dstAtoms = dst.atoms.associateWith { it }
+		fun Atom.match() = dstAtoms[this]
+			?: throw NoSuchElementException("destination molecule doesn't have equivalent atom for $this")
+
+		return AmberTypes(
+			ffnames = ffnames,
+			atomTypes = atomTypes
+				.mapKeys { (srcAtom, _) ->
+					srcAtom.match()
+				},
+			bondTypes = bondTypes
+				.mapKeys { (srcBond, _) ->
+					AtomPair(srcBond.a.match(), srcBond.b.match())
+				},
+			atomCharges = atomCharges
+				.mapKeys { (srcAtom, _) ->
+					srcAtom.match()
+				}
+		)
+	}
 }
 
 /**

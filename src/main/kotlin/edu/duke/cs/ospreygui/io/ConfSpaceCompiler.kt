@@ -267,14 +267,14 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			fun Atom.isDynamic() =
 				dynamicFixedAtoms.values.any { this in it }
 
+			// TODO: if positions share any dynamic fixed atoms, throw an error
+			
 			// static atoms are the subset of fixed atoms that don't change forcefield params
 			// collect all the static atoms
 			val staticAtomsByMol = fixedAtoms
 				.mapValuesIdentity { (_, atoms) ->
 					atoms.filter { !it.isDynamic() }
 				}
-
-			// TODO: if positions share any dynamic fixed atoms, throw an error
 
 			// write out the static atoms in order
 			write("\n")
