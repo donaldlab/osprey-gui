@@ -86,7 +86,7 @@ fun List<MinimizerInfo>.minimize(
 						atomsByIndex.add(atomA)
 					}
 
-					val types = mol.calcTypesAmber(moltype.defaultForcefieldNameOrThrow)
+					val types = mol.calcTypesAmber(moltype)
 
 					mol.calcModsAmber(types)?.let { frcmods.add(it) }
 

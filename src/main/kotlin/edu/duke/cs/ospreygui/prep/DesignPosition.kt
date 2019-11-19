@@ -122,7 +122,11 @@ class DesignPosition(
 		// update the current atoms with the newly added atoms
 		val atomsByInfo = IdentityHashMap<ConfLib.AtomInfo,Atom>()
 		for ((posAnchor, fragAnchor) in anchorMatch.pairs) {
+
+			// update the residue type, if needed
 			val res = posAnchor.findResidue()
+			res?.type = frag.type
+
 			for (atomInfo in frag.getAtomsFor(fragAnchor)) {
 
 				// make the atom

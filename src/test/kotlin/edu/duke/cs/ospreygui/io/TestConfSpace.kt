@@ -120,36 +120,37 @@ fun makeTestConfSpace(): ConfSpace {
 			// add a mutation
 			mutations.add("BAR")
 
-			// make a fragment with a silly oxygen triangle
-			val ha1 = ConfLib.AtomInfo(1, "OA1", Element.Oxygen)
-			val ha2 = ConfLib.AtomInfo(2, "OA2", Element.Oxygen)
+			// make a fragment from a hydroxyl group
+			val ob = ConfLib.AtomInfo(1, "OB", Element.Oxygen)
+			val hb = ConfLib.AtomInfo(2, "HB", Element.Hydrogen)
 			val anchor = ConfLib.Anchor.Single(
 				id = 1,
-				bonds = listOf(ha1, ha2)
+				bonds = listOf(ob)
 			)
 			val bar = ConfLib.Fragment(
 				id = "bar",
 				name = "Bar",
 				type = "BAR",
-				atoms = listOf(ha1, ha2),
-				bonds = listOf(ConfLib.Bond(ha1, ha2)),
+				atoms = listOf(ob, hb),
+				bonds = listOf(ConfLib.Bond(ob, hb)),
 				anchors = listOf(anchor),
 				confs = mapOf(
 					"bar1" to ConfLib.Conf(
 						id = "bar1",
 						name = "Bar 1",
 						description = null,
+						// NOTE: coords borrowed from tyrosine hydroxyl group
 						coords = identityHashMapOf(
 							// none of the actual coords matter at all
-							ha1 to Vector3d(1.0, 2.0, 3.0),
-							ha2 to Vector3d(4.0, 5.0, 6.0)
+							ob to Vector3d(-0.131, -6.026, 1.092),
+							hb to Vector3d(0.132, -6.557, 1.849)
 						),
 						anchorCoords = identityHashMapOf(
 							anchor to ConfLib.AnchorCoords.Single(
 								// NOTE: don't make anchor atoms co-linear
-								a = Vector3d(1.2, 1.3, 1.4),
-								b = Vector3d(2.2, 2.3, 2.4),
-								c = Vector3d(3.2, 3.3, 0.4)
+								a = Vector3d(0.378, -4.766, 1.126), // CZ
+								b = Vector3d(1.192, -4.367, 2.193), // CE1
+								c = Vector3d(0.086, -3.866, 0.093) // CE2
 							)
 						)
 					),
@@ -157,17 +158,19 @@ fun makeTestConfSpace(): ConfSpace {
 						id = "bar2",
 						name = "Bar 2",
 						description = "Bar 2 description, yup",
+						// NOTE: coords borrowed from tyrosine hydroxyl group,
+						// but HB is perturbed slightly
 						coords = identityHashMapOf(
 							// none of the actual coords matter at all
-							ha1 to Vector3d(1.5, 2.5, 3.5),
-							ha2 to Vector3d(4.5, 5.5, 6.5)
+							ob to Vector3d(-0.131, -6.026, 1.092),
+							hb to Vector3d(0.232, -6.457, 1.949)
 						),
 						anchorCoords = identityHashMapOf(
 							anchor to ConfLib.AnchorCoords.Single(
 								// NOTE: don't make anchor atoms co-linear
-								a = Vector3d(4.2, 4.3, 4.4),
-								b = Vector3d(5.2, 5.3, 5.4),
-								c = Vector3d(6.2, 6.3, 3.4)
+								a = Vector3d(0.378, -4.766, 1.126), // CZ
+								b = Vector3d(1.192, -4.367, 2.193), // CE1
+								c = Vector3d(0.086, -3.866, 0.093) // CE2
 							)
 						)
 					)

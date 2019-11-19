@@ -32,7 +32,7 @@ class MoleculeMapper(val src: Molecule, val dst: Molecule) {
 	fun mapAtom(srcAtom: Atom): Atom? {
 
 		return if (src is Polymer) {
-			val srcRes = src.findResidueOrThrow(srcAtom)
+			val srcRes = src.findResidue(srcAtom) ?: return null
 			val dstRes = mapResidue(srcRes)
 			dstRes.atoms.find { it.name == srcAtom.name }
 		} else {

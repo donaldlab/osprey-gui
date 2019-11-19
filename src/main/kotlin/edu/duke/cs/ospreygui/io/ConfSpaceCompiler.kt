@@ -4,13 +4,17 @@ import cuchaz.kludge.tools.x
 import cuchaz.kludge.tools.y
 import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.tools.identityHashMapOf
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
+import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
+import edu.duke.cs.ospreygui.forcefield.amber.findTypeOrThrow
 import edu.duke.cs.ospreygui.prep.ConfSpace
+import edu.duke.cs.ospreygui.prep.DesignPosition
 import org.joml.Vector3dc
 import java.util.*
 import kotlin.collections.ArrayList
@@ -37,9 +41,117 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			.map { it.forcefield }
 
 
+	inner class NetCharges(val smallMol: Molecule) {
+
+		/** The net charge of the unmodified molecule */
+		var netCharge: Int? = null
+
+		val netChargeOrThrow get() =
+			netCharge ?: throw IllegalStateException("small molecule $smallMol needs a net charge")
+
+		private val charges = IdentityHashMap<DesignPosition,IdentityHashMap<ConfLib.Fragment,Int>>()
+
+		operator fun get(pos: DesignPosition, frag: ConfLib.Fragment) =
+			charges.getOrPut(pos) { IdentityHashMap() }.get(frag)
+
+		fun getOrThrow(pos: DesignPosition, frag: ConfLib.Fragment): Int =
+			this[pos, frag]
+				?: throw NoSuchElementException("small molecule $smallMol needs a net charge for fragment ${frag.id} at design position ${pos.name}")
+
+		operator fun set(pos: DesignPosition, frag: ConfLib.Fragment, charge: Int?) {
+			charges.getOrPut(pos) { IdentityHashMap() }.let {
+				if (charge != null) {
+					it[frag] = charge
+				} else {
+					it.remove(frag)
+				}
+			}
+		}
+	}
+	val smallMolNetCharges: MutableMap<Molecule,NetCharges> = IdentityHashMap()
+
+	private fun getSmallMolNetChargesWhenNeeded(mol: Molecule): NetCharges? =
+		when (mol.findTypeOrThrow()) {
+
+			MoleculeType.SmallMolecule -> {
+				// small molecule, need net charges
+				smallMolNetCharges[mol]
+					?: throw NoSuchElementException("Small molecule $mol has no net charges configured")
+			}
+
+			// not a small molecule, no net charges needed
+			else -> null
+		}
+
+	/**
+	 * Get the net charges for small molecules before any conformational changes.
+	 */
+	private fun getSmallMolNetCharges(mols: List<Molecule>) =
+		IdentityHashMap<Molecule,Int>().apply {
+
+			for (mol in mols) {
+				getSmallMolNetChargesWhenNeeded(mol)?.let { netCharges ->
+					this[mol] = netCharges.netChargeOrThrow
+				}
+			}
+		}
+
+	/**
+	 * Get the net charges for small molecules after setting a
+	 * design position to a conformation from the given fragment.
+	 */
+	private fun getSmallMolNetCharges(mols: List<Molecule>, pos: DesignPosition, frag: ConfLib.Fragment) =
+		IdentityHashMap<Molecule,Int>().apply {
+
+			// start with the original net charges
+			putAll(getSmallMolNetCharges(mols))
+
+			getSmallMolNetChargesWhenNeeded(pos.mol)?.let { netCharges ->
+				// overwrite with the modified net charge
+				this[pos.mol] = netCharges.getOrThrow(pos, frag)
+			}
+		}
+
+	/**
+	 * Get the net charges for small molecules after setting two
+	 * design positions to conformations from the given fragments.
+	 */
+	private fun getSmallMolNetCharges(mols: List<Molecule>, pos1: DesignPosition, frag1: ConfLib.Fragment, pos2: DesignPosition, frag2: ConfLib.Fragment) =
+		IdentityHashMap<Molecule,Int>().apply {
+
+			// start with the original net charges
+			putAll(getSmallMolNetCharges(mols))
+
+			// do the two positions modify the same molecule?
+			if (pos1.mol === pos2.mol) {
+
+				// yup, get the net charge for both changes at once
+				val mol = pos1.mol
+				getSmallMolNetChargesWhenNeeded(mol)?.let { netCharges ->
+
+					// overwrite with the modified net charge
+					val charge1 = netCharges.getOrThrow(pos1, frag1)
+					val charge2 = netCharges.getOrThrow(pos2, frag2)
+					this[mol] = charge1 + charge2 - 2*netCharges.netChargeOrThrow
+				}
+
+			} else {
+
+				// nope, apply the two charges separately
+				getSmallMolNetChargesWhenNeeded(pos1.mol)?.let { netCharges ->
+					this[pos1.mol] = netCharges.getOrThrow(pos1, frag1)
+				}
+				getSmallMolNetChargesWhenNeeded(pos2.mol)?.let { netCharges ->
+					this[pos2.mol] = netCharges.getOrThrow(pos2, frag2)
+				}
+			}
+		}
+
+
 	data class Message(
 		val type: Type,
-		val message: String
+		val message: String,
+		val extraInfo: String? = null
 	) {
 
 		enum class Type {
@@ -51,7 +163,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			"$type: $message"
 	}
 
-	private class CompilerError(val msg: String) : RuntimeException(msg)
+	private class CompilerError(val msg: String, val extraInfo: String? = null) : RuntimeException(msg)
 
 	data class Report(
 		val messages: List<Message>,
@@ -60,6 +172,18 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		val warnings get() = messages.filter { it.type == Message.Type.Warning }
 		val errors get() = messages.filter { it.type == Message.Type.Error }
+	}
+
+	/**
+	 * Add extra context to exceptions,
+	 * so the compiler errors are more useful.
+	 */
+	inline fun <R> infoOnException(info: String, block: () -> R): R {
+		try {
+			return block()
+		} catch (t: Throwable) {
+			throw RuntimeException(info, t)
+		}
 	}
 
 	/**
@@ -93,6 +217,9 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			// TODO: issues warnings/errors for:
 			//   missing forcefield params
 
+			// TODO: setMolecules() is pretty slow for amber,
+			//   need to show progress information to the user somehow
+
 			// get the authoritative list of conf space positions in order
 			val positions = confSpace.positions()
 
@@ -106,17 +233,31 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			val fixedAtoms = confSpace.fixedAtoms()
 			val analyses = ffparams
 				.associateWith { ff ->
-					ff.setMolecules(allMols)
+
+					// setMolecules() is especially error-prone since it does most of the forcefield parameterization
+					infoOnException("Can't parameterize original molecules") {
+						ff.setMolecules(allMols, getSmallMolNetCharges(allMols))
+					}
+
 					ff.analyze(fixedAtoms)
 				}
 
 			// then look through all the confs to find the changed atoms
+			// TODO: partial charges vary a lot for small molecules in different conformations!
+			//   need to limit the change propagation somehow,
+			//   otherwise dynamic fixed atoms from multiple design positions will probably overlap!
 			val dynamicFixedAtoms = positions
 				.associateWith { pos ->
 					val changedAtoms = identityHashSet<Atom>()
 					confSpace.forEachConf(pos) { frag, conf ->
 						for ((ff, analysis) in analyses) {
-							ff.setMolecules(allMols)
+
+							// setMolecules() is especially error-prone since it does most of the forcefield parameterization
+							infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id}") {
+								ff.setMolecules(allMols, getSmallMolNetCharges(allMols, pos, frag))
+							}
+
+							ff.analyze(fixedAtoms)
 							changedAtoms.addAll(analysis.findChangedAtoms(ff.analyze(fixedAtoms)))
 						}
 					}
@@ -244,7 +385,12 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						pos.name, frag.id, conf.id
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
-						ff.setMolecules(listOf(pos.mol))
+
+						// setMolecules() is especially error-prone since it does most of the forcefield parameterization
+						infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id}") {
+							ff.setMolecules(listOf(pos.mol), getSmallMolNetCharges(allMols, pos, frag))
+						}
+
 						write("%d = %f\n",
 							ffi,
 							confAtoms
@@ -260,7 +406,12 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						pos.name, frag.id, conf.id
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
-						ff.setMolecules(allMols)
+
+						// setMolecules() is especially error-prone since it does most of the forcefield parameterization
+						infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id}") {
+							ff.setMolecules(allMols, getSmallMolNetCharges(allMols, pos, frag))
+						}
+
 						write("%d = [\n", ffi)
 						ForcefieldParams.forEachPair(confAtomsByMol, staticAtomsByMol) { cmol, catom, smol, satom, dist ->
 							ff.pairParams(cmol, catom, smol, satom, dist)?.let { params ->
@@ -292,7 +443,12 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 							)
 							for ((ffi, ff) in ffparams.withIndex()) {
 								write("%d = [\n", ffi)
-								ff.setMolecules(listOf(pos.mol, posb.mol))
+
+								// setMolecules() is especially error-prone since it does most of the forcefield parameterization
+								infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id} and ${posb.name} is ${fragb.id}:${confb.id}") {
+									ff.setMolecules(listOf(pos.mol, posb.mol), getSmallMolNetCharges(allMols, pos, frag, posb, fragb))
+								}
+
 								ForcefieldParams.forEachPair(confAtomsByMol, posbAtomsByMol) { mola, atoma, molb, atomb, dist ->
 									ff.pairParams(mola, atoma, molb, atomb, dist)?.let { params ->
 
@@ -340,7 +496,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		} catch (err: CompilerError) {
 
-			messages.add(Message(Message.Type.Error, err.msg))
+			messages.add(Message(Message.Type.Error, err.msg, err.extraInfo))
 
 		} catch (t: Throwable) {
 
@@ -348,12 +504,16 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 			// collect all the error messages from all the exceptions in the chain
 			val msgs = ArrayList<String>()
-			var cause: Throwable? = t
+			var cause: Throwable? = t.cause
 			while (cause != null) {
-				msgs.add(cause.message ?: t.javaClass.simpleName)
+				msgs.add(cause.message ?: cause.javaClass.simpleName)
 				cause = cause.cause
 			}
-			messages.add(Message(Message.Type.Error, msgs.joinToString("\n")))
+			messages.add(Message(
+				Message.Type.Error,
+				t.message ?: t.javaClass.simpleName,
+				msgs.joinToString("\n")
+			))
 
 		} finally {
 

@@ -31,7 +31,6 @@ class TestParams : SharedSpec({
 		// skip the first line of the topology file, since it has a timestamp
 		this.top.skipFirstLine() shouldBe top.skipFirstLine()
 		this.crd shouldBe crd
-
 	}
 
 	group("1cc8") {
@@ -42,7 +41,7 @@ class TestParams : SharedSpec({
 
 			test("types") {
 
-				val types = mol.calcTypesAmber(ForcefieldName.ff96)
+				val types = mol.calcTypesAmber(MoleculeType.Protein, ForcefieldName.ff96)
 
 				// check the atom types against the amber94 atom types for amino acids
 				
@@ -436,7 +435,7 @@ class TestParams : SharedSpec({
 
 			test("mods") {
 
-				val types = mol.calcTypesAmber(ForcefieldName.ff96)
+				val types = mol.calcTypesAmber(MoleculeType.Protein, ForcefieldName.ff96)
 				val frcmod = mol.calcModsAmber(types)
 
 				frcmod shouldBe null
@@ -444,7 +443,7 @@ class TestParams : SharedSpec({
 
 			test("params") {
 
-				val types = mol.calcTypesAmber(ForcefieldName.ff96)
+				val types = mol.calcTypesAmber(MoleculeType.Protein, ForcefieldName.ff96)
 				val params = mol.calcParamsAmber(types)
 
 				params.assert(
@@ -460,7 +459,7 @@ class TestParams : SharedSpec({
 
 			test("types") {
 
-				val types = mol.calcTypesAmber(ForcefieldName.gaff2)
+				val types = mol.calcTypesAmber(MoleculeType.SmallMolecule, ForcefieldName.gaff2)
 
 				mol.atoms.assertType(types, "C1", "ca")
 				mol.atoms.assertType(types, "C2", "ca")
@@ -482,7 +481,7 @@ class TestParams : SharedSpec({
 
 			test("mods") {
 
-				val types = AmberTypes(listOf(ForcefieldName.gaff2), metadata.atomTypes, metadata.bondTypes)
+				val types = AmberTypes(listOf(ForcefieldName.gaff2), metadata)
 				val frcmod = mol.calcModsAmber(types)
 
 				frcmod shouldBe OspreyGui.getResourceAsString("benzamidine.h.frcmod")
@@ -490,7 +489,7 @@ class TestParams : SharedSpec({
 
 			test("params") {
 
-				val types = AmberTypes(listOf(ForcefieldName.gaff2), metadata.atomTypes, metadata.bondTypes)
+				val types = AmberTypes(listOf(ForcefieldName.gaff2), metadata)
 				val frcmod = OspreyGui.getResourceAsString("benzamidine.h.frcmod")
 				val params = mol.calcParamsAmber(types, listOf(frcmod))
 
@@ -506,8 +505,8 @@ class TestParams : SharedSpec({
 			val (molProtein, metadataProtein) = Molecule.fromMol2WithMetadata(OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"))
 			val (molSmall, metadataSmall) = Molecule.fromMol2WithMetadata(OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"))
 
-			val typesProtein = AmberTypes(listOf(ForcefieldName.ff96), metadataProtein.atomTypes, metadataProtein.bondTypes)
-			val typesSmall = AmberTypes(listOf(ForcefieldName.gaff2), metadataSmall.atomTypes, metadataSmall.bondTypes)
+			val typesProtein = AmberTypes(listOf(ForcefieldName.ff96), metadataProtein)
+			val typesSmall = AmberTypes(listOf(ForcefieldName.gaff2), metadataSmall)
 
 			val molsAndTypes = listOf(
 				molProtein to typesProtein,

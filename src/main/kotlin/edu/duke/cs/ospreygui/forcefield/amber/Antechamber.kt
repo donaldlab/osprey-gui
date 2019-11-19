@@ -16,7 +16,8 @@ object Antechamber {
 	data class Results(
 		val exitCode: Int,
 		val console: List<String>,
-		val mol2: String?
+		val mol2: String?,
+		val sqm: SQM.Results?
 	)
 
 	enum class InType(val id: String) {
@@ -32,7 +33,24 @@ object Antechamber {
 		SYBYL("sybyl")
 	}
 
-	fun run(inmol: String, inType: InType, atomTypes: AtomTypes, useACDoctor: Boolean = true): Results {
+	enum class ChargeMethod(val id: String) {
+		RESP("resp"),
+		AM1BCC("bcc"),
+		CM1("cm1"),
+		CM2("cm2"),
+		ESP("esp"),
+		Mulliken("mul"),
+		Gasteiger("gas")
+	}
+
+	fun run(
+		inmol: String,
+		inType: InType,
+		atomTypes: AtomTypes,
+		useACDoctor: Boolean = true,
+		generateCharges: ChargeMethod? = null,
+		netCharge: Int? = null
+	): Results {
 
 		// make sure antechamber is available for this platform
 		if (!antechamberPath.exists) {
@@ -44,17 +62,25 @@ object Antechamber {
 			// write the input files
 			inmol.write(cwd.resolve("mol.in"))
 
+			val command = mutableListOf(
+				antechamberPath.toString(),
+				"-i", "mol.in",
+				"-fi", inType.id,
+				"-o", "mol.mol2",
+				"-fo", "mol2",
+				"-at", atomTypes.id,
+				"-dr", if (useACDoctor) "y" else "n"
+			)
+			if (generateCharges != null) {
+				command += listOf("-c", generateCharges.id)
+			}
+			if (netCharge != null) {
+				command += listOf("-nc", netCharge.toString())
+			}
+
 			// start antechamber
 			val process = ProcessBuilder()
-				.command(
-					antechamberPath.toString(),
-					"-i", "mol.in",
-					"-fi", inType.id,
-					"-o", "mol.mol2",
-					"-fo", "mol2",
-					"-at", atomTypes.id,
-					"-dr", if (useACDoctor) "y" else "n"
-				)
+				.command(command)
 				.apply {
 					environment().apply {
 						put("AMBERHOME", homePath.toString())
@@ -72,6 +98,15 @@ object Antechamber {
 					cwd.resolve("mol.mol2").read()
 				} catch (ex: IOException) {
 					null
+				},
+				// read results from SQM, if any
+				try {
+					SQM.Results(
+						cwd.resolve("sqm.in").read(),
+						cwd.resolve("sqm.out").read()
+					)
+				} catch (ex: IOException) {
+					null
 				}
 			)
 		}
@@ -87,6 +122,11 @@ object Antechamber {
 		results.console.forEach {
 			append(it)
 			append("\n")
+		}
+		if (results.sqm != null) {
+			append("\n\n")
+			append("SQM:\n")
+			append(results.sqm)
 		}
 	}.toString())
 }

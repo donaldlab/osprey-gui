@@ -14,7 +14,13 @@ object Leap {
 		val exitCode: Int,
 		val console: List<String>,
 		val files: Map<String,String?>
-	)
+	) {
+
+		/* TODO: scan the console outfor for errors/warnings/etc
+		     apparently LEaP *does* use consistent tagging in the output.
+		     See: Amber manual 13.5, Error Handling and Reporting
+		*/
+	}
 
 	fun run(
 		filesToWrite: Map<String,String>,

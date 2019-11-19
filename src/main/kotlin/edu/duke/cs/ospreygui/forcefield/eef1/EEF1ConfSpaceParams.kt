@@ -33,7 +33,7 @@ class EEF1ConfSpaceParams : ForcefieldParams {
 	private val atomTypesOrThrow get() =
 		atomTypes ?: throw IllegalStateException("call setMolecules() before calling other methods")
 
-	override fun setMolecules(mols: List<Molecule>) {
+	override fun setMolecules(mols: List<Molecule>, smallMolNetCharges: Map<Molecule,Int>) {
 		atomTypes = ForcefieldParams.AtomParams<EEF1.AtomType?>().apply {
 			for (mol in mols) {
 				for (atom in mol.atoms) {

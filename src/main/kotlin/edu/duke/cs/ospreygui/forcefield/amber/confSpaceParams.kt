@@ -50,6 +50,13 @@ abstract class AmberConfSpaceParams(val ffnameOverrides: Map<MoleculeType,Forcef
 	 */
 	var vdwScale = 0.95
 
+	/**
+	 * Method to generate partial charges for small molecules.
+	 *
+	 * The default AM1BCC method is currently recommended by Amber for most purposes.
+	 */
+	var chargeMethod = Antechamber.ChargeMethod.AM1BCC
+
 	// TODO: expose the above options for configuration somewhere?
 
 
@@ -57,7 +64,61 @@ abstract class AmberConfSpaceParams(val ffnameOverrides: Map<MoleculeType,Forcef
 	private val topologyOrThrow get() =
 		topology ?: throw IllegalStateException("call setMolecules() before calling other methods")
 
-	override fun setMolecules(mols: List<Molecule>) {
+
+	private data class TypesKey(val mol: String, val netCharge: Int?) {
+
+		companion object {
+
+			// TODO: shouldn't this really be some kind of molecule equals() function??
+			//   then we could just make the Molecule itself part of the key rather than this string
+			/**
+			 * Render the molecule into a string we can use as a hash table key.
+			 * The key should uniquely describe the molecule, but be insensitive
+			 * to nuisance factors like atom or bond orders.
+			 */
+			private fun Molecule.toKeyString(): String {
+				val buf = StringBuilder()
+
+				// sort the atoms and positions
+				val sortedAtoms = atoms
+					.sortedBy { it.pos.z }
+					.sortedBy { it.pos.y }
+					.sortedBy { it.pos.x }
+					.sortedBy { it.name }
+				val atomIndices = sortedAtoms
+					.mapIndexed { i, atom -> atom to i }
+					.associate { (atom, i) -> atom to i }
+
+				// write the atoms and positions
+				sortedAtoms.forEach {
+					buf.append("${it.name}_${it.pos.x}_${it.pos.y}_${it.pos.z}\n")
+				}
+
+				// sort the bonds
+				data class Bond(val i1: Int, val i2: Int)
+				val sortedBonds = atoms
+					.flatMap { a1 ->
+						bonds.bondedAtoms(a1).map { a2 ->
+							Bond(atomIndices.getValue(a1), atomIndices.getValue(a2))
+						}
+					}
+					.sortedBy { it.i2 }
+					.sortedBy { it.i1 }
+
+				// write out the bonds
+				sortedBonds.forEach {
+					buf.append("${it.i1}_${it.i2}\n")
+				}
+
+				return buf.toString()
+			}
+		}
+
+		constructor(mol: Molecule, netCharge: Int?) : this(mol.toKeyString(), netCharge)
+	}
+	private val typesCache = HashMap<TypesKey,AmberTypes>()
+
+	override fun setMolecules(mols: List<Molecule>, smallMolNetCharges: Map<Molecule,Int>) {
 
 		// calc all the amber types
 		val molsAndTypes = mols.map { mol ->
@@ -66,8 +127,84 @@ abstract class AmberConfSpaceParams(val ffnameOverrides: Map<MoleculeType,Forcef
 			val type = mol.findTypeOrThrow()
 			val ffname = ffnameOverrides[type] ?: type.defaultForcefieldNameOrThrow
 
+			// get charge generation settings if small molecule
+			val molType = mol.findTypeOrThrow()
+			val (chargeMethod, netCharge) = when (molType) {
+				MoleculeType.SmallMolecule -> {
+					chargeMethod to (smallMolNetCharges[mol]
+						?: throw IllegalStateException("No net charge set for small molecule: $mol"))
+				}
+				else -> null to null
+			}
+
 			// get the amber types
-			mol to mol.calcTypesAmber(ffname)
+			try {
+
+				/* NOTE:
+					This function gets called several times for each conformation single and pair.
+					Computing Amber types can be somewhat slow, especially if we have to call
+					antechamber (and sqm) for a small molecule.
+					If there are multiple molecules, we'll end up parameterizing the exact same small molecule
+					conformations several times while we iterate over conformations of other molecules.
+					So, to speed things up, we can cache the amber types between instances of the exact
+					same molecules, and re-use them across different conformations of the other molecules.
+				*/
+
+				// check the cache first
+				val types = typesCache.getOrPut(TypesKey(mol, netCharge)) {
+
+					// cache miss, run amber to calculate
+					mol.calcTypesAmber(mol.findTypeOrThrow(), ffname, chargeMethod, netCharge)
+				}
+
+				mol to types
+
+			} catch (ex: Antechamber.Exception) {
+
+				fun List<Pair<SQM.ErrorType,String>>.format(): String {
+					val buf = StringBuffer()
+					for ((errType, errMsg) in this) {
+
+						buf.append("\n")
+
+						// show the error message
+						errMsg
+							.split("\n")
+							.forEachIndexed { i, line ->
+								if (i == 0) {
+									buf.append(" * $line\n")
+								} else {
+									buf.append("   $line\n")
+								}
+							}
+
+						// suggest potential fixes
+						val suggestedFix = when (errType) {
+							SQM.ErrorType.NoConvergence ->
+								"Maybe try fixing issues with molecule chmesitry or structure?"
+							SQM.ErrorType.BadNetCharge ->
+								"Try changing the net charge for this conformation?"
+						}
+						buf.append("TO FIX: $suggestedFix\n")
+					}
+					return buf.toString()
+				}
+
+				// parameterizing small molecules is especially error-prone
+				// since we need to call SQM to compute the partial charges
+				// if SQM failed, try to give a friendly(er) error message to the user
+				ex.results.sqm
+					?.takeIf { it.errors.isNotEmpty() }
+					?.let {
+						throw RuntimeException("""
+							|Can't generate partial charges for $mol
+							|SQM failed with errors:
+							|${it.errors.format()}
+						""".trimMargin(), ex)
+					}
+					// if we got here, we didn't parse any errors from sqm, so just re-throw the original exception
+					?: throw ex
+			}
 		}
 
 		// calculate any frcmods we may need
@@ -78,9 +215,6 @@ abstract class AmberConfSpaceParams(val ffnameOverrides: Map<MoleculeType,Forcef
 		// calculate the amber "topology" which has the real forcefield parameters in it
 		val params = molsAndTypes.calcParamsAmber(frcmods)
 		val top = TopIO.read(params.top)
-
-		// TEMP
-		println("num distinct charges: ${top.charges.toSet().size}")
 
 		// read the amber forcefield params from the toplogy file
 		topology = top.mapTo(mols)

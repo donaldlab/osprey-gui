@@ -1,17 +1,20 @@
 package edu.duke.cs.ospreygui.forcefield.amber
 
 import edu.duke.cs.molscope.molecule.*
-import edu.duke.cs.ospreygui.io.Mol2Metadata
-import edu.duke.cs.ospreygui.io.fromMol2WithMetadata
-import edu.duke.cs.ospreygui.io.toMol2
+import edu.duke.cs.molscope.tools.associateIdentity
+import edu.duke.cs.ospreygui.io.*
 import java.util.*
 
 
 data class AmberTypes(
 	val ffnames: List<ForcefieldName>,
 	val atomTypes: Map<Atom,String>,
-	val bondTypes: Map<AtomPair,String>
+	val bondTypes: Map<AtomPair,String>,
+	val atomCharges: Map<Atom,String>
 ) {
+
+	constructor(ffnames: List<ForcefieldName>, mol2Metadata: Mol2Metadata)
+		: this(ffnames, mol2Metadata.atomTypes, mol2Metadata.bondTypes, mol2Metadata.atomCharges)
 
 	fun toMol2Metadata(mol: Molecule): Mol2Metadata {
 
@@ -20,12 +23,7 @@ data class AmberTypes(
 		// copy over the atom and bond types
 		metadata.atomTypes.putAll(atomTypes)
 		metadata.bondTypes.putAll(bondTypes)
-
-		// use defaults for everything else
-
-		for (atom in mol.atoms) {
-			metadata.atomCharges[atom] = Mol2Metadata.defaultCharge
-		}
+		metadata.atomCharges.putAll(atomCharges)
 
 		if (mol is Polymer) {
 			for (chain in mol.chains) {
@@ -39,73 +37,113 @@ data class AmberTypes(
 	}
 }
 
-fun Molecule.calcTypesAmber(ffname: ForcefieldName): AmberTypes {
+/**
+ * Calculate Amber types for atoms and bonds.
+ * Pass values to `chargeMethod` and `netCharge` to calculate partial charges for small molecules as well.
+ */
+fun Molecule.calcTypesAmber(
+	molType: MoleculeType,
+	ffname: ForcefieldName = molType.defaultForcefieldNameOrThrow,
+	chargeMethod: Antechamber.ChargeMethod? = null,
+	netCharge: Int? = null
+): AmberTypes {
 
 	val dst = this
 
-	// run antechamber to infer all the atom and bond types
-	val inMol2 = dst.toMol2()
+	val (srcMetadata, atomMap) = when (molType) {
 
-	val antechamberResults = Antechamber.run(
-		inMol2,
-		Antechamber.InType.Mol2,
-		ffname.atomTypesOrThrow,
-		useACDoctor = false
-	)
-	val outMol2 = antechamberResults.mol2
-		?: throw Antechamber.Exception("Antechamber didn't produce an output molecule", inMol2, antechamberResults)
+		// use antechamber to get types for small molecules
+		MoleculeType.SmallMolecule -> {
 
-	val (src, srcMetadata) = Molecule.fromMol2WithMetadata(outMol2)
+			val inMol2 = dst.toMol2()
 
-	// HACKHACK: sometimes Antechamber gets the types wrong for proteins
-	// no idea why this happens, but just overwrite with the correct answer for these cases
-	// TODO: maybe there's a less hacky way to resolve this issue?
-	when (ffname.atomTypes) {
-		Antechamber.AtomTypes.Amber -> {
+			val antechamberResults = Antechamber.run(
+				inMol2,
+				Antechamber.InType.Mol2,
+				ffname.atomTypesOrThrow,
+				useACDoctor = false,
+				generateCharges = chargeMethod,
+				netCharge = netCharge
+			)
 
-			// make sure all the TYR CZ atoms have type C instead of CA
-			if (dst is Polymer) {
-				for (chain in dst.chains) {
-					chain.residues
-						.filter { it.type.toUpperCase() == "TYR" }
-						.forEach { tyr ->
+			// read the resulting mol2 file
+			val outMol2 = antechamberResults.mol2
+				?: throw Antechamber.Exception("Antechamber didn't produce an output molecule", inMol2, antechamberResults)
+			val (src, srcMetadata) = Molecule.fromMol2WithMetadata(outMol2)
 
-							tyr.atoms
-								.find { it.name.toUpperCase() == "CZ" }
-								?.let { dstAtom ->
-									val srcAtom = src.atoms[dst.atoms.indexOf(dstAtom)]
-									if (srcMetadata.atomTypes[srcAtom] == "CA") {
-										srcMetadata.atomTypes[srcAtom] = "C"
-									}
-								}
-						}
-				}
+			// Tragically, we antechamber doesn't write the residue info back into the mol2 file,
+			// so we can't use our usual MoleculeMapper to do the atom mapping here.
+			// Thankfully, the atom order is preserved, so we can use that to do the mapping instead.
+			// val mapper = src.mapTo(dst)
+			srcMetadata to src.atoms.associateIdentity { srcAtom ->
+				srcAtom to dst.atoms[src.atoms.indexOf(srcAtom)]
 			}
 		}
-		else -> Unit
+
+		// for everything else, use LEaP
+		else -> {
+
+			val pdb = dst.toPDB()
+
+			val results = Leap.run(
+				filesToWrite = mapOf("in.pdb" to pdb),
+				commands = """
+					|verbosity 2
+					|source leaprc.${ffname.name}
+					|mol = loadPDB in.pdb
+					|saveMol2 mol out.mol2 1
+				""".trimMargin(),
+				filesToRead = listOf("out.mol2")
+			)
+
+			val outMol2 = results.files["out.mol2"]
+				?: throw Leap.Exception("LEaP didn't produce an output molecule", pdb, results)
+			val (src, srcMetadata) = Molecule.fromMol2WithMetadata(outMol2)
+
+			// check for unmapped atoms with the dst->src mapping
+			MoleculeMapper(dst, src)
+				.let { dstToSrc ->
+					dst.atoms.filter { dstToSrc.mapAtom(it) == null }
+				}
+				.takeIf { it.isNotEmpty() }
+				?.map { atom ->
+					// get descriptive info for the atom
+					(dst as? Polymer)
+						?.findChainAndResidue(atom)
+						?.let { (chain, res) ->
+							"${atom.name} @ ${chain.id}${res.id}"
+						}
+						?: atom.name
+				}
+				?.let { unmappedAtoms ->
+					throw Leap.Exception("LEaP didn't generate atom info for ${unmappedAtoms.size} atom(s):\n$unmappedAtoms", pdb, results)
+				}
+
+			// use the molecule mapper to map the metadata back with the src->dst mapping
+			val srcToDst = MoleculeMapper(src, dst)
+			srcMetadata to src.atoms.associateIdentity { srcAtom ->
+				srcAtom to srcToDst.mapAtom(srcAtom)
+			}
+		}
 	}
 
-	// Tragically, we antechamber doesn't write the residue info back into the mol2 file,
-	// so we can't use our usual MoleculeMapper to do the atom mapping here.
-	// Thankfully, the atom order is preserved, so we can use that to do the mapping instead.
-	// val mapper = src.mapTo(dst)
-	val atomMap = src.atoms.associateWithTo(IdentityHashMap()) { srcAtom ->
-		dst.atoms[src.atoms.indexOf(srcAtom)]
-	}
-
-	// translate the atoms back
+	// translate the metadata back
 	val dstMetadata = Mol2Metadata()
 	for ((srcAtom, type) in srcMetadata.atomTypes) {
-		val dstAtom = atomMap.getValue(srcAtom)
+		val dstAtom = atomMap.getValue(srcAtom) ?: continue
 		dstMetadata.atomTypes[dstAtom] = type
 	}
 	for ((srcBond, type) in srcMetadata.bondTypes) {
-		val dsta = atomMap.getValue(srcBond.a)
-		val dstb = atomMap.getValue(srcBond.b)
+		val dsta = atomMap.getValue(srcBond.a) ?: continue
+		val dstb = atomMap.getValue(srcBond.b) ?: continue
 		dstMetadata.bondTypes[AtomPair(dsta, dstb)] = type
 	}
+	for ((srcAtom, charge) in srcMetadata.atomCharges) {
+		val dstAtom = atomMap.getValue(srcAtom) ?: continue
+		dstMetadata.atomCharges[dstAtom] = charge
+	}
 
-	return AmberTypes(listOf(ffname), dstMetadata.atomTypes, dstMetadata.bondTypes)
+	return AmberTypes(listOf(ffname), dstMetadata)
 }
 
 
@@ -135,6 +173,7 @@ fun List<Pair<Molecule,AmberTypes>>.combine(): Pair<Molecule,AmberTypes> {
 
 	val atomTypes = IdentityHashMap<Atom,String>()
 	val bondTypes = HashMap<AtomPair,String>()
+	val atomCharges = IdentityHashMap<Atom,String>()
 	for ((_, types) in this) {
 
 		for ((atom, type) in types.atomTypes) {
@@ -147,12 +186,17 @@ fun List<Pair<Molecule,AmberTypes>>.combine(): Pair<Molecule,AmberTypes> {
 				atomMap.getBOrThrow(bond.b)
 			)] = type
 		}
+
+		for ((atom, charge) in types.atomCharges) {
+			atomCharges[atomMap.getBOrThrow(atom)] = charge
+		}
 	}
 
 	val combinedTypes = AmberTypes(
 		flatMap { (_, types) -> types.ffnames },
 		atomTypes,
-		bondTypes
+		bondTypes,
+		atomCharges
 	)
 
 	return combinedMol to combinedTypes

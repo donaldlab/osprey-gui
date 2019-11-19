@@ -15,7 +15,7 @@ interface ForcefieldParams {
 	/**
 	 * Let the parameterizer know what molecules we want to parameterize next
 	 */
-	fun setMolecules(mols: List<Molecule>)
+	fun setMolecules(mols: List<Molecule>, smallMolNetCharges: Map<Molecule,Int>)
 
 	/**
 	 * Return the internal energy for this atom, if any.
