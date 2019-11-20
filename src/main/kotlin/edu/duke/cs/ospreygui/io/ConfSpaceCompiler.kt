@@ -6,10 +6,7 @@ import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
-import edu.duke.cs.molscope.tools.associateIdentity
-import edu.duke.cs.molscope.tools.identityHashMapOf
-import edu.duke.cs.molscope.tools.identityHashSet
-import edu.duke.cs.molscope.tools.mapValuesIdentity
+import edu.duke.cs.molscope.tools.*
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
@@ -71,7 +68,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	}
 	val smallMolNetCharges: MutableMap<Molecule,NetCharges> = IdentityHashMap()
 
-	private fun getSmallMolNetChargesWhenNeeded(mol: Molecule): NetCharges? =
+	private fun getNetCharges(mol: Molecule): NetCharges? =
 		when (mol.findTypeOrThrow()) {
 
 			MoleculeType.SmallMolecule -> {
@@ -84,70 +81,28 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			else -> null
 		}
 
-	/**
-	 * Get the net charges for small molecules before any conformational changes.
-	 */
-	private fun getSmallMolNetCharges(mols: List<Molecule>) =
-		IdentityHashMap<Molecule,Int>().apply {
+	class ForcefieldMolParams(val original: ForcefieldParams.MolParams) {
 
-			for (mol in mols) {
-				getSmallMolNetChargesWhenNeeded(mol)?.let { netCharges ->
-					this[mol] = netCharges.netChargeOrThrow
-				}
-			}
+		private val byConf = IdentityHashMap<DesignPosition,IdentityHashMap<ConfLib.Conf,ForcefieldParams.MolParams>>()
+
+		operator fun get(pos: DesignPosition, conf: ConfLib.Conf) =
+			byConf.getValue(pos).getValue(conf)
+
+		operator fun set(pos: DesignPosition, conf: ConfLib.Conf, molParams: ForcefieldParams.MolParams) {
+			byConf.getOrPut(pos) { IdentityHashMap() }[conf] = molParams
 		}
+	}
 
-	/**
-	 * Get the net charges for small molecules after setting a
-	 * design position to a conformation from the given fragment.
-	 */
-	private fun getSmallMolNetCharges(mols: List<Molecule>, pos: DesignPosition, frag: ConfLib.Fragment) =
-		IdentityHashMap<Molecule,Int>().apply {
+	class ForcefieldMolsParams {
+		private val byMol = IdentityHashMap<Molecule,ForcefieldMolParams>()
 
-			// start with the original net charges
-			putAll(getSmallMolNetCharges(mols))
+		operator fun get(mol: Molecule) =
+			byMol.getValue(mol)
 
-			getSmallMolNetChargesWhenNeeded(pos.mol)?.let { netCharges ->
-				// overwrite with the modified net charge
-				this[pos.mol] = netCharges.getOrThrow(pos, frag)
-			}
+		operator fun set(mol: Molecule, ffMolParams: ForcefieldMolParams) {
+			byMol[mol] = ffMolParams
 		}
-
-	/**
-	 * Get the net charges for small molecules after setting two
-	 * design positions to conformations from the given fragments.
-	 */
-	private fun getSmallMolNetCharges(mols: List<Molecule>, pos1: DesignPosition, frag1: ConfLib.Fragment, pos2: DesignPosition, frag2: ConfLib.Fragment) =
-		IdentityHashMap<Molecule,Int>().apply {
-
-			// start with the original net charges
-			putAll(getSmallMolNetCharges(mols))
-
-			// do the two positions modify the same molecule?
-			if (pos1.mol === pos2.mol) {
-
-				// yup, get the net charge for both changes at once
-				val mol = pos1.mol
-				getSmallMolNetChargesWhenNeeded(mol)?.let { netCharges ->
-
-					// overwrite with the modified net charge
-					val charge1 = netCharges.getOrThrow(pos1, frag1)
-					val charge2 = netCharges.getOrThrow(pos2, frag2)
-					this[mol] = charge1 + charge2 - 2*netCharges.netChargeOrThrow
-				}
-
-			} else {
-
-				// nope, apply the two charges separately
-				getSmallMolNetChargesWhenNeeded(pos1.mol)?.let { netCharges ->
-					this[pos1.mol] = netCharges.getOrThrow(pos1, frag1)
-				}
-				getSmallMolNetChargesWhenNeeded(pos2.mol)?.let { netCharges ->
-					this[pos2.mol] = netCharges.getOrThrow(pos2, frag2)
-				}
-			}
-		}
-
+	}
 
 	data class Message(
 		val type: Type,
@@ -165,6 +120,13 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	}
 
 	private class CompilerError(val msg: String, val extraInfo: String? = null) : RuntimeException(msg)
+
+	fun Vector3dc.checkForErrors(source: String): Vector3dc = apply {
+		// check that all the coords are valid (ie, not NaN)
+		if (!x.isFinite() || !y.isFinite() || !z.isFinite()) {
+			throw CompilerError("Coordinates at '$source' have bad values: [%12.6f,%12.6f,%12.6f]".format(x, y, z))
+		}
+	}
 
 	data class Report(
 		val messages: List<Message>,
@@ -200,13 +162,6 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		fun warn(msg: String) =
 			messages.add(Message(Message.Type.Warning, msg))
 
-		fun Vector3dc.checkForErrors(source: String): Vector3dc = apply {
-			// check that all the coords are valid (ie, not NaN)
-			if (!x.isFinite() || !y.isFinite() || !z.isFinite()) {
-				throw CompilerError("Coordinates at '$source' have bad values: [%12.6f,%12.6f,%12.6f]".format(x, y, z))
-			}
-		}
-
 		try {
 
 			write("\n")
@@ -221,60 +176,125 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			// TODO: setMolecules() is pretty slow for amber,
 			//   need to show progress information to the user somehow
 
+			val allMols = confSpace.mols
+				.map { (_, mol) -> mol }
+
+			val fixedAtoms = confSpace.fixedAtoms()
+
 			// get the authoritative list of conf space positions in order
 			val positions = confSpace.positions()
 
-			// find out what fixed atoms have ff params that are affected by changes in conformations
-			// and add them to the atoms list for all the conformations at that design position
-			// and also subtract them from the list of fixed atoms
+			val molsParamsByFF = ffparams
+				.associateIdentity { ff ->
+					ff to ForcefieldMolsParams().apply {
 
-			// first, analyze the current atoms
-			val allMols = confSpace.mols
-				.map { (_, mol) -> mol }
-			val fixedAtoms = confSpace.fixedAtoms()
-			val analyses = ffparams
-				.associateWith { ff ->
+						for (mol in allMols) {
 
-					// setMolecules() is especially error-prone since it does most of the forcefield parameterization
-					infoOnException("Can't parameterize original molecules") {
-						ff.setMolecules(allMols, getSmallMolNetCharges(allMols))
-					}
+							// NOTE: copy molecules before sending to the parameterizers,
+							// since the parameterizers will store them in the returned MolParams,
+							// but we'll change this molecue instance when we set conformations at design positions
 
-					ff.analyze(fixedAtoms)
-				}
+							// first, parameterize the molecule without any conformational changes
+							this[mol] = ForcefieldMolParams(
+								infoOnException("Can't parameterize original molecule: $mol") {
+									ff.parameterize(mol.copy(), getNetCharges(mol)?.netChargeOrThrow)
+								}
+							).apply {
 
-			// then look through all the confs to find the changed atoms
-			// TODO: partial charges vary a lot for small molecules in different conformations!
-			//   need to limit the change propagation somehow,
-			//   otherwise dynamic fixed atoms from multiple design positions will probably overlap!
-			val dynamicFixedAtoms = positions
-				.associateWith { pos ->
-					val changedAtoms = identityHashSet<Atom>()
-					confSpace.forEachConf(pos) { frag, conf ->
-						for ((ff, analysis) in analyses) {
+								// then parameterize the molecule for each conformation at each design position
+								/* NOTE: SQM consumes atomic coords as input,
+									so we should parameterize each conformation,
+									rather than each fragment at a design position,
+									since theoretically, we could get different partial charges for different conformations
+								*/
+								val molPositions = positions.filter { it.mol === mol }
+								for (pos in molPositions) {
+									confSpace.forEachConf(pos) { frag, conf ->
 
-							// setMolecules() is especially error-prone since it does most of the forcefield parameterization
-							infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id}") {
-								ff.setMolecules(allMols, getSmallMolNetCharges(allMols, pos, frag))
+										this[pos, conf] = infoOnException("Can't parameterize molecule: $mol with ${pos.name} = ${frag.id}:${conf.id}") {
+											ff.parameterize(mol.copy(), getNetCharges(mol)?.getOrThrow(pos, frag))
+										}
+									}
+								}
 							}
-
-							ff.analyze(fixedAtoms)
-							changedAtoms.addAll(analysis.findChangedAtoms(ff.analyze(fixedAtoms)))
 						}
 					}
+				}
+
+			// find out what fixed atoms have ff params that are affected by changes in conformations
+			// and add them to the atoms lists for all the conformations at that design position
+			// look through all the molecule params for each conf to find the changed atoms
+			// TODO: partial charges vary a lot for small molecules in different conformations!
+			//   need to limit the change propagation somehow,
+			//   otherwise dynamic fixed atoms from multiple design positions will probably overlap
+			val dynamicFixedAtoms = positions
+				.associateWith { pos ->
+
+					val mol = pos.mol
+					val fixedAtomsForMol = fixedAtoms.getValue(mol)
+					val posConfSpace = confSpace.positionConfSpaces[pos]!!
+
+					val changedAtoms = identityHashSet<Atom>()
+
+					for ((_, ffMolsParams) in molsParamsByFF) {
+						val ffMolParams = ffMolsParams[mol]
+
+						for ((_, confs) in posConfSpace.confs) {
+							for (conf in confs) {
+								changedAtoms.addAll(ffMolParams[pos, conf].findChangedAtoms(ffMolParams.original, fixedAtomsForMol))
+							}
+						}
+					}
+
+					// TODO: limit the dynamic fixed atoms by bond distance to the bonded anchor atoms?
+
 					return@associateWith changedAtoms
 				}
 			fun Atom.isDynamic() =
 				dynamicFixedAtoms.values.any { this in it }
 
-			// TODO: if positions share any dynamic fixed atoms, throw an error
-			
+			// make sure no two positions share any dynamic fixed atoms
+			// TODO: this error won't trip until we get two design positions on the small molecule in the test conf space
+			for (i1 in 0 until positions.size) {
+
+				val pos1 = positions[i1]
+				val atoms1 = dynamicFixedAtoms.getValue(pos1)
+
+				for (i2 in 0 until i1) {
+
+					val pos2 = positions[i2]
+
+					// get the mol the two positions share, if any
+					val mol = if (pos1.mol === pos2.mol) {
+						pos1.mol
+					} else {
+						// no shared mol, so can't share fixed atoms either
+						continue
+					}
+
+					val atoms2 = dynamicFixedAtoms.getValue(pos2)
+
+					val commonAtoms = atoms1.intersect(atoms2)
+					if (commonAtoms.isNotEmpty()) {
+						throw CompilerError("""
+							|Forcefield parameterization at positions ${pos1.name} and ${pos2.name} yield conflicting parameters for atoms:
+							|${commonAtoms.map { it.fixedName(mol) }}
+						""".trimMargin())
+					}
+				}
+			}
+
 			// static atoms are the subset of fixed atoms that don't change forcefield params
 			// collect all the static atoms
 			val staticAtomsByMol = fixedAtoms
 				.mapValuesIdentity { (_, atoms) ->
 					atoms.filter { !it.isDynamic() }
 				}
+			fun staticMolParamsByMol(ff: ForcefieldParams) = staticAtomsByMol
+				.mapValuesIdentity { (mol, _) ->
+					molsParamsByFF.getValue(ff)[mol].original
+				}
+
 
 			// write out the static atoms in order
 			write("\n")
@@ -289,15 +309,8 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					val index = staticAtomIndices.size
 					staticAtomIndices[atom] = index
 
-					// make a globally-unique atom name, since static atoms can come from different molecules
-					val resName = (mol as? Polymer)
-						?.let {
-							it.findChainAndResidue(atom)?.let { (chain, res) ->
-								"-${chain.id}${res.id}"
-							}
-						}
-						?: ""
-					val atomName = "${mol.name}$resName-${atom.name}"
+					// assign the atom name
+					val atomName = atom.fixedName(mol)
 					staticAtomNames[atom] = atomName
 
 					write("\t{ xyz = %s, name = %20s }, # %d\n",
@@ -314,7 +327,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			for ((ffi, ff) in ffparams.withIndex()) {
 				write("%d = %f\n",
 					ffi,
-					ff.calcEnergy(staticAtomsByMol)
+					ff.calcEnergy(staticAtomsByMol, staticMolParamsByMol(ff))
 				)
 			}
 
@@ -362,15 +375,17 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					write("[pos.$posi.conf.$confi] # %s:%s:%s\n",
 						pos.name, frag.id, conf.id
 					)
-					write("id = %s\n", conf.id.quote())
+					write("id = %s\n", "${frag.id}:${conf.id}".quote())
 					write("type = %s\n", frag.type.quote())
 
-					// write the atoms, and track the indices
+					// collect the atoms for this conf (including dynamic fixed atoms), and assign indices
 					val confAtoms = dynamicFixedAtoms.getValue(pos) +
 						frag.atoms.map { pos.atomResolverOrThrow.resolveOrThrow(it) }
 					val confAtomIndices = confAtoms
 						.withIndex()
 						.associateIdentity { (i, atom) -> atom to i }
+
+					// write the atoms for this conf
 					write("atoms = [\n")
 					for ((atomi, atom) in confAtoms.withIndex()) {
 						write("\t{ xyz = %s, name = %8s }, # %d\n",
@@ -387,20 +402,15 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
 
-						// setMolecules() is especially error-prone since it does most of the forcefield parameterization
-						infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id}") {
-							ff.setMolecules(listOf(pos.mol), getSmallMolNetCharges(allMols, pos, frag))
-						}
+						val molParams = molsParamsByFF.getValue(ff)[pos.mol][pos, conf]
 
 						write("%d = %f\n",
 							ffi,
 							confAtoms
-								.mapNotNull { atom -> ff.internalEnergy(pos.mol, atom) }
+								.mapNotNull { atom -> ff.internalEnergy(molParams, atom) }
 								.sum()
 						)
 					}
-
-					val confAtomsByMol = identityHashMapOf(pos.mol to confAtoms.toList())
 
 					// write the pos-static params
 					write("[pos.$posi.conf.$confi.params.static] # %s:%s:%s\n",
@@ -408,14 +418,15 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 					)
 					for ((ffi, ff) in ffparams.withIndex()) {
 
-						// setMolecules() is especially error-prone since it does most of the forcefield parameterization
-						infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id}") {
-							ff.setMolecules(allMols, getSmallMolNetCharges(allMols, pos, frag))
-						}
+						val cmolParams = molsParamsByFF.getValue(ff)[pos.mol][pos, conf]
+						val confAtomsByMol = identityHashMapOf(pos.mol to confAtoms.toList())
 
 						write("%d = [\n", ffi)
 						ForcefieldParams.forEachPair(confAtomsByMol, staticAtomsByMol) { cmol, catom, smol, satom, dist ->
-							ff.pairParams(cmol, catom, smol, satom, dist)?.let { params ->
+
+							val smolParams = molsParamsByFF.getValue(ff)[smol].original
+
+							ff.pairParams(cmolParams, catom, smolParams, satom, dist)?.let { params ->
 								write("\t[ %2d, %6d, %6d ], # %s, %s\n",
 									confAtomIndices.getValue(catom),
 									staticAtomIndices.getValue(satom),
@@ -435,7 +446,12 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						var confbi = 0
 						confSpace.forEachConf(posb) { fragb, confb ->
 
-							val posbAtomsByMol = identityHashMapOf(posb.mol to posb.currentAtoms.toList())
+							// collect the atoms for this conf (including dynamic fixed atoms), and assign indices
+							val confbAtoms = dynamicFixedAtoms.getValue(posb) +
+								fragb.atoms.map { posb.atomResolverOrThrow.resolveOrThrow(it) }
+							val confbAtomIndices = confbAtoms
+								.withIndex()
+								.associateIdentity { (i, atom) -> atom to i }
 
 							write("\n")
 							write("[pos.$posi.conf.$confi.params.pos.$posbi.conf.$confbi] # %s:%s:%s - %s:%s:%s\n",
@@ -443,24 +459,19 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 								posb.name, fragb.id, confb.id
 							)
 							for ((ffi, ff) in ffparams.withIndex()) {
+
+								val molaParams = molsParamsByFF.getValue(ff)[pos.mol][pos, conf]
+								val confaAtomsByMol = identityHashMapOf(pos.mol to confAtoms.toList())
+
+								val molbParams = molsParamsByFF.getValue(ff)[posb.mol][posb, confb]
+								val confbAtomsByMol = identityHashMapOf(posb.mol to confbAtoms.toList())
+
 								write("%d = [\n", ffi)
-
-								// setMolecules() is especially error-prone since it does most of the forcefield parameterization
-								infoOnException("Can't parameterize molecules when ${pos.name} is ${frag.id}:${conf.id} and ${posb.name} is ${fragb.id}:${confb.id}") {
-									ff.setMolecules(listOf(pos.mol, posb.mol), getSmallMolNetCharges(allMols, pos, frag, posb, fragb))
-								}
-
-								ForcefieldParams.forEachPair(confAtomsByMol, posbAtomsByMol) { mola, atoma, molb, atomb, dist ->
-									ff.pairParams(mola, atoma, molb, atomb, dist)?.let { params ->
-
-										val atombi = fragb.atoms
-											.indexOfFirst { it.name == atomb.name }
-											.takeIf { it >= 0 }
-											?: throw RuntimeException("can't find atom $atomb in fragment $fragb")
-
+								ForcefieldParams.forEachPair(confaAtomsByMol, confbAtomsByMol) { mola, atoma, molb, atomb, dist ->
+									ff.pairParams(molaParams, atoma, molbParams, atomb, dist)?.let { params ->
 										write("\t[ %2d, %2d, %6d ], # %s, %s\n",
 											confAtomIndices.getValue(atoma),
-											atombi,
+											confbAtomIndices.getValue(atomb),
 											paramsCaches[ffi].index(params.list),
 											atoma.name,
 											atomb.name
@@ -524,6 +535,8 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				null
 			} else {
 				buf.toString()
+
+				// TODO: these files can get kinda big (several MiB), consider compression? maybe LZMA?
 			}
 			return Report(messages, toml)
 		}
@@ -534,3 +547,18 @@ private fun String.quote() = "'$this'"
 
 private fun Vector3dc.toToml() =
 	"[ %12.6f, %12.6f, %12.6f ]".format(x, y, z)
+
+
+/**
+ * make a globally-unique atom name, since fixed atoms can come from different molecules
+ */
+private fun Atom.fixedName(mol: Molecule): String {
+	val resName = (mol as? Polymer)
+		?.let {
+			it.findChainAndResidue(this)?.let { (chain, res) ->
+				"-${chain.id}${res.id}"
+			}
+		}
+		?: ""
+	return "${mol.name}$resName-$name"
+}

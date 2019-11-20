@@ -13,59 +13,92 @@ interface ForcefieldParams {
 	val forcefield: Forcefield
 
 	/**
-	 * Let the parameterizer know what molecules we want to parameterize next
+	 * An opaque type the parameterizer can use to store parameters for a molecule.
 	 */
-	fun setMolecules(mols: List<Molecule>, smallMolNetCharges: Map<Molecule,Int>)
+	interface MolParams {
+		val mol: Molecule
 
-	/**
-	 * Return the internal energy for this atom, if any.
-	 */
-	fun internalEnergy(mol: Molecule, atom: Atom): Double?
+		fun isChanged(thisAtom: Atom, baseline: MolParams, baseAtom: Atom): Boolean
 
-	/**
-	 * Return the forcefield parameters for this atom pair interaction, if any.
-	 */
-	fun pairParams(mola: Molecule, atoma: Atom, molb: Molecule, atomb: Atom, dist: Int?): ParamsList?
+		/**
+		 * Return the atoms in this molecule whose params differ from the atoms in the baseline params.
+		 */
+		fun findChangedAtoms(baseline: MolParams, atoms: Set<Atom>): Set<Atom> {
 
-	/**
-	 * Calculate the forcefield energy of the selected atoms directly, rather than
-	 * collect the forcefield parameters. eg, for the fixed atoms.
-	 *
-	 * Not called a whole lot, doesn't need to be fast.
-	 */
-	fun calcEnergy(atomsByMol: Map<Molecule,List<Atom>>): Double
+			// make it easy to find atoms in the baseline
+			val baseAtoms = baseline.mol.atoms.associateWith { it }
 
+			return atoms
+				.filter { atom ->
 
-	/**
-	 * An opaque type a forcefield can use to determine when
-	 * conformation changes cause changes in forcefield parameters.
-	 */
-	interface Analysis {
-		fun findChangedAtoms(originalAnalysis: Analysis): Set<Atom>
+					// map the atom to our params molecule
+					val thisAtom = findAtom(atom)
+
+					// match to the atom in the baseline
+					val baseAtom = baseAtoms[thisAtom]
+						?: throw NoSuchElementException("Atom not found in baseline: $thisAtom")
+
+					// did any params change?
+					isChanged(thisAtom, baseline, baseAtom)
+				}
+				.toIdentitySet()
+		}
+
+		/**
+		 * Find the atoms in this molecule that correspond to the given atoms,
+		 * assuming the given atoms come from a different copy of this molecule.
+		 */
+		fun findAtoms(otherAtoms: List<Atom>): List<Atom> {
+			val thisAtoms = mol.atoms.associateWith { it }
+			return otherAtoms.map { thisAtoms.getValue(it) }
+		}
+
+		/**
+		 * Find the atoms in this molecule that correspond to the given atoms,
+		 * assuming the given atoms come from a different copy of this molecule.
+		 */
+		fun findAtom(otherAtom: Atom): Atom {
+			return mol.atoms
+				.find { it == otherAtom }
+				?: throw NoSuchElementException("no matching atom found in this mol like $otherAtom")
+		}
 	}
-	fun analyze(atomsByMol: Map<Molecule,Set<Atom>>): Analysis
+
+	/**
+	 * Compute the forcefield parameters for a molecule.
+	 */
+	fun parameterize(mol: Molecule, netCharge: Int?): MolParams
 
 
 	interface ParamsList {
 		val list: List<Double>
 	}
 
-	class AtomParams<T> {
+	/**
+	 * Return the internal energy for this atom, if any.
+	 *
+	 * `atom` might not be part of the molecule in `molParams`.
+	 */
+	fun internalEnergy(molParams: MolParams, atom: Atom): Double?
 
-		private val map = IdentityHashMap<Molecule,IdentityHashMap<Atom,T>>()
+	/**
+	 * Return the forcefield parameters for this atom pair interaction, if any.
+	 *
+	 * `atoma` might not be part of the molecule in `molaParams`.
+	 * `atomb` might not be part of the molecule in `molbParams`.
+	 */
+	fun pairParams(molaParams: MolParams, atoma: Atom, molbParams: MolParams, atomb: Atom, dist: Int?): ParamsList?
 
-		operator fun get(mol: Molecule, atom: Atom): T? =
-			map
-				.get(mol)
-				?.get(atom)
+	/**
+	 * Calculate the forcefield energy of the selected atoms directly, rather than
+	 * collect the forcefield parameters. eg, for the fixed atoms.
+	 *
+	 * Not called a whole lot, doesn't need to be fast.
+	 *
+	 * The atoms in each list might not be a member of the molecule in the associated mol params.
+	 */
+	fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,MolParams>): Double
 
-		operator fun set(mol: Molecule, atom: Atom, value: T): T? =
-			map
-				.getOrPut(mol) { IdentityHashMap() }
-				.put(atom, value)
-	}
-
-	// TODO: atom pairs? for amber?
 
 	companion object {
 
