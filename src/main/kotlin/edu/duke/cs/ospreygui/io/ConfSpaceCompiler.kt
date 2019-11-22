@@ -166,9 +166,33 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 			write("\n")
 			write("name = %s\n", confSpace.name.quote())
-			write("forcefields = [ %s ]\n",
-				forcefields.joinToString(", ") { it.name.toLowerCase().quote() }
-			)
+			write("forcefields = [\n")
+			for (forcefield in forcefields) {
+				write("\t[ %s, %s ],\n",
+					forcefield.name.quote(),
+					forcefield.ospreyImplementation.quote()
+				)
+			}
+			write("]\n")
+
+			// write out forcefield settings
+			for ((ffi, ff) in ffparams.withIndex()) {
+				ff.settings()
+					.takeIf { it.isNotEmpty() }
+					?.let { settings ->
+						write("\n")
+						write("[ffsettings.$ffi]\n")
+						for ((key, value) in settings) {
+
+							val valueToml = when (value) {
+								is String -> value.quote()
+								else -> value.toString()
+							}
+
+							write("%s = %s\n", key, valueToml)
+						}
+					}
+			}
 
 			// TODO: issues warnings/errors for:
 			//   missing forcefield params

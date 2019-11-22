@@ -13,6 +13,11 @@ interface ForcefieldParams {
 	val forcefield: Forcefield
 
 	/**
+	 * Any settings needed by the Osprey runtime to calculate this forcefield.
+	 */
+	fun settings(): Map<String,Any> = emptyMap()
+
+	/**
 	 * An opaque type the parameterizer can use to store parameters for a molecule.
 	 */
 	interface MolParams {

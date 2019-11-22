@@ -58,6 +58,9 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 
 	// TODO: expose the above options for configuration somewhere?
 
+	override fun settings() = LinkedHashMap<String,Any>().apply {
+		this["distanceDependentDielectric"] = distanceDependentDielectric
+	}
 
 	class MolParams(
 		override val mol: Molecule,
