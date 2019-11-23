@@ -15,6 +15,11 @@ class EEF1ForcefieldParams : ForcefieldParams {
 	companion object {
 
 		val trigConst = 2.0/(4.0*PI*PI.sqrt())
+
+		/**
+		 * Solvation interactions for atoms more than 9 A apart are already counted in dGref.
+		 */
+		const val cutoff = 9.0
 	}
 
 	override val forcefield = Forcefield.EEF1
@@ -86,9 +91,14 @@ class EEF1ForcefieldParams : ForcefieldParams {
 		)
 
 		fun calcEnergy(r: Double): Double {
-			val Xij = (r - vdwRadiusa)/lambdaa
-			val Xji = (r - vdwRadiusb)/lambdab
-			return -(alpha1*exp(-Xij*Xij) + alpha2*exp(-Xji*Xji))/r/r
+			return if (r <= cutoff) {
+				val Xij = (r - vdwRadiusa)/lambdaa
+				val Xji = (r - vdwRadiusb)/lambdab
+				val r2 = r*r
+				-(alpha1*exp(-Xij*Xij) + alpha2*exp(-Xji*Xji))/r2
+			} else {
+				0.0
+			}
 		}
 	}
 
