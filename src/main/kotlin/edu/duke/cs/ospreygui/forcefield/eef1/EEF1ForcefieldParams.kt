@@ -29,8 +29,8 @@ class EEF1ForcefieldParams : ForcefieldParams {
 
 
 	class MolParams(
-		override val mol: Molecule
-	) : ForcefieldParams.MolParams {
+		mol: Molecule
+	) : ForcefieldParams.MolParams(mol) {
 
 		val types = IdentityHashMap<Atom,EEF1.AtomType>()
 

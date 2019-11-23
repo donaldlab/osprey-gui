@@ -7,7 +7,6 @@ import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import java.util.*
 
 
-
 class Amber96Params : AmberForcefieldParams(mapOf(
 	MoleculeType.Protein to ForcefieldName.ff96
 )) {
@@ -63,10 +62,10 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 	}
 
 	class MolParams(
-		override val mol: Molecule,
+		mol: Molecule,
 		val types: AmberTypes,
 		val frcmod: String?
-	) : ForcefieldParams.MolParams {
+	) : ForcefieldParams.MolParams(mol) {
 
 		override fun isChanged(thisAtom: Atom, baseline: ForcefieldParams.MolParams, baseAtom: Atom): Boolean {
 
@@ -250,9 +249,74 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		// see: Amber manual 14.1.7, Van der Waals Parameters
 		var (vdwA, vdwB) = top.vdw(atoma, atomb)
 
+		/* Now, to apply Osprey's special brand of van der Waals scaling:
+
+			We actually want to scale the vdW radii, rather than the vdW potential value,
+			so let's breakdown the potential in terms of radii and other parameters:
+
+			The following equation references are from the Amber manual v19.
+
+			The 6-12 van der Waals potential has the general form given by Eqn 14.10:
+
+			Vij = Aij/rij^12 - Bij/rij^6
+
+			where rij is the radius (ie distance) between atoms i and j,
+			and Aij and Bij are defined in Eqn 14.12:
+
+			Aij = eij*Rmin^12
+			Bij = 2*eij*Rmin^6
+
+			where eij is defined in Eqn 14.14:
+
+			eij = sqrt(eii*ejj)
+			assuming eii = ei and ejj = ej, we can rewrite:
+			eij = sqrt(ei*ej)
+
+			and Rmin is defined in the text after Eqn 14.8:
+
+			Rmin = Ri + Rj
+
+			Here, ei and Ri are parameters defined for the Amber forcefields for
+			atom i and we can assume they're given and constant.
+
+			NOTE: Eqn 14.13 suggests a different mixing equation for Rmin:
+			Rminij = 0.5*(Rmini + Rminj)
+			assuming, Rminij = Rmin, Rmini = Ri, and Rminj = Rj, we can re-write:
+			Rmin = 0.5*(Ri + Rj)
+
+			After analying the outputs of LEaP, it appears that LEaP does NOT use Eqn 14.13 at all,
+			not even when the two atom types are different.
+			So the 0.5 scaling factor does not appear to be applied during LEaP's calculations.
+			Dropping the 0.5 scaling factor allows us to produce values for Aij and Bij
+			that are identical to LEaP's values.
+
+			Ok, back to the derivation...
+
+			To apply Osprey's version of vdW scaling, we need to multiply
+			Ri and Rj by a factor of s:
+			Let's massage Eqn 14.12 a bit to expose Ri and Rj:
+
+			Aij = eij*Rmin^12
+			    = eij*( Ri + Rj )^12
+
+			Now we apply the scaling factor s to Ri and Rj:
+
+			   eij*( Ri*s + Rj*s )^12
+			 = eij*[ s*(Ri + Rj) ]^12
+			 = eij*(Ri + Rj)^12*s^12
+			 = eij*Rmin^12*s^12
+			 = Aij*s^12
+
+			Therefore, Aij gete scaled by s^12,
+			and similarly, Bij get scaled by s^6.
+		*/
+
 		// apply the parametric vdW scaling
-		vdwA *= vdwScale
-		vdwB *= vdwScale
+		val s2 = vdwScale*vdwScale
+		val s6 = s2*s2*s2
+		val s12 = s6*s6
+		vdwA *= s12
+		vdwB *= s6
 
 		// 1-4 bonded atoms have scaled interactions
 		// see: Amber manual 14.1.6, 1-4 Non-Bonded Interaction Scaling

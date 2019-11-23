@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.forcefield
 
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.AtomPair
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.toIdentitySet
 import java.util.*
@@ -20,10 +21,16 @@ interface ForcefieldParams {
 	/**
 	 * An opaque type the parameterizer can use to store parameters for a molecule.
 	 */
-	interface MolParams {
+	abstract class MolParams(
 		val mol: Molecule
+	) {
 
-		fun isChanged(thisAtom: Atom, baseline: MolParams, baseAtom: Atom): Boolean
+		/**
+		 * Useful for mapping atoms across molecules efficiently.
+		 */
+		val atomsLookup = mol.atoms.associateWith { it }
+
+		abstract fun isChanged(thisAtom: Atom, baseline: MolParams, baseAtom: Atom): Boolean
 
 		/**
 		 * Return the atoms in this molecule whose params differ from the atoms in the baseline params.
@@ -53,18 +60,8 @@ interface ForcefieldParams {
 		 * Find the atoms in this molecule that correspond to the given atoms,
 		 * assuming the given atoms come from a different copy of this molecule.
 		 */
-		fun findAtoms(otherAtoms: List<Atom>): List<Atom> {
-			val thisAtoms = mol.atoms.associateWith { it }
-			return otherAtoms.map { thisAtoms.getValue(it) }
-		}
-
-		/**
-		 * Find the atoms in this molecule that correspond to the given atoms,
-		 * assuming the given atoms come from a different copy of this molecule.
-		 */
 		fun findAtom(otherAtom: Atom): Atom {
-			return mol.atoms
-				.find { it == otherAtom }
+			return atomsLookup[otherAtom]
 				?: throw NoSuchElementException("no matching atom found in this mol like $otherAtom")
 		}
 	}
@@ -123,6 +120,7 @@ interface ForcefieldParams {
 
 			val lookupa = atomsa.toIdentitySet()
 			val lookupb = atomsb.toIdentitySet()
+			val visitedPairs = HashSet<AtomPair>()
 
 			for (atoma in atomsa) {
 
@@ -137,7 +135,11 @@ interface ForcefieldParams {
 						atomb in lookupb
 					}
 					.forEach { (atomb, dist) ->
-						func(mol, atoma, mol, atomb, dist)
+						// make sure we only visit each pair of atoms once though
+						val wasAdded = visitedPairs.add(AtomPair(atoma, atomb))
+						if (wasAdded) {
+							func(mol, atoma, mol, atomb, dist)
+						}
 					}
 			}
 		}
