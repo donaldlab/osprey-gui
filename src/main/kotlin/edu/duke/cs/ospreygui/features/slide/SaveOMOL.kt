@@ -7,14 +7,14 @@ import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
+import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.io.toOMOL
 import edu.duke.cs.ospreygui.io.write
-import edu.duke.cs.ospreygui.prep.MoleculePrep
 import java.nio.file.Path
 import java.nio.file.Paths
 
 
-class SaveOMOL(val prep: MoleculePrep) : SlideFeature {
+class SaveOMOL(val getter: () -> List<Molecule>) : SlideFeature {
 
 	override val id = FeatureId("save.omol")
 
@@ -43,8 +43,8 @@ class SaveOMOL(val prep: MoleculePrep) : SlideFeature {
 		}
 		val pathWithExt = path.parent.resolve(filename)
 
-		// combine the included assembled mols and save the file
-		prep.getIncludedMols()
+		// get the molecules and save them to the file
+		getter()
 			.toOMOL()
 			.write(pathWithExt)
 

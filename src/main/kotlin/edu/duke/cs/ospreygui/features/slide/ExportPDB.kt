@@ -7,17 +7,17 @@ import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
+import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.combine
 import edu.duke.cs.ospreygui.io.ChainGeneratorSingleResidue
 import edu.duke.cs.ospreygui.io.ChainIdGeneratorAZ
 import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.io.write
-import edu.duke.cs.ospreygui.prep.MoleculePrep
 import java.nio.file.Path
 import java.nio.file.Paths
 
 
-class ExportPDB(val prep: MoleculePrep) : SlideFeature {
+class ExportPDB(val getter: () -> List<Molecule>) : SlideFeature {
 
 	override val id = FeatureId("export.pdb")
 
@@ -46,11 +46,11 @@ class ExportPDB(val prep: MoleculePrep) : SlideFeature {
 		}
 		val pathWithExt = path.parent.resolve(filename)
 
-		// combine the included assembled mols and save the file
+		// combine the mols and save the file
 		val chainIdGenerator = ChainIdGeneratorAZ()
 		val chainGenerator = ChainGeneratorSingleResidue(chainIdGenerator)
-		prep.getIncludedMols()
-			.combine(prep.name, chainIdGenerator, chainGenerator).first
+		getter()
+			.combine("name ignored by PDB writer", chainIdGenerator, chainGenerator).first
 			.toPDB()
 			.write(pathWithExt)
 

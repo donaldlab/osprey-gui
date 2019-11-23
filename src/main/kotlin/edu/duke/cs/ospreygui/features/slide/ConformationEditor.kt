@@ -192,6 +192,16 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 					// cleanup the pos editor
 					posEditor.closed()
 					confEditor = null
+
+					// deactivate any tabs if they're active
+					if (discreteTabState.wasActive) {
+						discreteTabState.wasActive = false
+						deactivateDiscreteTab(view)
+					}
+					if (continuousTabState.wasActive) {
+						continuousTabState.wasActive = false
+						deactivateContinuousTab(view)
+					}
 				}
 			)
 		}

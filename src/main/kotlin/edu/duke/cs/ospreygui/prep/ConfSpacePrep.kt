@@ -61,6 +61,10 @@ class ConfSpacePrep(
 				addSeparator()
 				// TODO: export compiled conf space
 				addSeparator()
+				add(SaveOMOL { confSpace.mols.map { (_, mol) -> mol } })
+				add(ExportPDB { confSpace.mols.map { (_, mol) -> mol } })
+				add(ExportMol2 { confSpace.mols.map { (_, mol) -> mol } to name })
+				addSeparator()
 				addSpacing(4)
 				addSeparator()
 				add(CloseSlide(win))

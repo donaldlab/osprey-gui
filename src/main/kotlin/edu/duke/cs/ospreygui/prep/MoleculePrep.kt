@@ -77,10 +77,10 @@ class MoleculePrep(
 			s.camera.lookAtEverything()
 
 			s.features.menu("File") {
-				add(SaveOMOL(this@MoleculePrep))
+				add(SaveOMOL { getIncludedMols() })
 				addSeparator()
-				add(ExportPDB(this@MoleculePrep))
-				add(ExportMol2(this@MoleculePrep))
+				add(ExportPDB { getIncludedMols() })
+				add(ExportMol2 { getIncludedMols() to name })
 				addSeparator()
 				addSpacing(4)
 				addSeparator()

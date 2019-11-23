@@ -106,6 +106,12 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 					// cleanup the pos editor
 					posEditor.closed()
 					mutEditor = null
+
+					// deactivate the mutations tab if it's open
+					if (mutationsTabState.wasActive) {
+						mutationsTabState.wasActive = false
+						deactivateMutationsTab(view)
+					}
 				}
 			)
 		}
