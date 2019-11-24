@@ -28,10 +28,15 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 	private val ffparams: MutableList<ForcefieldParams> = ArrayList()
 
-	fun addForcefield(ff: Forcefield) {
-		if (ff !in forcefields) {
-			ffparams.add(ff.parameterizer())
+	fun addForcefield(ff: Forcefield): ForcefieldParams {
+
+		if (ff in forcefields) {
+			throw IllegalArgumentException("forcefield $ff alread added")
 		}
+
+		val parameterizer = ff.parameterizer()
+		ffparams.add(parameterizer)
+		return parameterizer
 	}
 
 	val forcefields: List<Forcefield> get() =

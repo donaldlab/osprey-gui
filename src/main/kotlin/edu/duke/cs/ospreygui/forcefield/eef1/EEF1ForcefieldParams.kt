@@ -59,6 +59,11 @@ class EEF1ForcefieldParams : ForcefieldParams {
 
 		molParams as MolParams
 
+		// map the atoms to our params molecules
+		// and yes, shadow the names so we don't accidentally use the wrong atoms in the toplogy
+		@Suppress("NAME_SHADOWING")
+		val atom = molParams.findAtom(atom)
+
 		val type = molParams.types[atom] ?: return null
 		return scale*type.dGref
 	}
@@ -131,7 +136,7 @@ class EEF1ForcefieldParams : ForcefieldParams {
 
 		// add the internal energies
 		for ((mol, atoms) in atomsByMols) {
-			val molParams = molParamsByMols.getValue(mol) as MolParams
+			val molParams = molParamsByMols.getValue(mol)
 			for (atom in atoms) {
 				val internalEnergy = internalEnergy(molParams, atom) ?: continue
 				energy += internalEnergy
