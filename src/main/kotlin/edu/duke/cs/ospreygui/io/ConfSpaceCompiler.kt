@@ -441,7 +441,31 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						)
 					}
 
-					// write the pos-static params
+					// write the pos single params
+					write("[pos.$posi.conf.$confi.params.internal] # %s:%s:%s\n",
+						pos.name, frag.id, conf.id
+					)
+					for ((ffi, ff) in ffparams.withIndex()) {
+
+						val molParams = molsParamsByFF.getValue(ff)[pos.mol][pos, conf]
+						val confAtomsByMol = identityHashMapOf(pos.mol to confAtoms.toList())
+
+						write("%d = [\n", ffi)
+						ForcefieldParams.forEachPair(confAtomsByMol, confAtomsByMol) { mola, atoma, molb, atomb, dist ->
+							ff.pairParams(molParams, atoma, molParams, atomb, dist)?.let { params ->
+								write("\t[ %2d, %2d, %6d ], # %s, %s\n",
+									confAtomIndices.getValue(atoma),
+									confAtomIndices.getValue(atomb),
+									paramsCaches[ffi].index(params.list),
+									atoma.name,
+									atomb.name
+								)
+							}
+						}
+						write("]\n")
+					}
+
+					// write the pos-static pair params
 					write("[pos.$posi.conf.$confi.params.static] # %s:%s:%s\n",
 						pos.name, frag.id, conf.id
 					)
@@ -468,7 +492,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						write("]\n")
 					}
 
-					// write the pos-pos params
+					// write the pos-pos pair params
 					for (posbi in 0 until posi) {
 						val posb = positions[posbi]
 
