@@ -4,9 +4,12 @@ import cuchaz.kludge.tools.x
 import cuchaz.kludge.tools.y
 import cuchaz.kludge.tools.z
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.*
+import edu.duke.cs.ospreygui.dofs.DihedralAngle
+import edu.duke.cs.ospreygui.dofs.dihedralAngle
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
@@ -158,6 +161,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	 * Compiles the conf space and the forcefields.
 	 * Vigorously throws errors if something goes wrong.
 	 */
+	// TODO: this function is getting big and complicated... break it up?
 	fun compile(): Report {
 
 		val buf = StringBuilder()
@@ -424,6 +428,59 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						)
 					}
 					write("]\n")
+
+					// write the DoFs for this conf, if any
+					// TODO: all confs from the same fragment share the same DoFs, maybe de-duplicate somehow?
+					//  it's not that much space to save though, the DoF descriptions are small (for now?)
+					confSpace.positionConfSpaces[pos]?.let { posConfSpace ->
+						posConfSpace.dofSettings[frag]?.let { settings ->
+
+							// get the active DoFs for this pos according to the DoFs settings
+							val dofs = frag.dofs
+								.filter { dof ->
+									when (dof) {
+										is ConfLib.DegreeOfFreedom.DihedralAngle -> {
+
+											// include h-group rotations when needed
+											val isHGroupRotation = dof.affectedAtoms(frag)
+												.let { atoms ->
+													atoms.isNotEmpty() && atoms.all { it.element == Element.Hydrogen }
+												}
+
+											!isHGroupRotation || settings.includeHGroupRotations
+										}
+									}
+								}
+
+							if (dofs.isNotEmpty()) {
+
+								write("motions = [\n")
+								for (dof in dofs) {
+									when (dof) {
+										is ConfLib.DegreeOfFreedom.DihedralAngle -> {
+
+											val dihedral = pos.dihedralAngle(dof)
+											val initialDegrees = dihedral.measureDegrees()
+
+											write("\t{ type = %s, bounds = [ %f, %f ], abcd = [ %s ], rotated = [ %s ] },\n",
+												"dihedral".quote(),
+												initialDegrees - settings.dihedralRadiusDegrees,
+												initialDegrees + settings.dihedralRadiusDegrees,
+												listOf(dihedral.a, dihedral.b, dihedral.c, dihedral.d)
+													.map { confAtomIndices.getValue(it) }
+													.joinToString(", ") { it.toString() },
+												dihedral.rotatedAtoms
+													.map { confAtomIndices.getValue(it) }
+													.joinToString(", ") { it.toString() }
+											)
+										}
+									}
+								}
+								write("]\n")
+							}
+						}
+					}
+
 
 					// write the internal energy
 					write("[pos.$posi.conf.$confi.energy] # %s:%s:%s\n",

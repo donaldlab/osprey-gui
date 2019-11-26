@@ -1,10 +1,12 @@
 package edu.duke.cs.ospreygui.io
 
 import cuchaz.kludge.tools.abs
+import cuchaz.kludge.tools.toDegrees
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.identityHashMapOf
 import edu.duke.cs.molscope.tools.identityHashSetOf
+import edu.duke.cs.osprey.confspace.compiled.motions.DihedralAngle
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.absolutely
@@ -16,7 +18,10 @@ import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
 import edu.duke.cs.ospreygui.relatively
+import io.kotlintest.matchers.doubles.shouldBeLessThan
+import io.kotlintest.matchers.types.shouldBeTypeOf
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
+import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
 import io.kotlintest.shouldBe
 
 
@@ -77,8 +82,13 @@ class TestConfSpaceCompiler : SharedSpec({
 		}
 
 		// calculate and show the energies
-		println("amber96: ${calcAmber96Energy()}")
-		println("EEF1:    ${calcEEF1Energy()}")
+		val amber96 = calcAmber96Energy()
+		val eef1 = calcEEF1Energy()
+		println("""
+			|amber96:   $amber96
+			|EEF1:      $eef1
+			|combined:  ${amber96 + eef1}
+		""".trimMargin())
 	}
 
 
@@ -111,8 +121,31 @@ class TestConfSpaceCompiler : SharedSpec({
 				.mapIndexed { i, confId -> positions[i].findConfOrThrow(confId).index }
 				.toIntArray()
 		)
-	fun CompiledConfSpace.AssignedCoords.calcAmber96() = confSpace.ecalcs[0].calcEnergy(this)
-	fun CompiledConfSpace.AssignedCoords.calcEEF1() = confSpace.ecalcs[1].calcEnergy(this)
+	fun AssignedCoords.calcAmber96() = confSpace.ecalcs[0].calcEnergy(this)
+	fun AssignedCoords.calcEEF1() = confSpace.ecalcs[1].calcEnergy(this)
+
+	fun Group.testConf(
+		compiledConfSpace: CompiledConfSpace,
+		vararg confIds: String,
+		focus: Boolean = false,
+		dump: Pair<Molecule,List<DesignPosition>>? = null,
+		block: AssignedCoords.() -> Unit
+	) {
+		// dump the energies if needed
+		if (dump != null) {
+			val (mol, positions) = dump
+			mol.dumpEnergies(
+				*positions
+					.mapIndexed { i, pos -> pos to confIds[i] }
+					.toTypedArray()
+			)
+		}
+
+		// define the test
+		test("conf: " + confIds.joinToString(", "), focus = focus) {
+			compiledConfSpace.assign(*confIds).run(block)
+		}
+	}
 
 
 	// this essentially tests the static energy calculation
@@ -137,6 +170,8 @@ class TestConfSpaceCompiler : SharedSpec({
 	group("glycine dipeptide") {
 
 		val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("preppedMols/gly-gly.omol.toml"))[0] as Polymer
+		val res72 = mol.findChainOrThrow("A").findResidueOrThrow("72")
+		val res73 = mol.findChainOrThrow("A").findResidueOrThrow("73")
 
 		group("no positions") {
 
@@ -154,16 +189,10 @@ class TestConfSpaceCompiler : SharedSpec({
 			}
 		}
 
-		group("two positions") {
+		group("two discrete positions") {
 
-			val res72 = mol.findChainOrThrow("A").findResidueOrThrow("72")
-			val res73 = mol.findChainOrThrow("A").findResidueOrThrow("73")
 			val pos1 = Proteins.makeDesignPosition(mol, res72, "Pos1")
 			val pos2 = Proteins.makeDesignPosition(mol, res73, "Pos2")
-
-			// make the wildtype fragments
-			val wtFrag1 = pos1.makeFragment("wt1", "WildType")
-			val wtFrag2 = pos2.makeFragment("wt2", "WildType")
 
 			val confSpace = ConfSpace(listOf(MoleculeType.Protein to mol)).apply {
 
@@ -174,6 +203,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				positionConfSpaces.getOrMake(pos1).run {
 
 					// add the wt frag
+					val wtFrag1 = pos1.makeFragment("wt1", "WildType")
 					wildTypeFragment = wtFrag1
 
 					// add some mutations
@@ -195,6 +225,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				positionConfSpaces.getOrMake(pos2).run {
 
 					// add the wt frag
+					val wtFrag2 = pos2.makeFragment("wt2", "WildType")
 					wildTypeFragment = wtFrag2
 
 					// add some mutations
@@ -217,32 +248,123 @@ class TestConfSpaceCompiler : SharedSpec({
 			}
 			val compiledConfSpace = confSpace.compile()
 
-			test("wt-wt") {
-				compiledConfSpace.assign("wt1:wt1", "wt2:wt2").run {
-					calcAmber96().shouldBeEnergy(-2.9082532723206453)
-					calcEEF1().shouldBeEnergy(-47.75509989567506)
-				}
+			testConf(compiledConfSpace, "wt1:wt1", "wt2:wt2") {
+				calcAmber96().shouldBeEnergy(-2.9082532723206453)
+				calcEEF1().shouldBeEnergy(-47.75509989567506)
 			}
 
-			test("asp:p30-leu:tt") {
-				compiledConfSpace.assign("ASPn:p30", "LEU:tt").run {
-					calcAmber96().shouldBeEnergy(31.328372547103974)
-					calcEEF1().shouldBeEnergy(-57.897054356496625)
-				}
+			testConf(compiledConfSpace, "ASPn:p30", "LEU:tt") {
+				calcAmber96().shouldBeEnergy(31.328372547103974)
+				calcEEF1().shouldBeEnergy(-57.897054356496625)
 			}
 
-			test("asp:m-20-leu:tp") {
-				compiledConfSpace.assign("ASPn:m-20", "LEU:tp").run {
-					calcAmber96().shouldBeEnergy(-2.4030562287427513)
-					calcEEF1().shouldBeEnergy(-59.597396462270645)
-				}
+			testConf(compiledConfSpace, "ASPn:m-20", "LEU:tp") {
+				calcAmber96().shouldBeEnergy(-2.4030562287427513)
+				calcEEF1().shouldBeEnergy(-59.597396462270645)
 			}
 
-			test("ser:t_0-pro:up") {
-				compiledConfSpace.assign("SERn:t_0", "PRO:up").run {
-					calcAmber96().shouldBeEnergy(3681646.881490728)
-					calcEEF1().shouldBeEnergy(-41.52398320030191)
+			testConf(compiledConfSpace, "SERn:t_0", "PRO:up") {
+				calcAmber96().shouldBeEnergy(3681646.881490728)
+				calcEEF1().shouldBeEnergy(-41.52398320030191)
+			}
+		}
+
+		group("one continuous position") {
+
+			val pos1 = Proteins.makeDesignPosition(mol, res73, "Pos1")
+
+			val confSpace = ConfSpace(listOf(MoleculeType.Protein to mol)).apply {
+
+				// make one design position for the dipeptide at the C terminus
+				designPositionsByMol[mol] = mutableListOf(pos1)
+
+				// configure pos 1
+				positionConfSpaces.getOrMake(pos1).run {
+
+					// don't bother with the wild-type, glycine has no dihedrals
+
+					// add some mutations
+					val ala = conflib.fragments.getValue("ALA")
+					val leu = conflib.fragments.getValue("LEU")
+					val lys = conflib.fragments.getValue("LYS")
+					mutations.add(ala.type)
+					mutations.add(leu.type)
+					mutations.add(lys.type)
+
+					// add some confs
+					confs[ala] = ala.getConfs("ALA")
+					confs[leu] = leu.getConfs("pp", "tp", "tt")
+					confs[lys] = lys.getConfs("ptpt", "tptm", "mttt")
+
+					// add continuous degrees of freedom
+					dofSettings[ala] = ConfSpace.PositionConfSpace.DofSettings(
+						includeHGroupRotations = true,
+						dihedralRadiusDegrees = 5.0
+					)
+					dofSettings[leu] = ConfSpace.PositionConfSpace.DofSettings(
+						includeHGroupRotations = false,
+						dihedralRadiusDegrees = 9.0
+					)
+					dofSettings[lys] = ConfSpace.PositionConfSpace.DofSettings(
+						includeHGroupRotations = false,
+						dihedralRadiusDegrees = 9.0
+					)
 				}
+			}
+			val compiledConfSpace = confSpace.compile()
+
+			testConf(compiledConfSpace, "ALA:ALA") {
+
+				// make sure we got the right dofs
+				dofs.size shouldBe 1
+				dofs[0].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+					(angle.max() - angle.min()).toDegrees() shouldBe 10.0.absolutely(1e-9)
+				}
+
+				// check minimized energy
+				minimize().energy shouldBeLessThan -48.01726089618421
+			}
+
+			testConf(compiledConfSpace, "LEU:pp") {
+
+				// make sure we got the right dofs
+				dofs.size shouldBe 2
+				for (i in 0 until 2) {
+					dofs[i].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+						(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
+					}
+				}
+
+				// check minimized energy
+				minimize().energy shouldBeLessThan -44.76305148873534
+			}
+
+			testConf(compiledConfSpace, "LEU:tt") {
+
+				// make sure we got the right dofs
+				dofs.size shouldBe 2
+				for (i in 0 until 2) {
+					dofs[i].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+						(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
+					}
+				}
+
+				// check minimized energy
+				minimize().energy shouldBeLessThan -24.801305933011164
+			}
+
+			testConf(compiledConfSpace, "LYS:ptpt") {
+
+				// make sure we got the right dofs
+				dofs.size shouldBe 4
+				for (i in 0 until 4) {
+					dofs[i].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+						(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
+					}
+				}
+
+				// check minimized energy
+				minimize().energy shouldBeLessThan -64.30395031713154
 			}
 		}
 	}
