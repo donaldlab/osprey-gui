@@ -467,7 +467,9 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 												initialDegrees - settings.dihedralRadiusDegrees,
 												initialDegrees + settings.dihedralRadiusDegrees,
 												listOf(dihedral.a, dihedral.b, dihedral.c, dihedral.d)
-													.map { confAtomIndices.getValue(it) }
+													// if the atom is in the conf atoms, use a positive index
+													// if the atom is in the static atoms, use a negative index
+													.map { confAtomIndices[it] ?: staticAtomIndices.getValue(it).let { -it - 1 } }
 													.joinToString(", ") { it.toString() },
 												dihedral.rotatedAtoms
 													.map { confAtomIndices.getValue(it) }
