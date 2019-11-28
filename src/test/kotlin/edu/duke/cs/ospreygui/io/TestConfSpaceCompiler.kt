@@ -22,6 +22,7 @@ import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
 import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
+import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
 import io.kotlintest.shouldBe
 
 
@@ -115,14 +116,15 @@ class TestConfSpaceCompiler : SharedSpec({
 		return CompiledConfSpace(toml)
 	}
 
-	fun CompiledConfSpace.assign(vararg confIds: String) =
-		assign(
+	fun CompiledConfSpace.makeCoords(vararg confIds: String) =
+		makeCoords(
 			confIds
 				.mapIndexed { i, confId -> positions[i].findConfOrThrow(confId).index }
 				.toIntArray()
 		)
 	fun AssignedCoords.calcAmber96() = confSpace.ecalcs[0].calcEnergy(this)
 	fun AssignedCoords.calcEEF1() = confSpace.ecalcs[1].calcEnergy(this)
+	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace).minimize(assignments).energy
 
 	fun Group.testConf(
 		compiledConfSpace: CompiledConfSpace,
@@ -143,7 +145,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 		// define the test
 		test("conf: " + confIds.joinToString(", "), focus = focus) {
-			compiledConfSpace.assign(*confIds).run(block)
+			compiledConfSpace.makeCoords(*confIds).run(block)
 		}
 	}
 
@@ -156,7 +158,7 @@ class TestConfSpaceCompiler : SharedSpec({
 		// get the one conformation
 		val conf = ConfSpace(listOf(MoleculeType.Protein to mol))
 			.compile()
-			.assign()
+			.makeCoords()
 
 		test("amber") {
 			conf.calcAmber96().shouldBeEnergy(-489.08432295295387)
@@ -178,7 +180,7 @@ class TestConfSpaceCompiler : SharedSpec({
 			// get the one conformation
 			val conf = ConfSpace(listOf(MoleculeType.Protein to mol))
 				.compile()
-				.assign()
+				.makeCoords()
 
 			test("amber") {
 				conf.calcAmber96().shouldBeEnergy(-2.908253272320646)
@@ -322,7 +324,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimize().energy shouldBeLessThan -48.01726089618421
+				minimizeEnergy() shouldBeLessThan -48.01726089618421
 			}
 
 			testConf(compiledConfSpace, "LEU:pp") {
@@ -336,7 +338,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimize().energy shouldBeLessThan -44.76305148873534
+				minimizeEnergy() shouldBeLessThan -44.76305148873534
 			}
 
 			testConf(compiledConfSpace, "LEU:tt") {
@@ -350,7 +352,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimize().energy shouldBeLessThan -24.801305933011164
+				minimizeEnergy() shouldBeLessThan -24.801305933011164
 			}
 
 			testConf(compiledConfSpace, "LYS:ptpt") {
@@ -364,7 +366,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimize().energy shouldBeLessThan -64.30395031713154
+				minimizeEnergy() shouldBeLessThan -64.30395031713154
 			}
 		}
 	}
