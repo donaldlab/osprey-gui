@@ -76,6 +76,9 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 				|| this.types.atomCharges[thisAtom] != baseline.types.atomCharges[baseAtom]
 		}
 
+		override fun atomDescription(atom: Atom) =
+			"type=${types.atomTypes[atom]}, charge=${types.atomCharges[atom]}"
+
 		// NOTE: don't define hashCode() or equals() here
 		// the topology cache depends on hash tables using this class
 		// with identity comparisons rather than value comparisons
@@ -211,7 +214,7 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		// get the amber "topology" which has the real forcefield parameters in it
 		val top = topCache.getOrPut(TopKey(molaParams, molbParams)) {
 
-			// cache miss, caluate the topology for this molecule pair
+			// cache miss, calcuate the topology for this molecule pair
 
 			// collect the molecules and amber types
 			// collapse identical molecules if possible

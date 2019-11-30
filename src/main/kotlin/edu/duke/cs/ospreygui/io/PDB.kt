@@ -161,6 +161,7 @@ fun Molecule.toOspreyMol(): OspreyMolecule {
 	for ((atom, oatom) in atomMap) {
 		for (bonded in mol.bonds.bondedAtoms(atom)) {
 			val obonded = atomMap[bonded]
+				?: throw NoSuchElementException("bonded atom $bonded (bonded to $atom) not in this molecule: $mol")
 			if (obonded !in oatom.bonds) {
 				oatom.addBond(obonded)
 			}

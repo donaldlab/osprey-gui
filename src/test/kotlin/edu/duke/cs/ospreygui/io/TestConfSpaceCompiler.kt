@@ -5,6 +5,7 @@ import cuchaz.kludge.tools.toDegrees
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.identityHashMapOf
+import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.tools.identityHashSetOf
 import edu.duke.cs.osprey.confspace.compiled.motions.DihedralAngle
 import edu.duke.cs.ospreygui.OspreyGui
@@ -23,10 +24,32 @@ import io.kotlintest.matchers.types.shouldBeTypeOf
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
 import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
 import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
+import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
 import io.kotlintest.shouldBe
 
 
 class TestConfSpaceCompiler : SharedSpec({
+
+	/* TODO: make a GUI for this
+	run {
+		println("compiling ...")
+		val confSpace = ConfSpace.fromToml(Paths.get("dipeptide.5hydrophobic.confspace.toml").read())
+		val toml = ConfSpaceCompiler(confSpace).run {
+
+			addForcefield(Forcefield.Amber96)
+			addForcefield(Forcefield.EEF1)
+
+			compile().run {
+				errors.size shouldBe 0
+				println("compiled, compressing ...")
+				LZMA2.compress(toml).write(Paths.get("dipeptide.5hydrophobic.ccs.toml.xz"))
+				println("compressed!")
+			}
+		}
+
+		exitProcess(0)
+	}
+	*/
 
 	// load some amino acid confs
 	val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
@@ -72,15 +95,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 	/** Used to compute the expected energies for conformations */
 	@Suppress("unused")
-	fun Molecule.dumpEnergies(vararg assignments: Pair<DesignPosition,String>) {
-
-		// set the conformations
-		for ((pos, assignment) in assignments) {
-			val (fragId, confId) = assignment.split(":")
-			val frag = conflib.fragments.getValue(fragId)
-			val conf = frag.confs.getValue(confId)
-			pos.setConf(frag, conf)
-		}
+	fun Molecule.dumpEnergies() {
 
 		// calculate and show the energies
 		val amber96 = calcAmber96Energy()
@@ -92,6 +107,32 @@ class TestConfSpaceCompiler : SharedSpec({
 		""".trimMargin())
 	}
 
+	/** Used to compute the expected energies for conformations */
+	@Suppress("unused")
+	fun ConfSpace.dumpEnergies(vararg assignments: Pair<DesignPosition,String>) {
+
+		backupPositions(*assignments.map { (pos, _) -> pos }.toTypedArray()) {
+
+			// set the conformations
+			for ((pos, id) in assignments) {
+				val (fragId, confId) = id.split(":")
+				val posConfSpace = positionConfSpaces[pos]!!
+				val frag = posConfSpace.confs.keys.find { it.id == fragId }!!
+				val conf = posConfSpace.confs[frag]!!.find { it.id == confId }!!
+				pos.setConf(frag, conf)
+			}
+
+			// get the molecule from the positions
+			val mol = assignments
+				.map { (pos, _) -> pos.mol }
+				.toCollection(identityHashSet())
+				.takeIf { it.size == 1 }
+				?.first()
+				?: throw Error("positions are in different molecules")
+
+			mol.dumpEnergies()
+		}
+	}
 
 	fun ConfSpace.compile(): CompiledConfSpace {
 
@@ -107,8 +148,9 @@ class TestConfSpaceCompiler : SharedSpec({
 			}
 
 			compile().run {
-				errors.size shouldBe 0
-				toml
+				compiled?.toToml()
+					?: error?.let { throw it }
+					?: throw Error("no compiled")
 			}
 		}
 
@@ -124,31 +166,20 @@ class TestConfSpaceCompiler : SharedSpec({
 		)
 	fun AssignedCoords.calcAmber96() = confSpace.ecalcs[0].calcEnergy(this)
 	fun AssignedCoords.calcEEF1() = confSpace.ecalcs[1].calcEnergy(this)
+	fun AssignedCoords.calcEnergy() = calcAmber96() + calcEEF1()
 	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace).minimize(assignments).energy
 
 	fun Group.testConf(
 		compiledConfSpace: CompiledConfSpace,
 		vararg confIds: String,
 		focus: Boolean = false,
-		dump: Pair<Molecule,List<DesignPosition>>? = null,
 		block: AssignedCoords.() -> Unit
 	) {
-		// dump the energies if needed
-		if (dump != null) {
-			val (mol, positions) = dump
-			mol.dumpEnergies(
-				*positions
-					.mapIndexed { i, pos -> pos to confIds[i] }
-					.toTypedArray()
-			)
-		}
-
-		// define the test
+		// define the test, and make the conformation coords
 		test("conf: " + confIds.joinToString(", "), focus = focus) {
 			compiledConfSpace.makeCoords(*confIds).run(block)
 		}
 	}
-
 
 	// this essentially tests the static energy calculation
 	group("1cc8 no positions") {
@@ -171,11 +202,12 @@ class TestConfSpaceCompiler : SharedSpec({
 
 	group("glycine dipeptide") {
 
-		val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("preppedMols/gly-gly.omol.toml"))[0] as Polymer
-		val res72 = mol.findChainOrThrow("A").findResidueOrThrow("72")
-		val res73 = mol.findChainOrThrow("A").findResidueOrThrow("73")
+		fun loadMol() =
+			Molecule.fromOMOL(OspreyGui.getResourceAsString("preppedMols/gly-gly.omol.toml"))[0] as Polymer
 
 		group("no positions") {
+
+			val mol = loadMol()
 
 			// get the one conformation
 			val conf = ConfSpace(listOf(MoleculeType.Protein to mol))
@@ -192,6 +224,10 @@ class TestConfSpaceCompiler : SharedSpec({
 		}
 
 		group("two discrete positions") {
+
+			val mol = loadMol()
+			val res72 = mol.findChainOrThrow("A").findResidueOrThrow("72")
+			val res73 = mol.findChainOrThrow("A").findResidueOrThrow("73")
 
 			val pos1 = Proteins.makeDesignPosition(mol, res72, "Pos1")
 			val pos2 = Proteins.makeDesignPosition(mol, res73, "Pos2")
@@ -273,6 +309,8 @@ class TestConfSpaceCompiler : SharedSpec({
 
 		group("one continuous position") {
 
+			val mol = loadMol()
+			val res73 = mol.findChainOrThrow("A").findResidueOrThrow("73")
 			val pos1 = Proteins.makeDesignPosition(mol, res73, "Pos1")
 
 			val confSpace = ConfSpace(listOf(MoleculeType.Protein to mol)).apply {
@@ -324,7 +362,10 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimizeEnergy() shouldBeLessThan -48.01726089618421
+				(-48.01726089618421).let {
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy() shouldBeLessThan it
+				}
 			}
 
 			testConf(compiledConfSpace, "LEU:pp") {
@@ -338,7 +379,10 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimizeEnergy() shouldBeLessThan -44.76305148873534
+				(-44.76305148873534).let {
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy() shouldBeLessThan it
+				}
 			}
 
 			testConf(compiledConfSpace, "LEU:tt") {
@@ -352,7 +396,10 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimizeEnergy() shouldBeLessThan -24.801305933011164
+				(-24.801305933011164).let {
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy() shouldBeLessThan it
+				}
 			}
 
 			testConf(compiledConfSpace, "LYS:ptpt") {
@@ -366,7 +413,10 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 
 				// check minimized energy
-				minimizeEnergy() shouldBeLessThan -64.30395031713154
+				(-64.30395031713154).let {
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy() shouldBeLessThan it
+				}
 			}
 		}
 	}

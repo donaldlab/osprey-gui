@@ -21,40 +21,16 @@ interface ForcefieldParams {
 	/**
 	 * An opaque type the parameterizer can use to store parameters for a molecule.
 	 */
-	abstract class MolParams(
-		val mol: Molecule
-	) {
+	abstract class MolParams(val mol: Molecule) {
 
 		/**
-		 * Useful for mapping atoms across molecules efficiently.
+		 * Efficiently maps atom instances across molecules,
+		 * assuming the two molecules have atoms with identical properties,
+		 * but different Atom object instances.
 		 */
-		val atomsLookup = mol.atoms.associateWith { it }
+		private val atomsLookup = mol.atoms.associateWith { it }
 
 		abstract fun isChanged(thisAtom: Atom, baseline: MolParams, baseAtom: Atom): Boolean
-
-		/**
-		 * Return the atoms in this molecule whose params differ from the atoms in the baseline params.
-		 */
-		fun findChangedAtoms(baseline: MolParams, atoms: Set<Atom>): Set<Atom> {
-
-			// make it easy to find atoms in the baseline
-			val baseAtoms = baseline.mol.atoms.associateWith { it }
-
-			return atoms
-				.filter { atom ->
-
-					// map the atom to our params molecule
-					val thisAtom = findAtom(atom)
-
-					// match to the atom in the baseline
-					val baseAtom = baseAtoms[thisAtom]
-						?: throw NoSuchElementException("Atom not found in baseline: $thisAtom")
-
-					// did any params change?
-					isChanged(thisAtom, baseline, baseAtom)
-				}
-				.toIdentitySet()
-		}
 
 		/**
 		 * Find the atoms in this molecule that correspond to the given atoms,
@@ -64,6 +40,17 @@ interface ForcefieldParams {
 			return atomsLookup[otherAtom]
 				?: throw NoSuchElementException("no matching atom found in this mol like $otherAtom")
 		}
+
+		/**
+		 * Render the forcefield parameters for this atom into a human-readable string.
+		 */
+		abstract fun atomDescription(atom: Atom): String
+
+		/**
+		 * Like `atomDescription`, but calls `findAtom` on the atom first.
+		 */
+		fun findAtomDescription(atom: Atom): String =
+			atomDescription(findAtom(atom))
 	}
 
 	/**
@@ -103,6 +90,24 @@ interface ForcefieldParams {
 
 
 	companion object {
+
+		/**
+		 * Return atoms whose params differ
+		 * from the equivalent atoms in the given params.
+		 */
+		fun filterChangedAtoms(atoms: Set<Atom>, params1: MolParams, params2: MolParams): Set<Atom> {
+			return atoms
+				.filter { atom ->
+
+					// map the atoms to the params mols
+					val atom1 = params1.findAtom(atom)
+					val atom2 = params2.findAtom(atom)
+
+					// did any params change?
+					params1.isChanged(atom1, params2, atom2)
+				}
+				.toIdentitySet()
+		}
 
 		fun forEachPair(atomsByMola: Map<Molecule,List<Atom>>, atomsByMolb: Map<Molecule,List<Atom>>, func: FfparamsPairFunc) {
 			for ((mola, atomsa) in atomsByMola) {

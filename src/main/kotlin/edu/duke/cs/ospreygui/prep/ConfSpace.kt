@@ -90,53 +90,24 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 			}
 
 	/**
-	 * Apply all the conformations in the conf space, one-at-a-time,
-	 * and then restore the molecule to its original state.
+	 * Automatically undoes any conformational changes to the given design positions
+	 * after executing the supplied function.
 	 */
-	fun forEachConf(block: (DesignPosition, ConfLib.Fragment, ConfLib.Conf) -> Unit) {
-		for (pos in positions()) {
-			forEachConf(pos) { frag, conf ->
-				block(pos, frag, conf)
-			}
-		}
-	}
+	inline fun <R> backupPositions(vararg positions: DesignPosition, block: () -> R): R {
 
-	inline fun <R> backupPosition(pos: DesignPosition, block: () -> R): R {
-
-		// save the original conf
-		val originalFrag = pos.makeFragment("original", "Original")
+		// save the original conformations
+		val backupFrags = positions
+			.toList()
+			.associateIdentity { pos -> pos to pos.makeFragment("backup", "backup") }
 
 		try {
 			return block()
 		} finally {
 
-			// restore the original conf
-			pos.setConf(originalFrag, originalFrag.confs.values.first())
-		}
-	}
-
-	/**
-	 * Iterates over the conformations in the position conf space,
-	 * setting each conformation to the design position in turn.
-	 * Conformations are sorted (by fragment id, then conf id) so
-	 * the iteration order is deterministic.
-	 */
-	fun forEachConf(pos: DesignPosition, func: (ConfLib.Fragment, ConfLib.Conf) -> Unit) {
-
-		val posConfSpace = positionConfSpaces[pos] ?: return
-
-		backupPosition(pos) {
-			posConfSpace.confs
-				.toList()
-				.sortedBy { (frag, _) -> frag.id }
-				.forEach { (frag, confs) ->
-					confs
-						.sortedBy { it.id }
-						.forEach { conf ->
-							pos.setConf(frag, conf)
-							func(frag, conf)
-						}
-				}
+			// restore the original conformations
+			for ((pos, backupFrag) in backupFrags) {
+				pos.setConf(backupFrag, backupFrag.confs.values.first())
+			}
 		}
 	}
 

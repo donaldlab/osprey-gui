@@ -45,6 +45,9 @@ class EEF1ForcefieldParams : ForcefieldParams {
 
 			return this.types.getValue(thisAtom) != baseline.types.getValue(baseAtom)
 		}
+
+		override fun atomDescription(atom: Atom) =
+			"type=${types.getValue(atom).name}"
 	}
 
 	override fun parameterize(mol: Molecule, netCharge: Int?) =

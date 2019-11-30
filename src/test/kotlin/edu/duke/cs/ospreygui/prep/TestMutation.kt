@@ -2,6 +2,7 @@ package edu.duke.cs.ospreygui.prep
 
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.dofs.dihedralAngle
@@ -9,6 +10,7 @@ import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.show
 import io.kotlintest.matchers.beLessThanOrEqualTo
+import io.kotlintest.matchers.collections.shouldContain
 import io.kotlintest.matchers.types.shouldBeSameInstanceAs
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import io.kotlintest.should
@@ -29,6 +31,29 @@ class TestMutation : SharedSpec({
 
 	fun Polymer.Residue.shouldHaveAtomNear(atomName: String, x: Double, y: Double, z: Double) =
 		shouldHaveAtomNear(atomName, Vector3d(x, y, z))
+
+	fun Molecule.shouldBeConsistent() {
+
+		val atomsLookup = atoms.toIdentitySet()
+
+		// check that all residue atoms are also in the main atoms list
+		if (this is Polymer) {
+			for (chain in chains) {
+				for (res in chain.residues) {
+					for (atom in res.atoms) {
+						atomsLookup shouldContain atom
+					}
+				}
+			}
+		}
+
+		// check that all the bonds are to atoms also in the molecule
+		for (atom in atoms) {
+			for (bondedAtom in bonds.bondedAtoms(atom)) {
+				atomsLookup shouldContain bondedAtom
+			}
+		}
+	}
 
 	/**
 	 * Use this to visually inspect the mutation, to see if the atoms and bonds look correct.
@@ -187,6 +212,7 @@ class TestMutation : SharedSpec({
 			res.shouldHaveAtomNear("HA2", 5.865571, -1.028786, 8.932637)
 			res.shouldHaveAtomNear("HA3", 6.167383, -1.604053, 7.287993)
 			res.shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("glycine->valine") {
@@ -224,6 +250,7 @@ class TestMutation : SharedSpec({
 			res.shouldHaveAtomNear("HG22", 5.737316, -3.432624, 8.466278)
 			res.shouldHaveAtomNear("HG23", 4.558468, -3.099393, 7.152487)
 			res.shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("glycine->tryptophan") {
@@ -269,6 +296,7 @@ class TestMutation : SharedSpec({
 			res.shouldHaveAtomNear("HZ3", 10.727176, 0.101402, 4.621522)
 			res.shouldHaveAtomNear("HH2", 12.622241, -1.003771, 5.791199)
 			res.shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("glycine->proline") {
@@ -305,6 +333,7 @@ class TestMutation : SharedSpec({
 			res.shouldHaveAtomNear("CD", 3.948287, -1.376688, 6.416172)
 			res.shouldHaveAtomNear("HB2", 6.653983, -1.333461, 5.948938)
 			res.shouldHaveAtomNear("HD3", 4.019604, -0.850028, 5.452965)
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("glycine->proline->back") {
@@ -339,6 +368,7 @@ class TestMutation : SharedSpec({
 			for ((atomName, atomPos) in wtPositions) {
 				res.shouldHaveAtomNear(atomName, atomPos)
 			}
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("glycine->valine->serine") {
@@ -369,6 +399,7 @@ class TestMutation : SharedSpec({
 			res.shouldHaveAtomNear("OG", 7.667992, -2.225024, 7.443905)
 			res.shouldHaveAtomNear("HG", 7.706109, -2.447422, 8.418113)
 			res.shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("glycine->valine->back") {
@@ -403,6 +434,7 @@ class TestMutation : SharedSpec({
 			for ((atomName, atomPos) in wtPositions) {
 				res.shouldHaveAtomNear(atomName, atomPos)
 			}
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("proline->glycine") {
@@ -432,6 +464,7 @@ class TestMutation : SharedSpec({
 			res.shouldHaveAtomNear("HA2", 17.447047, 21.736009, 14.581452)
 			res.shouldHaveAtomNear("HA3", 18.980680, 20.914459, 14.265382)
 			res.shouldHaveAtomNear("H", 18.497148, 19.433047, 16.140951)
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("proline->glycine->back") {
@@ -473,6 +506,7 @@ class TestMutation : SharedSpec({
 			for ((atomName, atomPos) in wtPositions) {
 				res.shouldHaveAtomNear(atomName, atomPos)
 			}
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("Nala->glycine") {
@@ -503,6 +537,7 @@ class TestMutation : SharedSpec({
 			res.shouldHaveAtomNear("H3", 14.686749, 27.541349, 25.018984)
 			res.shouldHaveAtomNear("HA2", 14.542628, 24.991303, 24.041222)
 			res.shouldHaveAtomNear("HA3", 13.526968, 25.811973, 25.233619)
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("Nala->glycine->back") {
@@ -536,6 +571,7 @@ class TestMutation : SharedSpec({
 			for ((atomName, atomPos) in wtPositions) {
 				res.shouldHaveAtomNear(atomName, atomPos)
 			}
+			protein1cc8.shouldBeConsistent()
 		}
 
 		test("glycine->valine chi1") {
