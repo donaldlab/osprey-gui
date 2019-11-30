@@ -337,15 +337,15 @@ class TestConfSpaceCompiler : SharedSpec({
 					confs[lys] = lys.getConfs("ptpt", "tptm", "mttt")
 
 					// add continuous degrees of freedom
-					dofSettings[ala] = ConfSpace.PositionConfSpace.DofSettings(
+					motionSettings[ala] = ConfSpace.PositionConfSpace.MotionSettings(
 						includeHGroupRotations = true,
 						dihedralRadiusDegrees = 5.0
 					)
-					dofSettings[leu] = ConfSpace.PositionConfSpace.DofSettings(
+					motionSettings[leu] = ConfSpace.PositionConfSpace.MotionSettings(
 						includeHGroupRotations = false,
 						dihedralRadiusDegrees = 9.0
 					)
-					dofSettings[lys] = ConfSpace.PositionConfSpace.DofSettings(
+					motionSettings[lys] = ConfSpace.PositionConfSpace.MotionSettings(
 						includeHGroupRotations = false,
 						dihedralRadiusDegrees = 9.0
 					)

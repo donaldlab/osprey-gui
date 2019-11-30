@@ -11,9 +11,9 @@ import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.MoleculeRenderView
-import edu.duke.cs.ospreygui.dofs.DihedralAngle
-import edu.duke.cs.ospreygui.dofs.dihedralAngle
-import edu.duke.cs.ospreygui.dofs.supportsDihedralAngle
+import edu.duke.cs.ospreygui.motions.DihedralAngle
+import edu.duke.cs.ospreygui.motions.dihedralAngle
+import edu.duke.cs.ospreygui.motions.supportsDihedralAngle
 import edu.duke.cs.ospreygui.features.components.ConfLibPicker
 import edu.duke.cs.ospreygui.features.components.DesignPositionEditor
 import edu.duke.cs.ospreygui.features.components.default
@@ -59,8 +59,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				val id = conflib.fragRuntimeId(frag)
 				val confs = posInfo.confSpace.confs
 					.getOrPut(frag) { identityHashSet() }
-				val dofSettings = posInfo.confSpace.dofSettings
-					.getOrPut(frag) { ConfSpace.PositionConfSpace.DofSettings.default() }
+				val motionSettings = posInfo.confSpace.motionSettings
+					.getOrPut(frag) { ConfSpace.PositionConfSpace.MotionSettings.default() }
 
 				inner class ConfInfo(val conf: ConfLib.Conf) {
 
@@ -112,7 +112,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		var selectedFragInfo: MutInfo.FragInfo? = null
 		var selectedConfInfo: MutInfo.FragInfo.ConfInfo? = null
 
-		val dofInfos = ArrayList<DofInfo>()
+		val motionInfos = ArrayList<MotionInfo>()
 		val pJiggle = Ref.of(false)
 
 		@Suppress("RemoveRedundantQualifierName") // this qualifier is not redundant. IntelliJ is wrong. ;_;
@@ -321,7 +321,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 			setConf(view, fragInfo.frag, confInfo.conf)
 
-			resetDofInfos()
+			resetMotionInfos()
 		}
 
 		fun activateContinuousTab(view: MoleculeRenderView) {
@@ -347,21 +347,21 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			} else {
 				selectedFragInfo = null
 				selectedConfInfo = null
-				resetDofInfos()
+				resetMotionInfos()
 			}
 		}
 
-		fun resetDofInfos() {
+		fun resetMotionInfos() {
 
-			dofInfos.clear()
+			motionInfos.clear()
 
 			val fragInfo = selectedFragInfo ?: return
 			val confInfo = selectedConfInfo ?: return
 
-			// find the dof settings for this fragment
-			selectedFragInfo?.dofSettings?.let { dofSettings ->
-				pIncludeHGroupRotations.value = dofSettings.includeHGroupRotations
-				pDihedralRadiusDegrees.value = dofSettings.dihedralRadiusDegrees.toFloat()
+			// find the motion settings for this fragment
+			selectedFragInfo?.motionSettings?.let { motionSettings ->
+				pIncludeHGroupRotations.value = motionSettings.includeHGroupRotations
+				pDihedralRadiusDegrees.value = motionSettings.dihedralRadiusDegrees.toFloat()
 			}
 
 			val match = posInfo.pos.findAnchorMatch(fragInfo.frag)
@@ -384,29 +384,29 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				}
 
 
-			// build the DoFs for the selected fragment, if any
-			dofs@for (dof in fragInfo.frag.dofs) {
-				when (dof) {
-					is ConfLib.DegreeOfFreedom.DihedralAngle -> {
+			// build the continuous motions for the selected fragment, if any
+			motions@for (motion in fragInfo.frag.motions) {
+				when (motion) {
+					is ConfLib.ContinuousMotion.DihedralAngle -> {
 
 						// filter out h-group rotations if needed
-						val isHGroupRotation = dof.affectedAtoms(fragInfo.frag)
+						val isHGroupRotation = motion.affectedAtoms(fragInfo.frag)
 							.let { atoms ->
 								atoms.isNotEmpty() && atoms.all { it.element == Element.Hydrogen }
 							}
 						if (!pIncludeHGroupRotations.value && isHGroupRotation) {
-							continue@dofs
+							continue@motions
 						}
 
-						dofInfos.add(DofInfo.DihedralInfo(
-							dofInfos.size,
+						motionInfos.add(MotionInfo.DihedralInfo(
+							motionInfos.size,
 							posInfo.pos,
-							dof,
+							motion,
 							initialDegrees = DihedralAngle.measureDegrees(
-								dof.a.resolveCoords(),
-								dof.b.resolveCoords(),
-								dof.c.resolveCoords(),
-								dof.d.resolveCoords()
+								motion.a.resolveCoords(),
+								motion.b.resolveCoords(),
+								motion.c.resolveCoords(),
+								motion.d.resolveCoords()
 							),
 							radiusDegrees = pDihedralRadiusDegrees.value.toDouble()
 						))
@@ -457,8 +457,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 							""".trimMargin())
 
 							if (sliderFloat("##dihedralRadius", pDihedralRadiusDegrees, 0f, 180f, "%.1f")) {
-								fragInfo.dofSettings.dihedralRadiusDegrees = pDihedralRadiusDegrees.value.toDouble()
-								resetDofInfos()
+								fragInfo.motionSettings.dihedralRadiusDegrees = pDihedralRadiusDegrees.value.toDouble()
+								resetMotionInfos()
 							}
 							sameLine()
 							infoTip("Ctrl-click to type a precise value")
@@ -466,13 +466,13 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 							spacing()
 
 							if (checkbox("Include H-group rotations", pIncludeHGroupRotations)) {
-								fragInfo.dofSettings.includeHGroupRotations = pIncludeHGroupRotations.value
-								resetDofInfos()
+								fragInfo.motionSettings.includeHGroupRotations = pIncludeHGroupRotations.value
+								resetMotionInfos()
 							}
 						}
 					}
 				}
-				column(300f) { // DoFs column
+				column(300f) { // motions column
 
 					text("Choose a conformation to test:")
 					child("testConfs", 280f, 140f, true) {
@@ -498,9 +498,9 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 					text("Degrees of Freedom:")
 					indent(20f)
 
-					if (dofInfos.isNotEmpty()) {
+					if (motionInfos.isNotEmpty()) {
 
-						for (dofInfo in dofInfos) {
+						for (motionInfo in motionInfos) {
 
 							// breathe a little
 							spacing()
@@ -509,8 +509,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 							spacing()
 							spacing()
 
-							text(dofInfo.label)
-							dofInfo.gui(imgui, view)
+							text(motionInfo.label)
+							motionInfo.gui(imgui, view)
 						}
 
 						spacing()
@@ -529,7 +529,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 						""".trimMargin())
 
 						if (pJiggle.value) {
-							dofInfos.forEach { it.jiggle(rand) }
+							motionInfos.forEach { it.jiggle(rand) }
 							view.moleculeChanged()
 						}
 
@@ -549,7 +549,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			posInfo.confSpace.wildTypeFragment?.let { setConf(view, it, it.confs.values.first()) }
 
 			// cleanup
-			dofInfos.clear()
+			motionInfos.clear()
 		}
 	}
 
@@ -766,7 +766,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 }
 
 
-private sealed class DofInfo {
+private sealed class MotionInfo {
 
 	abstract val label: String
 	abstract fun gui(imgui: Commands, view: MoleculeRenderView)
@@ -775,14 +775,14 @@ private sealed class DofInfo {
 	class DihedralInfo(
 		val id: Int,
 		pos: DesignPosition,
-		dof: ConfLib.DegreeOfFreedom.DihedralAngle,
+		motion: ConfLib.ContinuousMotion.DihedralAngle,
 		val initialDegrees: Double,
 		val radiusDegrees: Double
-	) : DofInfo() {
+	) : MotionInfo() {
 
-		inner class AngleInfo(pos: DesignPosition, dof: ConfLib.DegreeOfFreedom.DihedralAngle) {
+		inner class AngleInfo(pos: DesignPosition, motion: ConfLib.ContinuousMotion.DihedralAngle) {
 
-			val dihedral = pos.dihedralAngle(dof)
+			val dihedral = pos.dihedralAngle(motion)
 				.apply {
 					setDegrees(initialDegrees)
 				}
@@ -796,8 +796,8 @@ private sealed class DofInfo {
 		}
 
 		val angleInfo =
-			if (pos.supportsDihedralAngle(dof)) {
-				AngleInfo(pos, dof)
+			if (pos.supportsDihedralAngle(motion)) {
+				AngleInfo(pos, motion)
 			} else {
 				null
 			}
@@ -807,7 +807,7 @@ private sealed class DofInfo {
 		override fun gui(imgui: Commands, view: MoleculeRenderView): Unit = imgui.run {
 			angleInfo?.run {
 				text("Range: %.1f to %.1f".format(minValue, maxValue))
-				if (sliderFloat("Angle##dof-$id", pValue, minValue, maxValue, format = "%.1f")) {
+				if (sliderFloat("Angle##motion-$id", pValue, minValue, maxValue, format = "%.1f")) {
 					dihedral.setDegrees(pValue.value.toDouble())
 					view.moleculeChanged()
 				}

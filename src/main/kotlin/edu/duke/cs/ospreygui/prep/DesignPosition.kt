@@ -226,7 +226,7 @@ class DesignPosition(
 		fragName: String,
 		confId: String = fragId,
 		confName: String = fragName,
-		dofs: List<ConfLib.DegreeOfFreedom> = emptyList()
+		motions: List<ConfLib.ContinuousMotion> = emptyList()
 	): ConfLib.Fragment {
 
 		val posAnchors = getCurrentAnchorGroups()
@@ -298,7 +298,7 @@ class DesignPosition(
 						.associate { it }
 				)
 			),
-			dofs = dofs
+			motions = motions
 				.map { it.copyTo(atoms, anchors, it.id) }
 		)
 	}

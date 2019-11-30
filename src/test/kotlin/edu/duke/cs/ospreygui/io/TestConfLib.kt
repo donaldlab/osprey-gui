@@ -56,21 +56,21 @@ class TestConfLib : SharedSpec({
 				bonds.shouldContainExactlyInAnyOrder(h)
 			}
 
-			dofs.size shouldBe 1
-			dofs[0].shouldBeTypeOf<ConfLib.DegreeOfFreedom.DihedralAngle> { dof ->
-				dof.id shouldBe 1
-				dof.a.shouldBeTypeOf<ConfLib.AnchorAtomPointer> { a ->
+			motions.size shouldBe 1
+			motions[0].shouldBeTypeOf<ConfLib.ContinuousMotion.DihedralAngle> { motion ->
+				motion.id shouldBe 1
+				motion.a.shouldBeTypeOf<ConfLib.AnchorAtomPointer> { a ->
 					a.anchor.id shouldBe 1
 					a.index shouldBe 1
 				}
-				dof.b.shouldBeTypeOf<ConfLib.AnchorAtomPointer> { b ->
+				motion.b.shouldBeTypeOf<ConfLib.AnchorAtomPointer> { b ->
 					b.anchor.id shouldBe 1
 					b.index shouldBe 0
 				}
-				dof.c.shouldBeTypeOf<ConfLib.AtomInfo> { c ->
+				motion.c.shouldBeTypeOf<ConfLib.AtomInfo> { c ->
 					c.name shouldBe "CB"
 				}
-				dof.d.shouldBeTypeOf<ConfLib.AtomInfo> { d ->
+				motion.d.shouldBeTypeOf<ConfLib.AtomInfo> { d ->
 					d.name shouldBe "HB1"
 				}
 			}
@@ -100,7 +100,7 @@ class TestConfLib : SharedSpec({
 			atoms.size shouldBe 12
 			bonds.size shouldBe 9
 			anchors.size shouldBe 2
-			dofs.size shouldBe 3
+			motions.size shouldBe 3
 
 			confs.size shouldBe 3
 			confs.getValue("p").run {
@@ -131,7 +131,7 @@ class TestConfLib : SharedSpec({
 				)
 			}
 
-			dofs.size shouldBe 0
+			motions.size shouldBe 0
 
 			confs.size shouldBe 2
 			confs.getValue("up").run {
@@ -155,7 +155,7 @@ class TestConfLib : SharedSpec({
 			atoms.size shouldBe 11
 			bonds.size shouldBe 9
 			anchors.size shouldBe 1
-			dofs.size shouldBe 3
+			motions.size shouldBe 3
 
 			confs.size shouldBe 3
 			confs.getValue("p").run {
@@ -203,7 +203,7 @@ class TestConfLib : SharedSpec({
 			bonds = emptyList(),
 			anchors = emptyList(),
 			confs = emptyMap(),
-			dofs = emptyList()
+			motions = emptyList()
 		)
 
 	test("fragment name collision") {
@@ -254,7 +254,7 @@ infix fun ConfLib.Fragment?.shouldBeFrag(exp: ConfLib.Fragment?) {
 			obsConf shouldBeConf expConf
 		}
 
-		obsFrag.dofs shouldContainExactly expFrag.dofs
+		obsFrag.motions shouldContainExactly expFrag.motions
 	}
 }
 

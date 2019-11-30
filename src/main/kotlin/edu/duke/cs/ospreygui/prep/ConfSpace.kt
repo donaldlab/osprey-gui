@@ -54,7 +54,7 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 		fun numConfs() =
 			confs.values.sumBy { it.size }
 
-		class DofSettings(
+		class MotionSettings(
 			var includeHGroupRotations: Boolean,
 			var dihedralRadiusDegrees: Double
 		) {
@@ -62,7 +62,7 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 				// blank for now, but defined so it can be extended
 			}
 		}
-		val dofSettings: MutableMap<ConfLib.Fragment,DofSettings> = IdentityHashMap()
+		val motionSettings: MutableMap<ConfLib.Fragment,MotionSettings> = IdentityHashMap()
 	}
 	class PositionConfSpaces {
 

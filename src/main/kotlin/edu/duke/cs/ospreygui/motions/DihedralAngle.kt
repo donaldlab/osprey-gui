@@ -1,4 +1,4 @@
-package edu.duke.cs.ospreygui.dofs
+package edu.duke.cs.ospreygui.motions
 
 import cuchaz.kludge.tools.toDegrees
 import cuchaz.kludge.tools.toRadians
@@ -128,7 +128,7 @@ class DihedralAngle(
 	}
 }
 
-fun DesignPosition.dihedralAngle(dihedral: ConfLib.DegreeOfFreedom.DihedralAngle) =
+fun DesignPosition.dihedralAngle(dihedral: ConfLib.ContinuousMotion.DihedralAngle) =
 	DihedralAngle(
 		mol,
 		atomResolverOrThrow.resolveOrThrow(dihedral.a),
@@ -137,7 +137,7 @@ fun DesignPosition.dihedralAngle(dihedral: ConfLib.DegreeOfFreedom.DihedralAngle
 		atomResolverOrThrow.resolveOrThrow(dihedral.d)
 	)
 
-fun DesignPosition.supportsDihedralAngle(dihedral: ConfLib.DegreeOfFreedom.DihedralAngle) =
+fun DesignPosition.supportsDihedralAngle(dihedral: ConfLib.ContinuousMotion.DihedralAngle) =
 	listOf(dihedral.a, dihedral.b, dihedral.c, dihedral.c)
 		.all {
 			atomResolver?.resolve(it) != null

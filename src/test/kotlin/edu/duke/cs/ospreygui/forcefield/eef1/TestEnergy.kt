@@ -56,7 +56,7 @@ class TestEnergy : SharedSpec({
 			// match the molecule to osprey's templates
 			val tmol = Strand.Builder(this.toOspreyMol()).build().mol
 
-			// convert to a parametric molecule with no DoFs
+			// convert to a parametric molecule with no motions
 			val pmol = ParametricMolecule(tmol)
 
 			// use a complete residue interaction graph

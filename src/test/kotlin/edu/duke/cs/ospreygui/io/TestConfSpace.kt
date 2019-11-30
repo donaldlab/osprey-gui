@@ -49,7 +49,7 @@ fun makeTestConfSpace(): ConfSpace {
 			val pro = conflib.fragments.getValue("PRO")
 
 			// add the wt frag
-			val wtFrag = pos1.makeFragment("wt-${pos1.name.toTomlKey()}", "WildType", dofs = leu.dofs)
+			val wtFrag = pos1.makeFragment("wt-${pos1.name.toTomlKey()}", "WildType", motions = leu.motions)
 			wildTypeFragment = wtFrag
 
 			// add some mutations
@@ -63,15 +63,15 @@ fun makeTestConfSpace(): ConfSpace {
 			confs[pro] = pro.getConfs("down", "up")
 
 			// add some continuous flexibility
-			dofSettings[wtFrag] = ConfSpace.PositionConfSpace.DofSettings(
+			motionSettings[wtFrag] = ConfSpace.PositionConfSpace.MotionSettings(
 				includeHGroupRotations = false,
 				dihedralRadiusDegrees = 9.0
 			)
-			dofSettings[leu] = ConfSpace.PositionConfSpace.DofSettings(
+			motionSettings[leu] = ConfSpace.PositionConfSpace.MotionSettings(
 				includeHGroupRotations = false,
 				dihedralRadiusDegrees = 9.0
 			)
-			dofSettings[ala] = ConfSpace.PositionConfSpace.DofSettings(
+			motionSettings[ala] = ConfSpace.PositionConfSpace.MotionSettings(
 				includeHGroupRotations = true,
 				dihedralRadiusDegrees = 30.0
 			)
@@ -175,14 +175,14 @@ fun makeTestConfSpace(): ConfSpace {
 						)
 					)
 				),
-				dofs = emptyList()
+				motions = emptyList()
 			)
 
 			// add some confs
 			confs[wtFrag] = wtFrag.confs.values.toMutableSet()
 			confs[bar] = bar.getConfs("bar1", "bar2")
 
-			// no DoF settings, ie no continuous flexibility
+			// no motion settings, ie no continuous flexibility
 		}
 	}
 }

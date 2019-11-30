@@ -156,20 +156,20 @@ class DesignPositionEditor(
 		// make a new conf space
 		confSpace.apply {
 
-			// find dofs for the wildtype fragment, by finding a similar fragment from the library
-			val wtDofs = prep.conflibs
+			// find motions for the wildtype fragment, by finding a similar fragment from the library
+			val wtMotions = prep.conflibs
 				.flatMap { it.fragments.values }
 				.firstOrNull {
 					// grab the first compatible fragment with the same seqeuence type
-					// TODO: do some kind of more rigorous check that the DoFs themselves are compatible?
+					// TODO: do some kind of more rigorous check that the motions themselves are compatible?
 					it.type == pos.type && pos.isFragmentCompatible(it)
 				}
-				?.dofs
+				?.motions
 				?: emptyList()
 
 			// make a new wildtype fragment, if possible
 			wildTypeFragment = try {
-				pos.makeFragment("wt-${name.toTomlKey()}", "WildType", dofs = wtDofs)
+				pos.makeFragment("wt-${name.toTomlKey()}", "WildType", motions = wtMotions)
 			} catch (ex: DesignPosition.IllegalAnchorsException) {
 				null
 			}
@@ -193,8 +193,8 @@ class DesignPositionEditor(
 					addAll(frag.confs.values)
 				}
 
-				// make the default dof settings for each included framgent
-				dofSettings[frag] = ConfSpace.PositionConfSpace.DofSettings.default()
+				// make the default motions settings for each included framgent
+				motionSettings[frag] = ConfSpace.PositionConfSpace.MotionSettings.default()
 			}
 		}
 	}
@@ -570,8 +570,8 @@ class DesignPositionEditor(
 }
 
 
-fun ConfSpace.PositionConfSpace.DofSettings.Companion.default() =
-	ConfSpace.PositionConfSpace.DofSettings(
+fun ConfSpace.PositionConfSpace.MotionSettings.Companion.default() =
+	ConfSpace.PositionConfSpace.MotionSettings(
 		includeHGroupRotations = false,
 		dihedralRadiusDegrees = 9.0
 	)

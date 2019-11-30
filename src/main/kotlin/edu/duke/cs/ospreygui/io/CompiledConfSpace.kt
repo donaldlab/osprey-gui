@@ -208,9 +208,6 @@ fun CompiledConfSpace.toToml(): String {
 		write("]\n")
 	}
 
-	// TEMP
-	buf.toString().lines().forEachIndexed { i, line -> println("$i: $line") }
-
 	return buf.toString()
 }
 

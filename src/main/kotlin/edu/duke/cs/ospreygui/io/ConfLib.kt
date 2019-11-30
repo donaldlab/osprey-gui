@@ -197,7 +197,7 @@ class ConfLib(
 		override fun toString() = "${this::class.simpleName}[${anchor.id},$index]"
 	}
 
-	sealed class DegreeOfFreedom {
+	sealed class ContinuousMotion {
 
 		abstract val id: Int
 		abstract fun affectedAtoms(frag: Fragment): List<AtomInfo>
@@ -206,7 +206,7 @@ class ConfLib(
 		 * Make a copy of this degree of freedom, but pointing to the given atoms and anchors,
 		 * instead of the atoms and anchors it already has.
 		 */
-		abstract fun copyTo(atoms: List<AtomInfo>, anchors: List<Anchor>, id: Int): DegreeOfFreedom
+		abstract fun copyTo(atoms: List<AtomInfo>, anchors: List<Anchor>, id: Int): ContinuousMotion
 
 		data class DihedralAngle(
 			override val id: Int,
@@ -214,7 +214,7 @@ class ConfLib(
 			val b: AtomPointer,
 			val c: AtomPointer,
 			val d: AtomPointer
-		) : DegreeOfFreedom() {
+		) : ContinuousMotion() {
 
 			override fun affectedAtoms(frag: Fragment): List<AtomInfo> {
 
@@ -243,7 +243,7 @@ class ConfLib(
 				)
 		}
 
-		// TODO: other DoFs?
+		// TODO: other motions?
 	}
 
 	data class Fragment(
@@ -254,7 +254,7 @@ class ConfLib(
 		val bonds: List<Bond>,
 		val anchors: List<Anchor>,
 		val confs: Map<String,Conf>,
-		val dofs: List<DegreeOfFreedom>
+		val motions: List<ContinuousMotion>
 	) {
 
 		fun bondedAtoms(atom: AtomInfo): List<AtomInfo> =
@@ -516,24 +516,24 @@ class ConfLib(
 						else -> throw TomlParseException("unrecognized atom pointer: $key", pos)
 					}
 
-				// read the dofs
-				val dofs = HashMap<Int,DegreeOfFreedom>()
-				val dofsArray = fragTable.getArrayOrThrow("dofs", fragPos)
-				for (i in 0 until dofsArray.size()) {
-					val dofTable = dofsArray.getTable(i)
-					val pos = dofsArray.inputPositionOf(i)
+				// read the motions
+				val motions = HashMap<Int,ContinuousMotion>()
+				val motionsArray = fragTable.getArrayOrThrow("motions", fragPos)
+				for (i in 0 until motionsArray.size()) {
+					val motionTable = motionsArray.getTable(i)
+					val pos = motionsArray.inputPositionOf(i)
 
-					val id = dofTable.getIntOrThrow("id", pos)
-					val type = dofTable.getStringOrThrow("type", pos)
+					val id = motionTable.getIntOrThrow("id", pos)
+					val type = motionTable.getStringOrThrow("type", pos)
 
 					when (type) {
 						"dihedral" -> {
-							dofs[id] = DegreeOfFreedom.DihedralAngle(
+							motions[id] = ContinuousMotion.DihedralAngle(
 								id,
-								makeAtomPointer(dofTable.get("a"), pos),
-								makeAtomPointer(dofTable.get("b"), pos),
-								makeAtomPointer(dofTable.get("c"), pos),
-								makeAtomPointer(dofTable.get("d"), pos)
+								makeAtomPointer(motionTable.get("a"), pos),
+								makeAtomPointer(motionTable.get("b"), pos),
+								makeAtomPointer(motionTable.get("c"), pos),
+								makeAtomPointer(motionTable.get("d"), pos)
 							)
 						}
 						else -> throw TomlParseException("unrecognized degree of freedom type: $type", pos)
@@ -548,7 +548,7 @@ class ConfLib(
 					bonds,
 					anchors.map { (_, anchor) -> anchor },
 					confs,
-					dofs.map { (_, dof) -> dof }
+					motions.map { (_, motion) -> motion }
 				)
 			}
 
@@ -674,22 +674,22 @@ fun List<ConfLib.Fragment>.toToml(
 				else -> "?"
 			}
 
-		// write the dofs
-		write("dofs = [\n")
-		for (dof in frag.dofs) {
-			when (dof) {
-				is ConfLib.DegreeOfFreedom.DihedralAngle ->
+		// write the motions
+		write("motions = [\n")
+		for (motion in frag.motions) {
+			when (motion) {
+				is ConfLib.ContinuousMotion.DihedralAngle ->
 					write("\t{ id = %2d, type = %s, a = %s, b = %s, c = %s, d = %s }, # %s, %s, %s, %s\n",
-						dof.id,
+						motion.id,
 						"dihedral".quote(),
-						dof.a.toToml(),
-						dof.b.toToml(),
-						dof.c.toToml(),
-						dof.d.toToml(),
-						dof.a.name(),
-						dof.b.name(),
-						dof.c.name(),
-						dof.d.name()
+						motion.a.toToml(),
+						motion.b.toToml(),
+						motion.c.toToml(),
+						motion.d.toToml(),
+						motion.a.name(),
+						motion.b.name(),
+						motion.c.name(),
+						motion.d.name()
 					)
 			}
 		}

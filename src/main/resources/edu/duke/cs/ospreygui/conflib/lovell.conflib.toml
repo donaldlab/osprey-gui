@@ -43,7 +43,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 5 }, # N, CA, CB, CG1
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 5, d = 6 }, # CA, CB, CG1, HG11
 	{ id =  3, type = 'dihedral', a = [1,1], b = 3, c = 9, d = 10 }, # CA, CB, CG2, HG21
@@ -134,7 +134,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, OG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, OG, HG
 ]
@@ -462,7 +462,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, ND1
 ]
@@ -681,7 +681,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 9 }, # N, CA, CB, CG1
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 9, d = 12 }, # CA, CB, CG1, CD1
 	{ id =  3, type = 'dihedral', a = 3, b = 9, c = 12, d = 13 }, # CB, CG1, CD1, HD11
@@ -891,7 +891,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, ND1
 ]
@@ -1116,7 +1116,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 12 }, # CB, CG, CD, CE
@@ -1887,7 +1887,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 10 }, # CB, CG, CD, OE1
@@ -2119,7 +2119,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'double', bondsa = [ 7, 10 ], bondsb = [ 1 ] }, # CA - CB, HA; N - CD
 ]
-dofs = [
+motions = [
 ]
 [frag.PRO.conf.down]
 name = 'down'
@@ -2199,7 +2199,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, CD1
 ]
@@ -2347,7 +2347,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, CD1
 	{ id =  3, type = 'dihedral', a = 9, b = 11, c = 12, d = 13 }, # CE1, CZ, OH, HH
@@ -2598,7 +2598,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, ND1
 ]
@@ -2817,7 +2817,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 10 }, # CB, CG, CD, OE1
@@ -3033,7 +3033,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, CD1
 ]
@@ -3255,7 +3255,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA2, HA3
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 ]
 [frag.GLY.conf.GLY]
 name = 'GLY'
@@ -3317,7 +3317,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 12 }, # CB, CG, CD, NE
@@ -4330,7 +4330,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 4 }, # N, CA, CB, HB1
 ]
 [frag.ALA.conf.ALA]
@@ -4370,7 +4370,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, SG
 ]
 [frag.CYS.conf.p]
@@ -4450,7 +4450,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, OD1
 ]
@@ -4626,7 +4626,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 8 }, # CA, CB, CG, CD1
 	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 8, d = 9 }, # CB, CG, CD1, HD11
@@ -4787,7 +4787,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 9 }, # CA, CB, CG, SD
 	{ id =  3, type = 'dihedral', a = 3, b = 6, c = 9, d = 10 }, # CB, CG, SD, CE
@@ -5104,7 +5104,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 6 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 6, d = 7 }, # CA, CB, CG, OD1
 ]
@@ -5222,7 +5222,7 @@ anchors = [
 	{ id = 1, type = 'single', bonds = [ 2, 3 ] }, # CA - HA, CB
 	{ id = 2, type = 'single', bonds = [ 1 ] }, # N - H
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 3, d = 9 }, # N, CA, CB, OG1
 	{ id =  2, type = 'dihedral', a = [1,1], b = 3, c = 9, d = 10 }, # CA, CB, OG1, HG1
 	{ id =  3, type = 'dihedral', a = [1,1], b = 3, c = 5, d = 6 }, # CA, CB, CG2, HG21
@@ -5600,7 +5600,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 4 }, # N, CA, CB, CG1
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 4, d = 5 }, # CA, CB, CG1, HG11
 	{ id =  3, type = 'dihedral', a = [1,1], b = 2, c = 8, d = 9 }, # CA, CB, CG2, HG21
@@ -5683,7 +5683,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, OG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, OG, HG
 ]
@@ -5973,7 +5973,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, ND1
 ]
@@ -6174,7 +6174,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 8 }, # N, CA, CB, CG1
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 8, d = 11 }, # CA, CB, CG1, CD1
 	{ id =  3, type = 'dihedral', a = 2, b = 8, c = 11, d = 12 }, # CB, CG1, CD1, HD11
@@ -6368,7 +6368,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, ND1
 ]
@@ -6575,7 +6575,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 11 }, # CB, CG, CD, CE
@@ -7290,7 +7290,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 9 }, # CB, CG, CD, OE1
@@ -7515,7 +7515,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, CD1
 ]
@@ -7653,7 +7653,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, CD1
 	{ id =  3, type = 'dihedral', a = 8, b = 10, c = 11, d = 12 }, # CE1, CZ, OH, HH
@@ -7886,7 +7886,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, ND1
 ]
@@ -8087,7 +8087,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 9 }, # CB, CG, CD, OE1
@@ -8285,7 +8285,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, CD1
 ]
@@ -8491,7 +8491,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA2, HA3
 ]
-dofs = [
+motions = [
 ]
 [frag.GLYn.conf.GLY]
 name = 'GLYn'
@@ -8549,7 +8549,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, CD
 	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 11 }, # CB, CG, CD, NE
@@ -9492,7 +9492,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 3 }, # N, CA, CB, HB1
 ]
 [frag.ALAn.conf.ALA]
@@ -9528,7 +9528,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, SG
 ]
 [frag.CYSn.conf.p]
@@ -9600,7 +9600,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, OD1
 ]
@@ -9760,7 +9760,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 7 }, # CA, CB, CG, CD1
 	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 7, d = 8 }, # CB, CG, CD1, HD11
@@ -9909,7 +9909,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 8 }, # CA, CB, CG, SD
 	{ id =  3, type = 'dihedral', a = 2, b = 5, c = 8, d = 9 }, # CB, CG, SD, CE
@@ -10198,7 +10198,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 5 }, # N, CA, CB, CG
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 5, d = 6 }, # CA, CB, CG, OD1
 ]
@@ -10304,7 +10304,7 @@ bonds = [
 anchors = [
 	{ id = 1, type = 'single', bonds = [ 1, 2 ] }, # CA - HA, CB
 ]
-dofs = [
+motions = [
 	{ id =  1, type = 'dihedral', a = [1,2], b = [1,1], c = 2, d = 8 }, # N, CA, CB, OG1
 	{ id =  2, type = 'dihedral', a = [1,1], b = 2, c = 8, d = 9 }, # CA, CB, OG1, HG1
 	{ id =  3, type = 'dihedral', a = [1,1], b = 2, c = 4, d = 5 }, # CA, CB, CG2, HG21

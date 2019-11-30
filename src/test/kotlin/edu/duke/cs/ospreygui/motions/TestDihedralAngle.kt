@@ -1,4 +1,4 @@
-package edu.duke.cs.ospreygui.dofs
+package edu.duke.cs.ospreygui.motions
 
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer

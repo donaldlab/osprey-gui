@@ -3,7 +3,7 @@ package edu.duke.cs.ospreygui.compiler
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.tools.*
-import edu.duke.cs.ospreygui.dofs.dihedralAngle
+import edu.duke.cs.ospreygui.motions.dihedralAngle
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.io.ConfLib
@@ -123,9 +123,6 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 							params[ff, posInfo.pos.mol]
 						)
 
-						// TEMP
-						println("${posInfo.pos.name}=${confInfo.id} dynamic fixed = $changedAtoms")
-
 						try {
 							fixedAtoms[posInfo].addDynamic(changedAtoms, confInfo)
 						} catch (ex: FixedAtoms.ClaimedAtomException) {
@@ -182,12 +179,10 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 								confInfo1, confInfo1,
 								ff, params, fixedAtoms, paramsCache
 							)
-							/* TEMP */.also { println("${posInfo1.pos.name}:${confInfo1.id} singles ${it.size}") }
 							statics[posInfo1.index, confInfo1.index] = compileAtomPairs(
 								confInfo1, fixedAtoms,
 								ff, params, paramsCache
 							)
-							/* TEMP */.also { println("${posInfo1.pos.name}:${confInfo1.id} statics ${it.size}") }
 
 							for (posInfo2 in confSpaceIndex.positions.subList(0, posInfo1.index)) {
 								posInfo2.forEachConf { confInfo2 ->
@@ -196,7 +191,6 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 										confInfo1, confInfo2,
 										ff, params, fixedAtoms, paramsCache
 									)
-									/* TEMP */.also { println("${posInfo1.pos.name}:${confInfo1.id} - ${posInfo2.pos.name}:${confInfo2.id} pairs ${it.size}") }
 								}
 							}
 						}
@@ -239,9 +233,9 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		// compile the continuous motions, if any
 		val motions =
-			posInfo.posConfSpace.dofSettings[frag]
+			posInfo.posConfSpace.motionSettings[frag]
 				?.let { settings ->
-					frag.dofs.mapNotNull { it.compile(this, settings, confAtoms, fixedAtoms) }
+					frag.motions.mapNotNull { it.compile(this, settings, confAtoms, fixedAtoms) }
 				}
 				?: emptyList()
 
@@ -264,15 +258,15 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compiles the continuous motion
 	 */
-	private fun ConfLib.DegreeOfFreedom.compile(
+	private fun ConfLib.ContinuousMotion.compile(
 		confInfo: ConfSpaceIndex.ConfInfo,
-		settings: ConfSpace.PositionConfSpace.DofSettings,
+		settings: ConfSpace.PositionConfSpace.MotionSettings,
 		confAtoms: AtomIndex,
 		fixedAtoms: FixedAtoms
 	): CompiledConfSpace.MotionInfo? {
 		when (this) {
 
-			is ConfLib.DegreeOfFreedom.DihedralAngle -> {
+			is ConfLib.ContinuousMotion.DihedralAngle -> {
 
 				// filter out h-group rotations when needed
 				val isHGroupRotation = affectedAtoms(confInfo.frag)

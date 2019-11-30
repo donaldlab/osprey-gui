@@ -5,7 +5,7 @@ import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
-import edu.duke.cs.ospreygui.dofs.dihedralAngle
+import edu.duke.cs.ospreygui.motions.dihedralAngle
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.show
@@ -584,7 +584,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(frag, conf)
 
 			// build the dihedral angle
-			val chi1 = frag.dofs[0] as ConfLib.DegreeOfFreedom.DihedralAngle
+			val chi1 = frag.motions[0] as ConfLib.ContinuousMotion.DihedralAngle
 			pos.dihedralAngle(chi1).run {
 				mol shouldBeSameInstanceAs pos.mol
 				a.name shouldBe "N"

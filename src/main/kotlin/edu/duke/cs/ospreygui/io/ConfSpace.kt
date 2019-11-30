@@ -101,12 +101,12 @@ fun ConfSpace.toToml(): String {
 			}
 			write("]\n")
 
-			// write the DoF settings
-			for ((frag, dofSettings) in posConfSpace.dofSettings) {
+			// write the motion settings
+			for ((frag, motionSettings) in posConfSpace.motionSettings) {
 				write("\n")
-				write("[confspace.positions.$posi.confspace.dofSettings.${frag.id}]\n")
-				write("includeHGroupRotations = %s\n", dofSettings.includeHGroupRotations)
-				write("dihedralRadiusDegrees = %s\n", dofSettings.dihedralRadiusDegrees)
+				write("[confspace.positions.$posi.confspace.motionSettings.${frag.id}]\n")
+				write("includeHGroupRotations = %s\n", motionSettings.includeHGroupRotations)
+				write("dihedralRadiusDegrees = %s\n", motionSettings.dihedralRadiusDegrees)
 			}
 		}
 	}
@@ -215,14 +215,14 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 						}
 					}
 
-					// read the dof settings
-					posConfSpaceTable.getTable("dofSettings")?.let { dofSettingsTable ->
-						for (fragId in dofSettingsTable.keySet()) {
-							val table = dofSettingsTable.getTableOrThrow(fragId)
-							val pos = dofSettingsTable.inputPositionOf(fragId)
+					// read the motion settings
+					posConfSpaceTable.getTable("motionSettings")?.let { motionSettingsTable ->
+						for (fragId in motionSettingsTable.keySet()) {
+							val table = motionSettingsTable.getTableOrThrow(fragId)
+							val pos = motionSettingsTable.inputPositionOf(fragId)
 
 							val frag = getFrag(fragId, pos)
-							dofSettings[frag] = ConfSpace.PositionConfSpace.DofSettings(
+							motionSettings[frag] = ConfSpace.PositionConfSpace.MotionSettings(
 								includeHGroupRotations = table.getBooleanOrThrow("includeHGroupRotations", pos),
 								dihedralRadiusDegrees = table.getDoubleOrThrow("dihedralRadiusDegrees", pos)
 							)
