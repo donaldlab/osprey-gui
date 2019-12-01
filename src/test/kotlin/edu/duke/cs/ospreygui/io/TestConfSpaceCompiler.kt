@@ -30,27 +30,6 @@ import io.kotlintest.shouldBe
 
 class TestConfSpaceCompiler : SharedSpec({
 
-	/* TODO: make a GUI for this
-	run {
-		println("compiling ...")
-		val confSpace = ConfSpace.fromToml(Paths.get("dipeptide.5hydrophobic.confspace.toml").read())
-		val toml = ConfSpaceCompiler(confSpace).run {
-
-			addForcefield(Forcefield.Amber96)
-			addForcefield(Forcefield.EEF1)
-
-			compile().run {
-				errors.size shouldBe 0
-				println("compiled, compressing ...")
-				LZMA2.compress(toml).write(Paths.get("dipeptide.5hydrophobic.ccs.toml.xz"))
-				println("compressed!")
-			}
-		}
-
-		exitProcess(0)
-	}
-	*/
-
 	// load some amino acid confs
 	val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
 
@@ -148,9 +127,12 @@ class TestConfSpaceCompiler : SharedSpec({
 			}
 
 			compile().run {
-				compiled?.toToml()
-					?: error?.let { throw it }
-					?: throw Error("no compiled")
+				waitForFinish()
+				report!!.run {
+					compiled?.toToml()
+						?: error?.let { throw it }
+						?: throw Error("no compiled")
+				}
 			}
 		}
 

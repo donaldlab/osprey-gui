@@ -7,6 +7,7 @@ import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
+import java.math.BigInteger
 import java.util.*
 
 
@@ -71,6 +72,16 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 		operator fun get(pos: DesignPosition) = confSpaces[pos]
 		fun getOrMake(pos: DesignPosition) = confSpaces.getOrPut(pos) { PositionConfSpace() }
 		fun remove(pos: DesignPosition) = confSpaces.remove(pos)
+
+		fun sequenceSpaceSize(): BigInteger =
+			confSpaces.values
+				.map { it.mutations.size.toBigInteger() }
+				.reduce { a, b -> a.multiply(b) }
+
+		fun confSpaceSize(): BigInteger =
+			confSpaces.values
+				.map { it.numConfs().toBigInteger() }
+				.reduce { a, b -> a.multiply(b) }
 	}
 	val positionConfSpaces = PositionConfSpaces()
 

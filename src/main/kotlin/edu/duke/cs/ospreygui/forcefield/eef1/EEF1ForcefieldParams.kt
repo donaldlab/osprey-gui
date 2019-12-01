@@ -25,7 +25,7 @@ class EEF1ForcefieldParams : ForcefieldParams {
 	override val forcefield = Forcefield.EEF1
 
 	/**
-	 * Scaling to apply to the van der Waals calculations.
+	 * Scaling to apply to the solvent forcefield energy.
 	 *
 	 * The default value of 0.5 was determined empirically by Osprey developers
 	 * to achieve good balance between the Amber96 and EEF1 forcefields.

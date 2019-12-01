@@ -59,7 +59,7 @@ class ConfSpacePrep(
 			s.features.menu("File") {
 				add(SaveConfSpace(confSpace))
 				addSeparator()
-				// TODO: export compiled conf space
+				add(CompileConfSpace(confSpace))
 				addSeparator()
 				add(SaveOMOL { confSpace.mols.map { (_, mol) -> mol } })
 				add(ExportPDB { confSpace.mols.map { (_, mol) -> mol } })

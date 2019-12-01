@@ -8,6 +8,7 @@ import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.prep.ConfSpace
+import edu.duke.cs.ospreygui.tools.pairs
 import org.joml.Vector3d
 import kotlin.collections.ArrayList
 
@@ -20,22 +21,19 @@ import kotlin.collections.ArrayList
  */
 class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
-	private val ffparams: MutableList<ForcefieldParams> = ArrayList()
+	private val _forcefields: MutableList<ForcefieldParams> = ArrayList()
+	val forcefields: List<ForcefieldParams> get() = _forcefields
 
 	fun addForcefield(ff: Forcefield): ForcefieldParams {
 
-		if (ff in forcefields) {
+		if (forcefields.any { it.forcefield === ff }) {
 			throw IllegalArgumentException("forcefield $ff alread added")
 		}
 
 		val parameterizer = ff.parameterizer()
-		ffparams.add(parameterizer)
+		_forcefields.add(parameterizer)
 		return parameterizer
 	}
-
-	val forcefields: List<Forcefield> get() =
-		ffparams
-			.map { it.forcefield }
 
 	val netCharges = NetCharges()
 
@@ -47,19 +45,79 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 	/**
 	 * Compiles the conf space and the forcefields.
-	 * Vigorously throws errors if something goes wrong.
+	 * If something goes wrong, the errors are collected and returned in the compilation report.
+	 *
+	 * Compilation is actually performed in a separate thread,
+	 * but progress can be monitored via the returned progress object.
 	 */
-	fun compile(): Report {
+	fun compile(molLocker: MoleculeLocker = MoleculeLocker()): CompilerProgress {
+
+		// get stable orders for all the positions and conformations
+		val confSpaceIndex = ConfSpaceIndex(confSpace)
+
+		// make a dummy thread variable for now,
+		// so the compiler progress can access it later
+		// otherwise we get an intractable dependency cycle
+		var thread = null as Thread?
+
+		val numSingles = confSpaceIndex.positions.sumBy { it.confs.size }
+		val numPairs = confSpaceIndex.positions.pairs().sumBy { (posInfo1, posInfo2) ->
+			posInfo1.confs.size*posInfo2.confs.size
+		}
+
+		// init the progress
+		val paramsTask = CompilerProgress.Task(
+			"Parameterize molecules",
+			forcefields.size*(numSingles + confSpaceIndex.mols.size)
+		)
+		val fixedAtomsTask = CompilerProgress.Task(
+			"Partition fixed atoms",
+			forcefields.size*numSingles + 2
+		)
+		val staticEnergiesTask = CompilerProgress.Task(
+			"Calculate energy of static atoms",
+			forcefields.size
+		)
+		val atomPairsTask = CompilerProgress.Task(
+			"Calculate forcefield atom pairs",
+			forcefields.size*(numSingles*2 + numPairs)
+		)
+		val progress = CompilerProgress(
+			paramsTask, fixedAtomsTask, staticEnergiesTask, atomPairsTask,
+			threadGetter = { thread ?: throw Error("compilation thread not created yet") }
+		)
+
+		// make a thread to do the actual compilation and start it
+		thread = Thread {
+			compile(
+				molLocker, confSpaceIndex, progress,
+				paramsTask, fixedAtomsTask, staticEnergiesTask, atomPairsTask
+			)
+		}.apply {
+			name = "ConfSpaceCompiler"
+			isDaemon = false
+			start()
+		}
+
+		return progress
+	}
+
+	private fun compile(
+		molLocker: MoleculeLocker,
+		confSpaceIndex: ConfSpaceIndex,
+		progress: CompilerProgress,
+		paramsTask: CompilerProgress.Task,
+		fixedAtomsTask: CompilerProgress.Task,
+		staticEnergiesTask: CompilerProgress.Task,
+		atomPairsTask: CompilerProgress.Task
+	) {
 
 		val warnings = ArrayList<CompilerWarning>()
 
 		try {
 
-			// get stable orders for all the positions and conformations
-			val confSpaceIndex = ConfSpaceIndex(confSpace)
-
 			// compile the forcefield metadata and settings
-			val forcefieldInfos = ffparams.map { ff ->
+			val forcefieldInfos = forcefields.map { ff ->
 				CompiledConfSpace.ForcefieldInfo(
 					ff.forcefield.name,
 					ff.forcefield.ospreyImplementation,
@@ -75,32 +133,36 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 			// compute all the forcefield parameters for the conf space
 			val params = MolsParams(confSpaceIndex)
-			for (ff in ffparams) {
-				for (mol in confSpaceIndex.mols) {
+			for (mol in confSpaceIndex.mols) {
 
-					// NOTE: copy molecules before sending to the parameterizers,
-					// since the parameterizers will store them in the returned MolParams,
-					// but we'll change this molecue instance when we set conformations at design positions
+				// NOTE: copy molecules before sending to the parameterizers,
+				// since the parameterizers will store them in the returned MolParams,
+				// but we'll change this molecue instance when we set conformations at design positions
 
-					// first, parameterize the molecule without any conformational changes
+				// first, parameterize the molecule without any conformational changes
+				for (ff in forcefields) {
 					try {
 						params[ff, mol] = ff.parameterize(mol.copy(), netCharges[mol]?.netChargeOrThrow)
+						paramsTask.increment()
 					} catch (t: Throwable) {
 						throw CompilerError("Can't parameterize wild-type molecule: $mol", cause = t)
 					}
+				}
 
-					// then parameterize the molecule for each conformation at each design position
-					/* NOTE: SQM consumes atomic coords as input,
-						so we should parameterize each conformation,
-						rather than each fragment at a design position,
-						since theoretically, we could get different partial charges for different conformations
-					*/
-					// TODO: test whether the coords actually affect the charges?? maybe key by pos/frag instead of pos/conf?
-					for (posInfo in confSpaceIndex.positions.filter { it.pos.mol === mol }) {
-						posInfo.forEachConf { confInfo ->
+				// then parameterize the molecule for each conformation at each design position
+				/* NOTE: SQM consumes atomic coords as input,
+					so we should parameterize each conformation,
+					rather than each fragment at a design position,
+					since theoretically, we could get different partial charges for different conformations
+				*/
+				// TODO: test whether the coords actually affect the charges?? maybe key by pos/frag instead of pos/conf?
+				for (posInfo in confSpaceIndex.positions.filter { it.pos.mol === mol }) {
+					posInfo.forEachConf(molLocker) { confInfo ->
 
+						for (ff in forcefields) {
 							try {
 								params[ff, confInfo] = ff.parameterize(mol.copy(), netCharges[mol]?.getOrThrow(posInfo.pos, confInfo.frag))
+								paramsTask.increment()
 							} catch (t: Throwable) {
 								throw CompilerError("Can't parameterize molecule: $mol with ${posInfo.pos.name} = ${confInfo.id}", cause = t)
 							}
@@ -113,7 +175,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			val fixedAtoms = FixedAtoms(confSpaceIndex, confSpace.fixedAtoms())
 
 			// find the dynamic atoms by comparing conf forcefield params against the wild-type mol params
-			for (ff in ffparams) {
+			for (ff in forcefields) {
 				for (posInfo in confSpaceIndex.positions) {
 					for (confInfo in posInfo.confs) {
 
@@ -135,21 +197,26 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 								|${posInfo.pos.name}:${confInfo.id}: ${params[ff, confInfo].findAtomDescription(ex.atom)}
 							""".trimMargin())
 						}
+
+						fixedAtomsTask.increment()
 					}
 				}
 			}
 
 			// all the rest of the fixed atoms are static fixed atoms
 			fixedAtoms.updateStatic()
+			fixedAtomsTask.increment()
 
 			// compile the static atoms
 			val staticAtoms = fixedAtoms.statics
 				.map { it.atom.compile(it.name) }
+			fixedAtomsTask.increment()
 
 			// calculate the internal energies for the static atoms
-			val staticEnergies = ffparams
+			val staticEnergies = forcefields
 				.map { ff ->
 					ff.calcEnergy(fixedAtoms.staticAtomsByMol, params.getWildTypeByMol(ff))
+						.also { staticEnergiesTask.increment() }
 				}
 
 			// compile the design positions
@@ -158,7 +225,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 				// compile the conformations
 				val confInfos = ArrayList<CompiledConfSpace.ConfInfo>()
-				posInfo.forEachConf { confInfo ->
+				posInfo.forEachConf(molLocker) { confInfo ->
 					confInfos.add(confInfo.compile(fixedAtoms, params))
 				}
 
@@ -168,30 +235,43 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				))
 			}
 
+			// TODO: push the ff loop inside so the GUI looks prettier
+
 			// compile all the atom pairs for the forcefields
-			val atomPairs = ffparams.map { ff ->
-				AtomPairs(confSpaceIndex, ffparams).apply {
+			val atomPairs = forcefields.map {
+				AtomPairs(confSpaceIndex, forcefields)
+			}
+			for (posInfo1 in confSpaceIndex.positions) {
+				posInfo1.forEachConf(molLocker) { confInfo1 ->
 
-					for (posInfo1 in confSpaceIndex.positions) {
-						posInfo1.forEachConf { confInfo1 ->
+					// compile the pos atom pairs
+					for ((ff, pairs) in forcefields.zip(atomPairs)) {
+						pairs.singles[posInfo1.index, confInfo1.index] = compileAtomPairs(
+							confInfo1, confInfo1,
+							ff, params, fixedAtoms, pairs.paramsCache
+						)
+						atomPairsTask.increment()
+					}
 
-							singles[posInfo1.index, confInfo1.index] = compileAtomPairs(
-								confInfo1, confInfo1,
-								ff, params, fixedAtoms, paramsCache
-							)
-							statics[posInfo1.index, confInfo1.index] = compileAtomPairs(
-								confInfo1, fixedAtoms,
-								ff, params, paramsCache
-							)
+					// compile the pos-static atom pairs
+					for ((ff, pairs) in forcefields.zip(atomPairs)) {
+						pairs.statics[posInfo1.index, confInfo1.index] = compileAtomPairs(
+							confInfo1, fixedAtoms,
+							ff, params, pairs.paramsCache
+						)
+						atomPairsTask.increment()
+					}
 
-							for (posInfo2 in confSpaceIndex.positions.subList(0, posInfo1.index)) {
-								posInfo2.forEachConf { confInfo2 ->
+					for (posInfo2 in confSpaceIndex.positions.subList(0, posInfo1.index)) {
+						posInfo2.forEachConf(molLocker) { confInfo2 ->
 
-									pairs[posInfo1.index, confInfo1.index, posInfo2.index, confInfo2.index] = compileAtomPairs(
-										confInfo1, confInfo2,
-										ff, params, fixedAtoms, paramsCache
-									)
-								}
+							// compile the pos-pos atom pairs
+							for ((ff, pairs) in forcefields.zip(atomPairs)) {
+								pairs.pairs[posInfo1.index, confInfo1.index, posInfo2.index, confInfo2.index] = compileAtomPairs(
+									confInfo1, confInfo2,
+									ff, params, fixedAtoms, pairs.paramsCache
+								)
+								atomPairsTask.increment()
 							}
 						}
 					}
@@ -199,7 +279,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			}
 
 			// if we made it this far, return a successful compiler result
-			return Report(
+			progress.report = Report(
 				warnings,
 				null,
 				CompiledConfSpace(
@@ -219,7 +299,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				?: CompilerError("Error", null, t)
 
 			// return a report with only warnings and errors, but no compiled conf space
-			return Report(warnings, error, null)
+			progress.report = Report(warnings, error, null)
 		}
 	}
 
@@ -240,7 +320,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				?: emptyList()
 
 		// compute the internal energies of the conformation atoms
-		val internalEnergies = ffparams.map { ff ->
+		val internalEnergies = forcefields.map { ff ->
 			confAtoms
 				.mapNotNull { atom -> ff.internalEnergy(params[ff, this], atom) }
 				.sum()

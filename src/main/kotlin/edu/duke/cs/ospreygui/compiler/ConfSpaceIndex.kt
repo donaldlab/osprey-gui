@@ -62,12 +62,28 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 		/**
 		 * Iterates over the conformations in the position conf space,
 		 * setting each conformation to the design position in turn.
+		 *
+		 * Make sure to get a lock on the molecule first before modifying it.
 		 */
-		fun forEachConf(block: (ConfInfo) -> Unit) {
-			confSpace.backupPositions(pos) {
+		fun forEachConf(molLocker: MoleculeLocker, block: (ConfInfo) -> Unit) {
+
+			// backup the original conformation
+			val backupFrag = pos.makeFragment("backup", "backup")
+
+			try {
+
 				for (confInfo in confs) {
-					pos.setConf(confInfo.frag, confInfo.conf)
+					molLocker.lock(pos.mol) {
+						pos.setConf(confInfo.frag, confInfo.conf)
+					}
 					block(confInfo)
+				}
+
+			} finally {
+
+				// restore the original conformation
+				molLocker.lock(pos.mol) {
+					pos.setConf(backupFrag, backupFrag.confs.values.first())
 				}
 			}
 		}

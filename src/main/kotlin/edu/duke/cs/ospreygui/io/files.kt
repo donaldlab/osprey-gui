@@ -12,6 +12,13 @@ fun String.write(path: Path) {
 fun Path.read(): String =
 	toFile().readText(Charsets.UTF_8)
 
+fun ByteArray.write(path: Path) {
+	path.toFile().writeBytes(this)
+}
+
+fun Path.readBytes(): ByteArray =
+	toFile().readBytes()
+
 
 val Path.exists get() = Files.exists(this)
 

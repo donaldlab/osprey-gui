@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.compiler
 
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
+import edu.duke.cs.ospreygui.tools.pairs
 import java.util.HashMap
 
 
@@ -37,16 +38,6 @@ class AtomPairs(index: ConfSpaceIndex, forcefields: List<ForcefieldParams>) {
 	}
 	val singles = PosSingles(index)
 	val statics = PosSingles(index)
-
-	/**
-	 * Returns all unique pairs of things in the list
-	 */
-	private fun <T> List<T>.pairs(): List<Pair<T,T>> =
-		mapIndexed { i, item ->
-			subList(0, i)
-				.map { item to it }
-		}
-		.flatten()
 
 	inner class PosPairs(index: ConfSpaceIndex) {
 
