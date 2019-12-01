@@ -228,9 +228,14 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 			}
 
 			// run amber to get the params
-			val params = molsAndTypes.calcParamsAmber(listOf(molaParams, molbParams).mapNotNull { it.frcmod })
+			val frcmods = listOf(molaParams, molbParams).mapNotNull { it.frcmod }
+			val params = molsAndTypes.calcParamsAmber(frcmods)
 
-			// read the amber forcefield params from the toplogy file
+			// NOTE: calcParamsAmber() eventually calls LEaP in a separate process
+			// profiling shows this is by far the bottleneck in compiling atom pairs
+			// maybe there's something we can do to speed this up so compiling goes faster?
+
+			// read the amber forcefield params from the topology file
 			val mols = molsAndTypes.map { (mol, _) -> mol }
 			TopIO.read(params.top).mapTo(mols)
 		}
@@ -310,8 +315,8 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 			 = eij*Rmin^12*s^12
 			 = Aij*s^12
 
-			Therefore, Aij gete scaled by s^12,
-			and similarly, Bij get scaled by s^6.
+			Therefore, Aij gets scaled by s^12,
+			and similarly, Bij gets scaled by s^6.
 		*/
 
 		// apply the parametric vdW scaling
