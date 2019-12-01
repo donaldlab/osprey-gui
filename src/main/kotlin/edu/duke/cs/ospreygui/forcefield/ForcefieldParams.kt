@@ -123,18 +123,16 @@ interface ForcefieldParams {
 
 		fun forEachPairIntramol(mol: Molecule, atomsa: List<Atom>, atomsb: List<Atom>, func: FfparamsPairFunc) {
 
-			val lookupa = atomsa.toIdentitySet()
 			val lookupb = atomsb.toIdentitySet()
 			val visitedPairs = HashSet<AtomPair>()
 
 			for (atoma in atomsa) {
 
-				// pair energies, by bonded distance
 				mol
 					.bfs(
 						source = atoma,
 						visitSource = false,
-						shouldVisit = { _, toAtom, dist -> toAtom in lookupa || toAtom in lookupb }
+						shouldVisit = { _, _, _ -> true }
 					)
 					.filter { (atomb, _) ->
 						atomb in lookupb

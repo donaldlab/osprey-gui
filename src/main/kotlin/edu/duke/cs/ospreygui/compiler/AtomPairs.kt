@@ -1,11 +1,10 @@
 package edu.duke.cs.ospreygui.compiler
 
-import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.tools.pairs
 import java.util.HashMap
 
 
-class AtomPairs(index: ConfSpaceIndex, forcefields: List<ForcefieldParams>) {
+class AtomPairs(index: ConfSpaceIndex) {
 
 	data class AtomPair(
 		val atomi1: Int,
@@ -16,25 +15,25 @@ class AtomPairs(index: ConfSpaceIndex, forcefields: List<ForcefieldParams>) {
 	inner class PosSingles(index: ConfSpaceIndex) {
 
 		// pre-allocate enough storage for every position and conf
-		val list: List<MutableList<List<AtomPair>?>> =
+		private val list: List<List<MutableList<AtomPair>?>> =
 			index.positions.map { posInfo ->
 				posInfo.confs
 					.map {
-						// IDEA is lying about the useless cast warning ...
-						// the compiler apparently needs a little help figuring out this type
-						@Suppress("USELESS_CAST")
-						null as List<AtomPair>?
+						// IDEA is apparently lying about the warning here ...
+						// looks like the compiler needs a little help figuring out this type
+						@Suppress("RemoveExplicitTypeArguments")
+						ArrayList<AtomPair>()
 					}
-					.toMutableList()
 			}
 
-		operator fun set(posi1: Int, confi1: Int, atomPairs: List<AtomPair>) {
-			list[posi1][confi1] = atomPairs
+		fun add(posi1: Int, confi1: Int, atomi1: Int, atomi2: Int, params: List<Double>) {
+			list[posi1][confi1]?.add(AtomPair(atomi1, atomi2, paramsCache.index(params)))
+				?: throw NoSuchElementException("position:conformation $posi1:$confi1 is not in this conf space")
 		}
 
 		operator fun get(posi1: Int, confi1: Int): List<AtomPair> =
 			list[posi1][confi1]
-				?: throw NoSuchElementException("position:conformation $posi1:$confi1 has no atom pairs")
+				?: throw NoSuchElementException("position:conformation $posi1:$confi1 is not in this conf space")
 	}
 	val singles = PosSingles(index)
 	val statics = PosSingles(index)
@@ -42,17 +41,16 @@ class AtomPairs(index: ConfSpaceIndex, forcefields: List<ForcefieldParams>) {
 	inner class PosPairs(index: ConfSpaceIndex) {
 
 		// pre-allocate enough storage for every position pair and conf pair
-		private val list: List<List<MutableList<List<AtomPair>?>>> =
+		private val list: List<List<List<MutableList<AtomPair>?>>> =
 			index.positions.pairs()
 				.map { (posInfo1, posInfo2) ->
 					posInfo1.confs.map {
 						posInfo2.confs.map {
-							// IDEA is lying about the useless cast warning ...
-							// the compiler needs a little help figuring out this type
-							@Suppress("USELESS_CAST")
-							null as List<AtomPair>?
+							// IDEA is apparently lying about the warning here ...
+							// looks like the compiler needs a little help figuring out this type
+							@Suppress("RemoveExplicitTypeArguments")
+							ArrayList<AtomPair>()
 						}
-						.toMutableList()
 					}
 				}
 
@@ -64,13 +62,14 @@ class AtomPairs(index: ConfSpaceIndex, forcefields: List<ForcefieldParams>) {
 			}
 		}
 
-		operator fun set(posi1: Int, confi1: Int, posi2: Int, confi2: Int, atomPairs: List<AtomPair>) {
-			list[posIndex(posi1, posi2)][confi1][confi2] = atomPairs
+		fun add(posi1: Int, confi1: Int, posi2: Int, confi2: Int, atomi1: Int, atomi2: Int, params: List<Double>) {
+			list[posIndex(posi1, posi2)][confi1][confi2]?.add(AtomPair(atomi1, atomi2, paramsCache.index(params)))
+				?: throw NoSuchElementException("position:conformation pair $posi1:$confi2 - $posi2:$confi2 is not in this conf space")
 		}
 
 		operator fun get(posi1: Int, confi1: Int, posi2: Int, confi2: Int): List<AtomPair> =
 			list[posIndex(posi1, posi2)][confi1][confi2]
-				?: throw NoSuchElementException("position:conformation pair $posi1:$confi2 - $posi2:$confi2 has no atom pairs")
+				?: throw NoSuchElementException("position:conformation pair $posi1:$confi2 - $posi2:$confi2 is not in this conf space")
 	}
 	val pairs = PosPairs(index)
 
@@ -79,7 +78,6 @@ class AtomPairs(index: ConfSpaceIndex, forcefields: List<ForcefieldParams>) {
 	 * This cache allows us to de-duplicate the params and save quite a bit of space/time.
 	 */
 	class ParamsCache(
-		forcefields: List<ForcefieldParams>,
 		private val list: ArrayList<List<Double>> = ArrayList()
 	) : List<List<Double>> by list {
 
@@ -97,5 +95,5 @@ class AtomPairs(index: ConfSpaceIndex, forcefields: List<ForcefieldParams>) {
 			return index
 		}
 	}
-	val paramsCache = ParamsCache(forcefields)
+	val paramsCache = ParamsCache()
 }

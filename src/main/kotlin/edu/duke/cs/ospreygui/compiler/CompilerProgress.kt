@@ -1,5 +1,8 @@
 package edu.duke.cs.ospreygui.compiler
 
+import edu.duke.cs.osprey.tools.Stopwatch
+import java.lang.Thread.sleep
+
 
 class CompilerProgress(
 	vararg val tasks: Task,
@@ -29,5 +32,26 @@ class CompilerProgress(
 	 */
 	fun waitForFinish() {
 		threadGetter().join()
+	}
+
+	/**
+	 * Waits for the compiler to finish,
+	 * but prints progress messages to stdout while waiting
+	 */
+	fun printUntilFinish(intervalMs: Long = 1000) {
+
+		val sw = Stopwatch().start()
+
+		Thread {
+			while (threadGetter().isAlive) {
+				sleep(intervalMs)
+				val percent = 100.0*tasks.sumBy { it.progress }/tasks.sumBy { it.size }
+				println("Compiling: %.1f%%".format(percent))
+			}
+		}.start()
+
+		waitForFinish()
+
+		println("Compilation finished in ${sw.getTime(2)}")
 	}
 }

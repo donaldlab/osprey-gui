@@ -80,7 +80,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		)
 		val atomPairsTask = CompilerProgress.Task(
 			"Calculate forcefield atom pairs",
-			forcefields.size*(numSingles*2 + numPairs)
+			numSingles*2 + numPairs
 		)
 		val progress = CompilerProgress(
 			paramsTask, fixedAtomsTask, staticEnergiesTask, atomPairsTask,
@@ -235,44 +235,26 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				))
 			}
 
-			// TODO: push the ff loop inside so the GUI looks prettier
-
 			// compile all the atom pairs for the forcefields
-			val atomPairs = forcefields.map {
-				AtomPairs(confSpaceIndex, forcefields)
-			}
+			val atomPairs = forcefields
+				.map { AtomPairs(confSpaceIndex) }
 			for (posInfo1 in confSpaceIndex.positions) {
 				posInfo1.forEachConf(molLocker) { confInfo1 ->
 
 					// compile the pos atom pairs
-					for ((ff, pairs) in forcefields.zip(atomPairs)) {
-						pairs.singles[posInfo1.index, confInfo1.index] = compileAtomPairs(
-							confInfo1, confInfo1,
-							ff, params, fixedAtoms, pairs.paramsCache
-						)
-						atomPairsTask.increment()
-					}
+					atomPairs.compile(confInfo1, fixedAtoms, params)
+					atomPairsTask.increment()
 
 					// compile the pos-static atom pairs
-					for ((ff, pairs) in forcefields.zip(atomPairs)) {
-						pairs.statics[posInfo1.index, confInfo1.index] = compileAtomPairs(
-							confInfo1, fixedAtoms,
-							ff, params, pairs.paramsCache
-						)
-						atomPairsTask.increment()
-					}
+					atomPairs.compileStatic(confInfo1, fixedAtoms, params)
+					atomPairsTask.increment()
 
 					for (posInfo2 in confSpaceIndex.positions.subList(0, posInfo1.index)) {
 						posInfo2.forEachConf(molLocker) { confInfo2 ->
 
 							// compile the pos-pos atom pairs
-							for ((ff, pairs) in forcefields.zip(atomPairs)) {
-								pairs.pairs[posInfo1.index, confInfo1.index, posInfo2.index, confInfo2.index] = compileAtomPairs(
-									confInfo1, confInfo2,
-									ff, params, fixedAtoms, pairs.paramsCache
-								)
-								atomPairsTask.increment()
-							}
+							atomPairs.compile(confInfo1, confInfo2, fixedAtoms, params)
+							atomPairsTask.increment()
 						}
 					}
 				}
@@ -381,32 +363,66 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		)
 
 	/**
+	 * Compile atom pairs for pos interactions.
+	 */
+	private fun List<AtomPairs>.compile(
+		confInfo: ConfSpaceIndex.ConfInfo,
+		fixedAtoms: FixedAtoms,
+		params: MolsParams
+	) {
+		val confAtoms = AtomIndex(confInfo.orderAtoms(fixedAtoms[confInfo.posInfo].dynamics))
+		val confAtomsByMol = identityHashMapOf(confInfo.posInfo.pos.mol to confAtoms as List<Atom>)
+
+		ForcefieldParams.forEachPair(confAtomsByMol, confAtomsByMol) { mol1, atom1, mol2, atom2, dist ->
+
+			for ((ffi, ff) in forcefields.withIndex()) {
+				val molParams = params[ff, confInfo]
+
+				ff.pairParams(molParams, atom1, molParams, atom2, dist)?.let { params ->
+					this[ffi].singles.add(
+						confInfo.posInfo.index,
+						confInfo.index,
+						confAtoms.getOrThrow(atom1),
+						confAtoms.getOrThrow(atom2),
+						params.list
+					)
+				}
+			}
+		}
+	}
+
+	/**
 	 * Compile atom pairs for pos and pos-pos interactions.
 	 */
-	private fun compileAtomPairs(
+	private fun List<AtomPairs>.compile(
 		confInfo1: ConfSpaceIndex.ConfInfo,
 		confInfo2: ConfSpaceIndex.ConfInfo,
-		ff: ForcefieldParams,
-		params: MolsParams,
 		fixedAtoms: FixedAtoms,
-		paramsCache: AtomPairs.ParamsCache
-	) = ArrayList<AtomPairs.AtomPair>().apply {
-
+		params: MolsParams
+	) {
 		val conf1Atoms = AtomIndex(confInfo1.orderAtoms(fixedAtoms[confInfo1.posInfo].dynamics))
 		val conf1AtomsByMol = identityHashMapOf(confInfo1.posInfo.pos.mol to conf1Atoms as List<Atom>)
-		val mol1Params = params[ff, confInfo1]
 
 		val conf2Atoms = AtomIndex(confInfo2.orderAtoms(fixedAtoms[confInfo2.posInfo].dynamics))
 		val conf2AtomsByMol = identityHashMapOf(confInfo2.posInfo.pos.mol to conf2Atoms as List<Atom>)
-		val mol2Params = params[ff, confInfo2]
 
 		ForcefieldParams.forEachPair(conf1AtomsByMol, conf2AtomsByMol) { mol1, atom1, mol2, atom2, dist ->
-			ff.pairParams(mol1Params, atom1, mol2Params, atom2, dist)?.let { params ->
-				add(AtomPairs.AtomPair(
-					conf1Atoms.getOrThrow(atom1),
-					conf2Atoms.getOrThrow(atom2),
-					paramsCache.index(params.list)
-				))
+
+			for ((ffi, ff) in forcefields.withIndex()) {
+				val mol1Params = params[ff, confInfo1]
+				val mol2Params = params[ff, confInfo2]
+
+				ff.pairParams(mol1Params, atom1, mol2Params, atom2, dist)?.let { params ->
+					this[ffi].pairs.add(
+						confInfo1.posInfo.index,
+						confInfo1.index,
+						confInfo2.posInfo.index,
+						confInfo2.index,
+						conf1Atoms.getOrThrow(atom1),
+						conf2Atoms.getOrThrow(atom2),
+						params.list
+					)
+				}
 			}
 		}
 	}
@@ -414,30 +430,31 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compile atom pairs for pos-static interactions
 	 */
-	private fun compileAtomPairs(
+	private fun List<AtomPairs>.compileStatic(
 		confInfo: ConfSpaceIndex.ConfInfo,
 		fixedAtoms: FixedAtoms,
-		ff: ForcefieldParams,
-		params: MolsParams,
-		paramsCache: AtomPairs.ParamsCache
-	) = ArrayList<AtomPairs.AtomPair>().apply {
-
+		params: MolsParams
+	) {
 		val confAtoms = AtomIndex(confInfo.orderAtoms(fixedAtoms[confInfo.posInfo].dynamics))
 		val confAtomsByMol = identityHashMapOf(confInfo.posInfo.pos.mol to confAtoms as List<Atom>)
-		val confParams = params[ff, confInfo]
 
 		val staticAtomsByMol = fixedAtoms.staticAtomsByMol
 
 		ForcefieldParams.forEachPair(confAtomsByMol, staticAtomsByMol) { cmol, catom, smol, satom, dist ->
 
-			val staticParams = params[ff, smol]
+			for ((ffi, ff) in forcefields.withIndex()) {
+				val confParams = params[ff, confInfo]
+				val staticParams = params[ff, smol]
 
-			ff.pairParams(confParams, catom, staticParams, satom, dist)?.let { params ->
-				add(AtomPairs.AtomPair(
-					confAtoms.getOrThrow(catom),
-					fixedAtoms.getStatic(satom).index,
-					paramsCache.index(params.list)
-				))
+				ff.pairParams(confParams, catom, staticParams, satom, dist)?.let { params ->
+					this[ffi].statics.add(
+						confInfo.posInfo.index,
+						confInfo.index,
+						confAtoms.getOrThrow(catom),
+						fixedAtoms.getStatic(satom).index,
+						params.list
+					)
+				}
 			}
 		}
 	}
