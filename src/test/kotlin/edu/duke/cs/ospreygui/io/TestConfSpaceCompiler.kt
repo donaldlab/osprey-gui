@@ -23,7 +23,9 @@ import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
 import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
+import edu.duke.cs.osprey.confspace.compiled.PosInterDist
 import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
+import edu.duke.cs.osprey.energy.compiled.PosInterGen
 import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
 import io.kotlintest.shouldBe
 
@@ -148,8 +150,10 @@ class TestConfSpaceCompiler : SharedSpec({
 		)
 	fun AssignedCoords.calcAmber96() = confSpace.ecalcs[0].calcEnergy(this)
 	fun AssignedCoords.calcEEF1() = confSpace.ecalcs[1].calcEnergy(this)
-	fun AssignedCoords.calcEnergy() = calcAmber96() + calcEEF1()
-	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace).minimize(assignments).energy
+
+	fun AssignedCoords.allInters() = PosInterGen(null, null).all(confSpace, assignments)
+	fun AssignedCoords.calcEnergy() = CPUConfEnergyCalculator(confSpace).calcEnergy(assignments, allInters())
+	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace).minimizeEnergy(assignments, allInters())
 
 	fun Group.testConf(
 		compiledConfSpace: CompiledConfSpace,
@@ -271,21 +275,25 @@ class TestConfSpaceCompiler : SharedSpec({
 			testConf(compiledConfSpace, "wt1:wt1", "wt2:wt2") {
 				calcAmber96().shouldBeEnergy(-2.9082532723206453)
 				calcEEF1().shouldBeEnergy(-47.75509989567506)
+				calcEnergy().shouldBeEnergy(-2.9082532723206453 + -47.75509989567506)
 			}
 
 			testConf(compiledConfSpace, "ASPn:p30", "LEU:tt") {
 				calcAmber96().shouldBeEnergy(31.328372547103974)
 				calcEEF1().shouldBeEnergy(-57.897054356496625)
+				calcEnergy().shouldBeEnergy(31.328372547103974 + -57.897054356496625)
 			}
 
 			testConf(compiledConfSpace, "ASPn:m-20", "LEU:tp") {
 				calcAmber96().shouldBeEnergy(-2.4030562287427513)
 				calcEEF1().shouldBeEnergy(-59.597396462270645)
+				calcEnergy().shouldBeEnergy(-2.4030562287427513 + -59.597396462270645)
 			}
 
 			testConf(compiledConfSpace, "SERn:t_0", "PRO:up") {
 				calcAmber96().shouldBeEnergy(3681646.881490728)
 				calcEEF1().shouldBeEnergy(-41.52398320030191)
+				calcEnergy().shouldBeEnergy(3681646.881490728 + -41.52398320030191)
 			}
 		}
 
@@ -345,6 +353,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 				// check minimized energy
 				(-48.01726089618421).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
 					calcEnergy().shouldBeEnergy(it)
 					minimizeEnergy() shouldBeLessThan it
 				}
@@ -362,6 +371,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 				// check minimized energy
 				(-44.76305148873534).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
 					calcEnergy().shouldBeEnergy(it)
 					minimizeEnergy() shouldBeLessThan it
 				}
@@ -379,6 +389,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 				// check minimized energy
 				(-24.801305933011164).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
 					calcEnergy().shouldBeEnergy(it)
 					minimizeEnergy() shouldBeLessThan it
 				}
@@ -396,6 +407,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 				// check minimized energy
 				(-64.30395031713154).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
 					calcEnergy().shouldBeEnergy(it)
 					minimizeEnergy() shouldBeLessThan it
 				}
