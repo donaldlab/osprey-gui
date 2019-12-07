@@ -150,6 +150,8 @@ class DesignPositionEditor(
 
 	private fun DesignPosition.resetConfSpace() {
 
+		val posType = type
+
 		// delete the old conf space
 		prep.confSpace.positionConfSpaces.remove(pos)
 
@@ -174,15 +176,16 @@ class DesignPositionEditor(
 				null
 			}
 
-			// select the wild-type "mutation" by default, if possible
-			wildTypeFragment?.let { mutations.add(it.type) }
+			// select the wild-type "mutation" by default
+			mutations.add(posType)
 
-			// gather all the possible fragments
+			// gather all the possible fragments that match this design position
 			val frags = ArrayList<ConfLib.Fragment>().apply {
 				wildTypeFragment
 					?.let { add(it) }
 				prep.conflibs
 					.flatMap { compatibleFragments(it) }
+					.filter { it.type == posType }
 					.forEach { add(it) }
 			}
 
