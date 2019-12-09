@@ -81,6 +81,7 @@ fun CompiledConfSpace.toToml(): String {
 			)
 			write("id = %s\n", conf.id.quote())
 			write("type = %s\n", conf.type.quote())
+			write("fragIndex = %d\n", conf.fragIndex)
 
 			// write out the atoms for this conformation
 			write("atoms = [\n")
@@ -126,22 +127,22 @@ fun CompiledConfSpace.toToml(): String {
 	}
 
 	for ((posi1, pos1) in positions.withIndex()) {
-		for ((confi1, conf1) in pos1.confs.withIndex()) {
+		for ((fragi1, frag1) in pos1.fragments.withIndex()) {
 
 			// write the pos atom pairs
 			write("\n")
-			write("[pos.$posi1.conf.$confi1.atomPairs.single] # %s=%s\n",
-				pos1.name, conf1.id
+			write("[pos.$posi1.frag.$fragi1.atomPairs.single] # %s=%s\n",
+				pos1.name, frag1.name
 			)
 			for ((ffi, atomPairs) in atomPairs.withIndex()) {
 				write("$ffi = [\n")
-				for (atomPair in atomPairs.singles[posi1, confi1]) {
+				for (atomPair in atomPairs.singles[posi1, fragi1]) {
 					write("\t[ %2d, %2d, %6d ], # %s - %s\n",
 						atomPair.atomi1,
 						atomPair.atomi2,
 						atomPair.paramsi,
-						conf1.atoms[atomPair.atomi1].name,
-						conf1.atoms[atomPair.atomi2].name
+						frag1.atomNames[atomPair.atomi1],
+						frag1.atomNames[atomPair.atomi2]
 					)
 				}
 				write("]\n")
@@ -149,17 +150,17 @@ fun CompiledConfSpace.toToml(): String {
 
 			// write the pos-static atom pairs
 			write("\n")
-			write("[pos.$posi1.conf.$confi1.atomPairs.static] # %s=%s\n",
-				pos1.name, conf1.id
+			write("[pos.$posi1.frag.$fragi1.atomPairs.static] # %s=%s\n",
+				pos1.name, frag1.name
 			)
 			for ((ffi, atomPairs) in atomPairs.withIndex()) {
 				write("$ffi = [\n")
-				for (atomPair in atomPairs.statics[posi1, confi1]) {
+				for (atomPair in atomPairs.statics[posi1, fragi1]) {
 					write("\t[ %2d, %2d, %6d ], # %s - %s\n",
 						atomPair.atomi1,
 						atomPair.atomi2,
 						atomPair.paramsi,
-						conf1.atoms[atomPair.atomi1].name,
+						frag1.atomNames[atomPair.atomi1],
 						staticAtoms[atomPair.atomi2].name
 					)
 				}
@@ -168,23 +169,23 @@ fun CompiledConfSpace.toToml(): String {
 
 			for (posi2 in 0 until posi1) {
 				val pos2 = positions[posi2]
-				for ((confi2, conf2) in pos2.confs.withIndex()) {
+				for ((fragi2, frag2) in pos2.fragments.withIndex()) {
 
 					// write the pos-pos atom pairs
 					write("\n")
-					write("[pos.$posi1.conf.$confi1.atomPairs.pos.$posi2.conf.$confi2] # %s=%s, %s=%s\n",
-						pos1.name, conf1.id,
-						pos2.name, conf2.id
+					write("[pos.$posi1.frag.$fragi1.atomPairs.pos.$posi2.frag.$fragi2] # %s=%s, %s=%s\n",
+						pos1.name, frag1.name,
+						pos2.name, frag2.name
 					)
 					for ((ffi, atomPairs) in atomPairs.withIndex()) {
 						write("$ffi = [\n")
-						for (atomPair in atomPairs.pairs[posi1, confi1, posi2, confi2]) {
+						for (atomPair in atomPairs.pairs[posi1, fragi1, posi2, fragi2]) {
 							write("\t[ %2d, %2d, %6d ], # %s - %s\n",
 								atomPair.atomi1,
 								atomPair.atomi2,
 								atomPair.paramsi,
-								conf1.atoms[atomPair.atomi1].name,
-								conf2.atoms[atomPair.atomi2].name
+								frag1.atomNames[atomPair.atomi1],
+								frag2.atomNames[atomPair.atomi2]
 							)
 						}
 						write("]\n")

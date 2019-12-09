@@ -14,10 +14,10 @@ class AtomPairs(index: ConfSpaceIndex) {
 
 	inner class PosSingles(index: ConfSpaceIndex) {
 
-		// pre-allocate enough storage for every position and conf
+		// pre-allocate enough storage for every position and fragment
 		private val list: List<List<MutableList<AtomPair>?>> =
 			index.positions.map { posInfo ->
-				posInfo.confs
+				posInfo.fragments
 					.map {
 						// IDEA is apparently lying about the warning here ...
 						// looks like the compiler needs a little help figuring out this type
@@ -26,26 +26,26 @@ class AtomPairs(index: ConfSpaceIndex) {
 					}
 			}
 
-		fun add(posi1: Int, confi1: Int, atomi1: Int, atomi2: Int, params: List<Double>) {
-			list[posi1][confi1]?.add(AtomPair(atomi1, atomi2, paramsCache.index(params)))
-				?: throw NoSuchElementException("position:conformation $posi1:$confi1 is not in this conf space")
+		fun add(posi1: Int, fragi1: Int, atomi1: Int, atomi2: Int, params: List<Double>) {
+			list[posi1][fragi1]?.add(AtomPair(atomi1, atomi2, paramsCache.index(params)))
+				?: throw NoSuchElementException("position:conformation $posi1:$fragi1 is not in this conf space")
 		}
 
-		operator fun get(posi1: Int, confi1: Int): List<AtomPair> =
-			list[posi1][confi1]
-				?: throw NoSuchElementException("position:conformation $posi1:$confi1 is not in this conf space")
+		operator fun get(posi1: Int, fragi1: Int): List<AtomPair> =
+			list[posi1][fragi1]
+				?: throw NoSuchElementException("position:conformation $posi1:$fragi1 is not in this conf space")
 	}
 	val singles = PosSingles(index)
 	val statics = PosSingles(index)
 
 	inner class PosPairs(index: ConfSpaceIndex) {
 
-		// pre-allocate enough storage for every position pair and conf pair
+		// pre-allocate enough storage for every position pair and fragment pair
 		private val list: List<List<List<MutableList<AtomPair>?>>> =
 			index.positions.pairs()
 				.map { (posInfo1, posInfo2) ->
-					posInfo1.confs.map {
-						posInfo2.confs.map {
+					posInfo1.fragments.map {
+						posInfo2.fragments.map {
 							// IDEA is apparently lying about the warning here ...
 							// looks like the compiler needs a little help figuring out this type
 							@Suppress("RemoveExplicitTypeArguments")
@@ -62,14 +62,14 @@ class AtomPairs(index: ConfSpaceIndex) {
 			}
 		}
 
-		fun add(posi1: Int, confi1: Int, posi2: Int, confi2: Int, atomi1: Int, atomi2: Int, params: List<Double>) {
-			list[posIndex(posi1, posi2)][confi1][confi2]?.add(AtomPair(atomi1, atomi2, paramsCache.index(params)))
-				?: throw NoSuchElementException("position:conformation pair $posi1:$confi2 - $posi2:$confi2 is not in this conf space")
+		fun add(posi1: Int, fragi1: Int, posi2: Int, fragi2: Int, atomi1: Int, atomi2: Int, params: List<Double>) {
+			list[posIndex(posi1, posi2)][fragi1][fragi2]?.add(AtomPair(atomi1, atomi2, paramsCache.index(params)))
+				?: throw NoSuchElementException("position:conformation pair $posi1:$fragi2 - $posi2:$fragi2 is not in this conf space")
 		}
 
-		operator fun get(posi1: Int, confi1: Int, posi2: Int, confi2: Int): List<AtomPair> =
-			list[posIndex(posi1, posi2)][confi1][confi2]
-				?: throw NoSuchElementException("position:conformation pair $posi1:$confi2 - $posi2:$confi2 is not in this conf space")
+		operator fun get(posi1: Int, fragi1: Int, posi2: Int, fragi2: Int): List<AtomPair> =
+			list[posIndex(posi1, posi2)][fragi1][fragi2]
+				?: throw NoSuchElementException("position:conformation pair $posi1:$fragi2 - $posi2:$fragi2 is not in this conf space")
 	}
 	val pairs = PosPairs(index)
 

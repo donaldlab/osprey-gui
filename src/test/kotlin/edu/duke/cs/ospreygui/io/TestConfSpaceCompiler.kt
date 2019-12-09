@@ -23,7 +23,6 @@ import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
 import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
-import edu.duke.cs.osprey.confspace.compiled.PosInterDist
 import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
 import edu.duke.cs.osprey.energy.compiled.PosInterGen
 import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
@@ -152,8 +151,8 @@ class TestConfSpaceCompiler : SharedSpec({
 	fun AssignedCoords.calcEEF1() = confSpace.ecalcs[1].calcEnergy(this)
 
 	fun AssignedCoords.allInters() = PosInterGen(null, null).all(confSpace, assignments)
-	fun AssignedCoords.calcEnergy() = CPUConfEnergyCalculator(confSpace).calcEnergy(assignments, allInters())
-	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace).minimizeEnergy(assignments, allInters())
+	fun AssignedCoords.calcEnergy() = CPUConfEnergyCalculator(confSpace, 1).calcEnergy(assignments, allInters())
+	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace, 1).minimizeEnergy(assignments, allInters())
 
 	fun Group.testConf(
 		compiledConfSpace: CompiledConfSpace,

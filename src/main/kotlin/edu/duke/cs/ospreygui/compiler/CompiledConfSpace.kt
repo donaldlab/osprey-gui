@@ -22,7 +22,13 @@ class CompiledConfSpace(
 
 	data class PosInfo(
 		val name: String,
+		val fragments: List<FragInfo>,
 		val confs: List<ConfInfo>
+	)
+
+	data class FragInfo(
+		val name: String,
+		val atomNames: List<String>
 	)
 
 	data class ConfInfo(
@@ -30,6 +36,8 @@ class CompiledConfSpace(
 		val type: String,
 		val atoms: List<AtomInfo>,
 		val motions: List<MotionInfo>,
+		/** to index into the atom pairs */
+		val fragIndex: Int,
 		/** in the same order as the forcefields */
 		val internalEnergies: List<Double>
 	)

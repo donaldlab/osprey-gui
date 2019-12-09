@@ -2,6 +2,7 @@ package edu.duke.cs.ospreygui.forcefield.eef1
 
 import cuchaz.kludge.tools.sqrt
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
@@ -33,27 +34,38 @@ class EEF1ForcefieldParams : ForcefieldParams {
 	var scale = 0.5
 
 
+	class AtomParams(
+		atom: Atom,
+		val type: EEF1.AtomType
+	) : ForcefieldParams.AtomParams(atom) {
+
+
+		override fun hashCode() =
+			type.hashCode()
+
+		override fun equals(other: Any?) =
+			other is AtomParams
+				&& this.type == other.type
+
+		override fun toString() =
+			"type=$type"
+	}
+
 	class MolParams(
 		mol: Molecule
 	) : ForcefieldParams.MolParams(mol) {
 
-		val types = IdentityHashMap<Atom,EEF1.AtomType>()
+		val atomsParams = IdentityHashMap<Atom,AtomParams>()
 
-		override fun isChanged(thisAtom: Atom, baseline: ForcefieldParams.MolParams, baseAtom: Atom): Boolean {
-
-			baseline as MolParams
-
-			return this.types.getValue(thisAtom) != baseline.types.getValue(baseAtom)
-		}
-
-		override fun atomDescription(atom: Atom) =
-			"type=${types.getValue(atom).name}"
+		override fun get(atom: Atom) =
+			atomsParams[atom]
 	}
 
 	override fun parameterize(mol: Molecule, netCharge: Int?) =
 		MolParams(mol).apply {
 			for (atom in mol.atoms) {
-				types[atom] = atom.atomTypeEEF1(mol)
+				val type = atom.atomTypeEEF1(mol) ?: continue
+				atomsParams[atom] = AtomParams(atom, type)
 			}
 		}
 
@@ -62,12 +74,7 @@ class EEF1ForcefieldParams : ForcefieldParams {
 
 		molParams as MolParams
 
-		// map the atoms to our params molecules
-		// and yes, shadow the names so we don't accidentally use the wrong atoms in the toplogy
-		@Suppress("NAME_SHADOWING")
-		val atom = molParams.findAtom(atom)
-
-		val type = molParams.types[atom] ?: return null
+		val type = molParams.atomsParams[atom]?.type ?: return null
 		return scale*type.dGref
 	}
 
@@ -121,19 +128,12 @@ class EEF1ForcefieldParams : ForcefieldParams {
 		molaParams as MolParams
 		molbParams as MolParams
 
-		// map the atoms to our params molecules
-		// and yes, shadow the names so we don't accidentally use the wrong atoms in the toplogy
-		@Suppress("NAME_SHADOWING")
-		val atoma = molaParams.findAtom(atoma)
-		@Suppress("NAME_SHADOWING")
-		val atomb = molbParams.findAtom(atomb)
-
-		val atype = molaParams.types[atoma] ?: return null
-		val btype = molbParams.types[atomb] ?: return null
+		val atype = molaParams.atomsParams[atoma]?.type ?: return null
+		val btype = molbParams.atomsParams[atomb]?.type ?: return null
 		return PairParams(atype, btype)
 	}
 
-	override fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,ForcefieldParams.MolParams>): Double {
+	override fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,ForcefieldParams.MolParams>, molToParams: Map<Molecule,AtomMap>?): Double {
 
 		var energy = 0.0
 
@@ -141,16 +141,22 @@ class EEF1ForcefieldParams : ForcefieldParams {
 		for ((mol, atoms) in atomsByMols) {
 			val molParams = molParamsByMols.getValue(mol)
 			for (atom in atoms) {
-				val internalEnergy = internalEnergy(molParams, atom) ?: continue
+				val patom = molToParams?.getValue(mol)?.getBOrThrow(atom) ?: atom
+				val internalEnergy = internalEnergy(molParams, patom) ?: continue
 				energy += internalEnergy
 			}
 		}
 
 		// add the pair energies
 		ForcefieldParams.forEachPair(atomsByMols, atomsByMols) { mola, atoma, molb, atomb, dist ->
+
+			// map the atoms to the params molecules
 			val molaParams = molParamsByMols.getValue(mola)
+			val patoma = molToParams?.getValue(mola)?.getBOrThrow(atoma) ?: atoma
 			val molbParams = molParamsByMols.getValue(molb)
-			pairParams(molaParams, atoma, molbParams, atomb, dist)?.let { params ->
+			val patomb = molToParams?.getValue(molb)?.getBOrThrow(atomb) ?: atomb
+
+			pairParams(molaParams, patoma, molbParams, patomb, dist)?.let { params ->
 				energy += params.calcEnergy(atoma.pos.distance(atomb.pos))
 			}
 		}

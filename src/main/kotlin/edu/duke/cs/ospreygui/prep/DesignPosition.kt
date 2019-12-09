@@ -118,6 +118,9 @@ class DesignPosition(
 		}
 		currentAtoms.clear()
 
+		// update the type
+		type = frag.type
+
 		// copy the atoms from the conf and add them to the molecule
 		// update the current atoms with the newly added atoms
 		val atomsByInfo = IdentityHashMap<ConfLib.AtomInfo,Atom>()

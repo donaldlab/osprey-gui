@@ -203,6 +203,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(frag, conf)
 
 			// does this look like glycine?
+			pos.type shouldBe "GLY"
 			res.type shouldBe "GLY"
 			res.atoms.size shouldBe 7
 			res.shouldHaveAtomNear("N", 4.400000, -0.515000, 7.533000)
@@ -232,6 +233,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(frag, conf)
 
 			// does this look like valine?
+			pos.type shouldBe "VAL"
 			res.type shouldBe "VAL"
 			res.atoms.size shouldBe 16
 			res.shouldHaveAtomNear("N", 4.400000, -0.515000, 7.533000)
@@ -270,6 +272,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(frag, conf)
 
 			// does this look like tryptophan?
+			pos.type shouldBe "TRP"
 			res.type shouldBe "TRP"
 			res.atoms.size shouldBe 24
 			res.shouldHaveAtomNear("N", 4.400000, -0.515000, 7.533000)
@@ -317,6 +320,7 @@ class TestMutation : SharedSpec({
 			// does this look like proline?
 			// this part of the backbone has TOTALLY the wrong phi/psi conformation to support proline,
 			// but otherwise, the mutation looks correct
+			pos.type shouldBe "PRO"
 			res.type shouldBe "PRO"
 			res.atoms.size shouldBe 14
 			res.shouldHaveAtomNear("N", 4.400000, -0.515000, 7.533000)
@@ -363,6 +367,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(wtFrag, wtConf)
 
 			// does this look like the original residue?
+			pos.type shouldBe "GLY"
 			res.type shouldBe "GLY"
 			res.atoms.size shouldBe wtPositions.size
 			for ((atomName, atomPos) in wtPositions) {
@@ -386,6 +391,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(frag, conf)
 
 			// does this look like serine?
+			pos.type shouldBe "SER"
 			res.type shouldBe "SER"
 			res.atoms.size shouldBe 11
 			res.shouldHaveAtomNear("N", 4.400000, -0.515000, 7.533000)
@@ -429,6 +435,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(wtFrag, wtConf)
 
 			// does this look like the original residue?
+			pos.type shouldBe "GLY"
 			res.type shouldBe "GLY"
 			res.atoms.size shouldBe wtPositions.size
 			for ((atomName, atomPos) in wtPositions) {
@@ -455,6 +462,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(frag, conf)
 
 			// does this look like glycine?
+			pos.type shouldBe "GLY"
 			res.type shouldBe "GLY"
 			res.atoms.size shouldBe 7
 			res.shouldHaveAtomNear("N", 17.783000, 20.016000, 15.734000)
@@ -501,6 +509,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(wtFrag, wtConf)
 
 			// does this look like the original residue?
+			pos.type shouldBe "PRO"
 			res.type shouldBe "PRO"
 			res.atoms.size shouldBe wtPositions.size
 			for ((atomName, atomPos) in wtPositions) {
@@ -526,6 +535,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(frag, conf)
 
 			// does this look like glycine?
+			pos.type shouldBe "GLY"
 			res.type shouldBe "GLY"
 			res.atoms.size shouldBe 9
 			res.shouldHaveAtomNear("N", 14.789000, 27.073000, 24.130000)
@@ -566,6 +576,7 @@ class TestMutation : SharedSpec({
 			pos.setConf(wtFrag, wtConf)
 
 			// does this look like the original residue?
+			pos.type shouldBe "ALA"
 			res.type shouldBe "ALA"
 			res.atoms.size shouldBe wtPositions.size
 			for ((atomName, atomPos) in wtPositions) {

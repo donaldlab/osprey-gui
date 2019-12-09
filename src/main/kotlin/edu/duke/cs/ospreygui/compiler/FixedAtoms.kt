@@ -111,8 +111,8 @@ class FixedAtoms(
 	data class DynamicInfo(
 		val atom: Atom,
 		val index: Int,
-		/** the first conformation to claim this atom at this design position */
-		val confInfo: ConfSpaceIndex.ConfInfo
+		/** the first fragment to claim this atom at this design position */
+		val fragInfo: ConfSpaceIndex.FragInfo
 	)
 
 	inner class PosInfo(val posInfo: ConfSpaceIndex.PosInfo) {
@@ -124,7 +124,7 @@ class FixedAtoms(
 		 * Moves the atom from the fixed atoms list to the dynamic atoms list for this position.
 		 * If the atom has already been moved, this function just returns without doing anything.
 		 */
-		fun addDynamic(atom: Atom, confInfo: ConfSpaceIndex.ConfInfo) {
+		fun addDynamic(atom: Atom, fragInfo: ConfSpaceIndex.FragInfo) {
 
 			// don't add the same atom twice
 			if (atom in dynamicLookup) {
@@ -135,7 +135,7 @@ class FixedAtoms(
 			for (posInfo in posInfos) {
 				posInfo.dynamicLookup[atom]
 					?.let { dynamicInfo ->
-						throw ClaimedAtomException(dynamicInfo.confInfo, atom)
+						throw ClaimedAtomException(dynamicInfo.fragInfo, atom)
 					}
 			}
 
@@ -143,14 +143,14 @@ class FixedAtoms(
 			val index = dynamicInfos.size
 
 			// make the info
-			val info = DynamicInfo(atom, index, confInfo)
+			val info = DynamicInfo(atom, index, fragInfo)
 			dynamicInfos.add(info)
 			dynamicLookup[atom] = info
 		}
 
-		fun addDynamic(atoms: Collection<Atom>, confInfo: ConfSpaceIndex.ConfInfo) {
+		fun addDynamic(atoms: Collection<Atom>, fragInfo: ConfSpaceIndex.FragInfo) {
 			for (atom in atoms) {
-				addDynamic(atom, confInfo)
+				addDynamic(atom, fragInfo)
 			}
 		}
 
@@ -167,16 +167,16 @@ class FixedAtoms(
 		posInfos[posInfo.index]
 
 	class ClaimedAtomException(
-		val confInfo: ConfSpaceIndex.ConfInfo,
+		val fragInfo: ConfSpaceIndex.FragInfo,
 		val atom: Atom
-	) : IllegalArgumentException("position ${confInfo.posInfo.pos.name} has already claimed dynamic fixed atom ${atom.fixedName(confInfo.posInfo.pos.mol)}")
+	) : IllegalArgumentException("position ${fragInfo.posInfo.pos.name} has already claimed dynamic fixed atom ${atom.fixedName(fragInfo.posInfo.pos.mol)}")
 }
 
 /**
  * Generate a unique name for the atom,
  * since atoms can come from multiple molecules.
  */
-private fun Atom.fixedName(mol: Molecule): String {
+fun Atom.fixedName(mol: Molecule): String {
 	val resName = (mol as? Polymer)
 		?.let {
 			it.findChainAndResidue(this)?.let { (chain, res) ->

@@ -14,11 +14,18 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 
 	inner class ConfInfo(
 		val posInfo: PosInfo,
-		val frag: ConfLib.Fragment,
+		val fragInfo: FragInfo,
 		val conf: ConfLib.Conf,
 		val index: Int
 	) {
-		val id = "${frag.id}:${conf.id}"
+		val id = "${fragInfo.frag.id}:${conf.id}"
+	}
+
+	inner class FragInfo(
+		val posInfo: PosInfo,
+		val frag: ConfLib.Fragment,
+		val index: Int
+	) {
 
 		/**
 		 * Append the conf atoms to the fixed atoms for this design position,
@@ -48,22 +55,27 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 		val index: Int
 	) {
 
-		// choose an order for the conformations and assign indices
+		// choose an order for the fragments, and assign indices
+		val fragments =
+			posConfSpace.confs.keys
+				.sortedBy { it.id }
+				.mapIndexed { i, frag -> FragInfo(this, frag, i) }
+
+		// flatten all the conformations across fragments, choose an order, and assign indices
 		val confs =
-			posConfSpace.confs.entries
-				.sortedBy { (frag, _) -> frag.id }
-				.flatMap { (frag, confs) ->
-					confs
+			fragments
+				.flatMap { fragInfo ->
+					posConfSpace.confs.getValue(fragInfo.frag)
 						.sortedBy { it.id }
-						.map { frag to it }
+						.map { fragInfo to it }
 				}
-				.mapIndexed { i, (frag, conf) -> ConfInfo(this, frag, conf, i) }
+				.mapIndexed { i, (fragInfo, conf) -> ConfInfo(this, fragInfo, conf, i) }
 
 		/**
 		 * Iterates over the conformations in the position conf space,
 		 * setting each conformation to the design position in turn.
 		 *
-		 * Make sure to get a lock on the molecule first before modifying it.
+		 * Makes sure to get a lock on the molecule first before modifying it.
 		 */
 		fun forEachConf(molLocker: MoleculeLocker, block: (ConfInfo) -> Unit) {
 
@@ -74,9 +86,42 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 
 				for (confInfo in confs) {
 					molLocker.lock(pos.mol) {
-						pos.setConf(confInfo.frag, confInfo.conf)
+						pos.setConf(confInfo.fragInfo.frag, confInfo.conf)
 					}
 					block(confInfo)
+				}
+
+			} finally {
+
+				// restore the original conformation
+				molLocker.lock(pos.mol) {
+					pos.setConf(backupFrag, backupFrag.confs.values.first())
+				}
+			}
+		}
+
+		/**
+		 * Iterates over the fragments in the position conf space, setting an
+		 * arbitrary conformation of each fragment to the design position in turn.
+		 *
+		 * Makes sure to get a lock on the molecule first before modifying it.
+		 */
+		fun forEachFrag(molLocker: MoleculeLocker, block: (FragInfo, ConfInfo) -> Unit) {
+
+			// backup the original conformation
+			val backupFrag = pos.makeFragment("backup", "backup")
+
+			try {
+
+				for (fragInfo in fragments) {
+
+					// pick an arbitrary conformation from the fragment
+					val confInfo = confs.first { it.fragInfo === fragInfo }
+
+					molLocker.lock(pos.mol) {
+						pos.setConf(fragInfo.frag, confInfo.conf)
+					}
+					block(fragInfo, confInfo)
 				}
 
 			} finally {

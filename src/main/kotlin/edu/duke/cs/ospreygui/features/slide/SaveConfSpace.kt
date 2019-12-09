@@ -29,12 +29,12 @@ class SaveConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		if (menuItem("Save Conformation Space")) {
 			FileDialog.saveFile(filterList, dir)?.let { path ->
 				dir = path.parent
-				save(slide, slidewin, path)
+				save(slidewin, path)
 			}
 		}
 	}
 
-	private fun save(slide: Slide.Locked, slidewin: SlideCommands, path: Path) = slidewin.showExceptions {
+	private fun save(slidewin: SlideCommands, path: Path) = slidewin.showExceptions {
 
 		// append the file extension if needed
 		var filename = path.fileName.toString()
@@ -43,10 +43,33 @@ class SaveConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		}
 		val pathWithExt = path.parent.resolve(filename)
 
-		// save the file
-		confSpace
-			.toToml()
-			.write(pathWithExt)
+		// backup the current design position conformations
+		val positions = confSpace.positions()
+		val backups = positions.map { it.makeFragment("backup", "backup") }
+		try {
+
+			// put the conf space back into wild-type mode for saving
+			for (pos in positions) {
+				val posConfSpace = confSpace.positionConfSpaces[pos] ?: continue
+				val wtFrag = posConfSpace.wildTypeFragment
+				if (wtFrag != null) {
+					val wtConf = wtFrag.confs.values.firstOrNull() ?: continue
+					pos.setConf(wtFrag, wtConf)
+				}
+			}
+
+			// save the file
+			confSpace
+				.toToml()
+				.write(pathWithExt)
+
+		} finally {
+
+			// restore the backups
+			for ((pos, backup) in positions.zip(backups)) {
+				pos.setConf(backup, backup.confs.values.first())
+			}
+		}
 
 		// TODO: feedback to the user that the save worked?
 	}

@@ -1,9 +1,6 @@
 package edu.duke.cs.ospreygui.forcefield
 
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.AtomPair
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.toIdentitySet
+import edu.duke.cs.molscope.molecule.*
 import java.util.*
 
 
@@ -19,38 +16,20 @@ interface ForcefieldParams {
 	fun settings(): Map<String,Any> = emptyMap()
 
 	/**
+	 * An opaque tope the parameterizer can use to store parameters for an atom
+	 */
+	abstract class AtomParams(val atom: Atom)
+
+	/**
 	 * An opaque type the parameterizer can use to store parameters for a molecule.
 	 */
 	abstract class MolParams(val mol: Molecule) {
 
 		/**
-		 * Efficiently maps atom instances across molecules,
-		 * assuming the two molecules have atoms with identical properties,
-		 * but different Atom object instances.
+		 * Gets the atom params for this atom.
+		 * The atom must be a member of the molecule in this params.
 		 */
-		private val atomsLookup = mol.atoms.associateWith { it }
-
-		abstract fun isChanged(thisAtom: Atom, baseline: MolParams, baseAtom: Atom): Boolean
-
-		/**
-		 * Find the atoms in this molecule that correspond to the given atoms,
-		 * assuming the given atoms come from a different copy of this molecule.
-		 */
-		fun findAtom(otherAtom: Atom): Atom {
-			return atomsLookup[otherAtom]
-				?: throw NoSuchElementException("no matching atom found in this mol like $otherAtom")
-		}
-
-		/**
-		 * Render the forcefield parameters for this atom into a human-readable string.
-		 */
-		abstract fun atomDescription(atom: Atom): String
-
-		/**
-		 * Like `atomDescription`, but calls `findAtom` on the atom first.
-		 */
-		fun findAtomDescription(atom: Atom): String =
-			atomDescription(findAtom(atom))
+		abstract operator fun get(atom: Atom): AtomParams?
 	}
 
 	/**
@@ -66,15 +45,15 @@ interface ForcefieldParams {
 	/**
 	 * Return the internal energy for this atom, if any.
 	 *
-	 * `atom` might not be part of the molecule in `molParams`.
+	 * `atom` must be part of the molecule in `molParams`.
 	 */
 	fun internalEnergy(molParams: MolParams, atom: Atom): Double?
 
 	/**
 	 * Return the forcefield parameters for this atom pair interaction, if any.
 	 *
-	 * `atoma` might not be part of the molecule in `molaParams`.
-	 * `atomb` might not be part of the molecule in `molbParams`.
+	 * `atoma` must be part of the molecule in `molaParams`.
+	 * `atomb` must be part of the molecule in `molbParams`.
 	 */
 	fun pairParams(molaParams: MolParams, atoma: Atom, molbParams: MolParams, atomb: Atom, dist: Int?): ParamsList?
 
@@ -82,32 +61,15 @@ interface ForcefieldParams {
 	 * Calculate the forcefield energy of the selected atoms directly, rather than
 	 * collect the forcefield parameters. eg, for the fixed atoms.
 	 *
-	 * Not called a whole lot, doesn't need to be fast.
+	 * If the atoms are not members of the molecules in the  MolParams,
+	 * then AtomMaps must be provided to perform the mapping to the MolParams molecules
 	 *
-	 * The atoms in each list might not be a member of the molecule in the associated mol params.
+	 * Not called a whole lot, doesn't need to be fast.
 	 */
-	fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,MolParams>): Double
+	fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,MolParams>, molToParams: Map<Molecule,AtomMap>? = null): Double
 
 
 	companion object {
-
-		/**
-		 * Return atoms whose params differ
-		 * from the equivalent atoms in the given params.
-		 */
-		fun filterChangedAtoms(atoms: Set<Atom>, params1: MolParams, params2: MolParams): Set<Atom> {
-			return atoms
-				.filter { atom ->
-
-					// map the atoms to the params mols
-					val atom1 = params1.findAtom(atom)
-					val atom2 = params2.findAtom(atom)
-
-					// did any params change?
-					params1.isChanged(atom1, params2, atom2)
-				}
-				.toIdentitySet()
-		}
 
 		fun forEachPair(atomsByMola: Map<Molecule,List<Atom>>, atomsByMolb: Map<Molecule,List<Atom>>, func: FfparamsPairFunc) {
 			for ((mola, atomsa) in atomsByMola) {

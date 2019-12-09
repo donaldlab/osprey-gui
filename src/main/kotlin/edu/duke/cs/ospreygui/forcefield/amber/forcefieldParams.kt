@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.forcefield.amber
 
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
@@ -61,23 +62,35 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		this["distanceDependentDielectric"] = distanceDependentDielectric
 	}
 
+	class AtomParams(
+		atom: Atom,
+		val type: String,
+		val charge: Double
+	) : ForcefieldParams.AtomParams(atom) {
+
+		override fun hashCode() =
+			type.hashCode()*31 + charge.hashCode()
+
+		override fun equals(other: Any?) =
+			other is AtomParams
+				&& this.type == other.type
+				&& this.charge == other.charge
+
+		override fun toString() =
+			"type=$type, charge=$charge"
+	}
+
 	class MolParams(
 		mol: Molecule,
 		val types: AmberTypes,
 		val frcmod: String?
 	) : ForcefieldParams.MolParams(mol) {
 
-		override fun isChanged(thisAtom: Atom, baseline: ForcefieldParams.MolParams, baseAtom: Atom): Boolean {
-
-			baseline as MolParams
-
-			// did any params change?
-			return this.types.atomTypes[thisAtom] != baseline.types.atomTypes[baseAtom]
-				|| this.types.atomCharges[thisAtom] != baseline.types.atomCharges[baseAtom]
+		override fun get(atom: Atom): ForcefieldParams.AtomParams? {
+			val type = types.atomTypes[atom] ?: return null
+			val charge = types.atomCharges[atom]?.toDoubleOrNull() ?: return null
+			return AtomParams(atom, type, charge)
 		}
-
-		override fun atomDescription(atom: Atom) =
-			"type=${types.atomTypes[atom]}, charge=${types.atomCharges[atom]}"
 
 		// NOTE: don't define hashCode() or equals() here
 		// the topology cache depends on hash tables using this class
@@ -240,13 +253,6 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 			TopIO.read(params.top).mapTo(mols)
 		}
 
-		// map the atoms to our params molecules
-		// and yes, shadow the names so we don't accidentally use the wrong atoms in the toplogy
-		@Suppress("NAME_SHADOWING")
-		val atoma = molaParams.findAtom(atoma)
-		@Suppress("NAME_SHADOWING")
-		val atomb = molbParams.findAtom(atomb)
-
 		// get the electrostatic params
 		// NOTE: the coulomb factor (~322.05) is already pre-multiplied into the charges
 		// see: Amber manual 14.1.7, Partial Charges
@@ -339,15 +345,20 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		return PairParams(esQ, vdwA, vdwB)
 	}
 
-	override fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,ForcefieldParams.MolParams>): Double {
+	override fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,ForcefieldParams.MolParams>, molToParams: Map<Molecule,AtomMap>?): Double {
 
 		var energy = 0.0
 
 		// add the pair energies
 		ForcefieldParams.forEachPair(atomsByMols, atomsByMols) { mola, atoma, molb, atomb, dist ->
+
+			// map the atoms to the params molecules
 			val molaParams = molParamsByMols.getValue(mola)
+			val patoma = molToParams?.getValue(mola)?.getBOrThrow(atoma) ?: atoma
 			val molbParams = molParamsByMols.getValue(molb)
-			pairParams(molaParams, atoma, molbParams, atomb, dist)?.let { params ->
+			val patomb = molToParams?.getValue(molb)?.getBOrThrow(atomb) ?: atomb
+
+			pairParams(molaParams, patoma, molbParams, patomb, dist)?.let { params ->
 				energy += params.calcEnergy(atoma.pos.distance(atomb.pos))
 			}
 		}
