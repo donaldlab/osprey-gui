@@ -189,27 +189,23 @@ fun makeTestConfSpace(): ConfSpace {
 
 class TestConfSpace : SharedSpec({
 
-	test("roundtrip") {
+	infix fun ConfSpace.shouldBeConfSpace(exp: ConfSpace) {
 
-		// do the roundtrip
-		val expConfSpace = makeTestConfSpace()
-		val toml = expConfSpace.toToml()
-		val obsConfSpace = ConfSpace.fromToml(toml)
+		val obs = this
 
-		// make sure we got the same conf space back
-		obsConfSpace.name shouldBe expConfSpace.name
+		obs.name shouldBe exp.name
 
 		// check the molecules
-		obsConfSpace.mols
+		obs.mols
 			.map { (type, mol) -> type to mol.type }
 			.shouldBe(
-				expConfSpace.mols
-				.map { (type, mol) -> type to mol.type }
+				exp.mols
+					.map { (type, mol) -> type to mol.type }
 			)
 
 		// check the design positions
-		obsConfSpace.positions().size shouldBe expConfSpace.positions().size
-		for ((obsPos, expPos) in obsConfSpace.positions().zip(expConfSpace.positions())) {
+		obs.positions().size shouldBe exp.positions().size
+		for ((obsPos, expPos) in obs.positions().zip(exp.positions())) {
 
 			obsPos.name shouldBe expPos.name
 			obsPos.type shouldBe expPos.type
@@ -232,8 +228,8 @@ class TestConfSpace : SharedSpec({
 			obsPos.currentAtoms.toSet() shouldBe expPos.currentAtoms.toSet()
 
 			// check the position conf spaces
-			val obsPosConfSpace = obsConfSpace.positionConfSpaces[obsPos]!!
-			val expPosConfSpace = expConfSpace.positionConfSpaces[expPos]!!
+			val obsPosConfSpace = obs.positionConfSpaces[obsPos]!!
+			val expPosConfSpace = exp.positionConfSpaces[expPos]!!
 
 			obsPosConfSpace.wildTypeFragment shouldBeFrag expPosConfSpace.wildTypeFragment
 			obsPosConfSpace.mutations shouldBe expPosConfSpace.mutations
@@ -256,6 +252,73 @@ class TestConfSpace : SharedSpec({
 				for ((obsConf, expConf) in obsConfs.zip(expConfs)) {
 					obsConf shouldBeConf expConf
 				}
+			}
+		}
+	}
+
+	test("roundtrip") {
+
+		// do the roundtrip
+		val expConfSpace = makeTestConfSpace()
+		val toml = expConfSpace.toToml()
+		val obsConfSpace = ConfSpace.fromToml(toml)
+
+		// make sure we got the same conf space back
+		obsConfSpace shouldBeConfSpace expConfSpace
+	}
+
+	test("copy") {
+
+		// do the roundtrip
+		val expConfSpace = makeTestConfSpace()
+		val obsConfSpace = expConfSpace.copy()
+
+		// make sure we got the same conf space back
+		obsConfSpace shouldBeConfSpace expConfSpace
+	}
+
+	test("copy protein") {
+
+		val expConfSpace = makeTestConfSpace()
+		val mol = expConfSpace.mols
+			.mapNotNull { (type, mol) -> mol.takeIf { type == MoleculeType.Protein } }
+			.first()
+		val obsConfSpace = expConfSpace.copy(listOf(mol))
+
+		// make sure we got just the protein
+		obsConfSpace.mols shouldBe listOf(MoleculeType.Protein to mol)
+
+		// and just the protein design positions
+		obsConfSpace.positions().run {
+			size shouldBe 2
+			this[0].run {
+				this.mol shouldBe mol
+				name shouldBe expConfSpace.designPositionsByMol.getValue(mol)[0].name
+			}
+			this[1].run {
+				this.mol shouldBe mol
+				name shouldBe expConfSpace.designPositionsByMol.getValue(mol)[1].name
+			}
+		}
+	}
+
+	test("copy small mol") {
+
+		val expConfSpace = makeTestConfSpace()
+		val mol = expConfSpace.mols
+			.mapNotNull { (type, mol) -> mol.takeIf { type == MoleculeType.SmallMolecule } }
+			.first()
+		val obsConfSpace = expConfSpace.copy(listOf(mol))
+
+		// make sure we got just the small molecule
+		obsConfSpace.mols shouldBe listOf(MoleculeType.SmallMolecule to mol)
+
+		// and just the small molecule design positions
+		obsConfSpace.positions().run {
+			size shouldBe 1
+			this[0].run {
+				this.mol shouldBe mol
+				name shouldBe expConfSpace.designPositionsByMol.getValue(mol)[0].name
 			}
 		}
 	}

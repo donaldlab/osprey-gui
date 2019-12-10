@@ -58,6 +58,7 @@ class ConfSpacePrep(
 
 			s.features.menu("File") {
 				add(SaveConfSpace(confSpace))
+				add(SplitConfSpace(confSpace))
 				addSeparator()
 				add(CompileConfSpace(confSpace))
 				addSeparator()

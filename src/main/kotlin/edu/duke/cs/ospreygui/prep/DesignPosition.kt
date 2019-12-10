@@ -241,9 +241,12 @@ class DesignPosition(
 				}
 			}
 
+		// sort the atoms so we get a deterministic order from the set
+		val sortedAtoms = currentAtoms.sortedBy { it.name }
+
 		// make the atom infos
 		val atomInfos = Atom.identityMap<ConfLib.AtomInfo>().apply {
-			for ((i, atom) in currentAtoms.withIndex()) {
+			for ((i, atom) in sortedAtoms.withIndex()) {
 				put(atom, ConfLib.AtomInfo(i + 1, atom.name, atom.element))
 			}
 		}
@@ -269,7 +272,7 @@ class DesignPosition(
 			name = fragName,
 			type = type,
 			atoms = atoms,
-			bonds = currentAtoms
+			bonds = sortedAtoms
 				.flatMap { atom ->
 					val atomInfo = atom.info()
 					mol.bonds.bondedAtomsSorted(atom)
@@ -326,6 +329,8 @@ class DesignPosition(
 
 		abstract fun translate(id: Int, getAtomInfo: (Atom) -> ConfLib.AtomInfo): ConfLib.Anchor
 		abstract fun translateCoords(): ConfLib.AnchorCoords
+
+		abstract fun copyToPos(pos: DesignPosition, oldToNew: AtomMap): Anchor
 
 		/**
 		 * Returns the residue of the first anchor atom, if any
@@ -443,7 +448,8 @@ class DesignPosition(
 			override fun translate(id: Int, getAtomInfo: (Atom) -> ConfLib.AtomInfo) =
 				ConfLib.Anchor.Single(
 					id,
-					bonds = pos.mol.bonds.bondedAtoms(a)
+					// use sorted atoms here so we get a deterministic order
+					bonds = pos.mol.bonds.bondedAtomsSorted(a)
 						.filter { it in pos.currentAtoms }
 						.map { getAtomInfo(it) }
 				)
@@ -453,6 +459,14 @@ class DesignPosition(
 					Vector3d(a.pos),
 					Vector3d(b.pos),
 					Vector3d(c.pos)
+				)
+
+			override fun copyToPos(pos: DesignPosition, oldToNew: AtomMap) =
+				Single(
+					pos,
+					a = oldToNew.getBOrThrow(a),
+					b = oldToNew.getBOrThrow(b),
+					c = oldToNew.getBOrThrow(c)
 				)
 		}
 
@@ -617,6 +631,15 @@ class DesignPosition(
 					Vector3d(b.pos),
 					Vector3d(c.pos),
 					Vector3d(d.pos)
+				)
+
+			override fun copyToPos(pos: DesignPosition, oldToNew: AtomMap) =
+				Double(
+					pos,
+					a = oldToNew.getBOrThrow(a),
+					b = oldToNew.getBOrThrow(b),
+					c = oldToNew.getBOrThrow(c),
+					d = oldToNew.getBOrThrow(d)
 				)
 		}
 	}
