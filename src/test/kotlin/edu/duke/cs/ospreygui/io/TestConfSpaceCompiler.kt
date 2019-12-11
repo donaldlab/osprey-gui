@@ -117,7 +117,7 @@ class TestConfSpaceCompiler : SharedSpec({
 	fun ConfSpace.compile(): CompiledConfSpace {
 
 		// compile the conf space
-		val toml = ConfSpaceCompiler(this).run {
+		val bytes = ConfSpaceCompiler(this).run {
 
 			addForcefield(Forcefield.Amber96)
 
@@ -130,7 +130,7 @@ class TestConfSpaceCompiler : SharedSpec({
 			compile().run {
 				waitForFinish()
 				report!!.run {
-					compiled?.toToml()
+					compiled?.toBytes()
 						?: error?.let { throw it }
 						?: throw Error("no compiled")
 				}
@@ -138,7 +138,7 @@ class TestConfSpaceCompiler : SharedSpec({
 		}
 
 		// send it to osprey to rebuild the conf space
-		return CompiledConfSpace(toml)
+		return CompiledConfSpace.fromBytes(bytes)
 	}
 
 	fun CompiledConfSpace.makeCoords(vararg confIds: String) =

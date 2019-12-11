@@ -18,7 +18,7 @@ import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.amber.AmberForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.eef1.EEF1ForcefieldParams
-import edu.duke.cs.ospreygui.io.toToml
+import edu.duke.cs.ospreygui.io.toBytes
 import edu.duke.cs.ospreygui.io.write
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import java.math.BigInteger
@@ -32,8 +32,8 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	override val id = FeatureId("compile.confspace")
 
 	companion object {
-		const val textExtension = "ccs.toml"
-		const val compressedExtension = "ccs.toml.xz"
+		const val textExtension = "ccs"
+		const val compressedExtension = "ccs.xz"
 	}
 
 	// make the compiler and configure the default settings
@@ -369,12 +369,11 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	private fun CompiledConfSpace.save(compress: Boolean, path: Path) {
 
 		// actually write out the compiled conf space to a file
-		val toml = toToml()
+		var bytes = toBytes()
 		if (compress) {
-			LZMA2.compress(toml).write(path)
-		} else {
-			toml.write(path)
+			bytes = LZMA2.compress(bytes)
 		}
+		bytes.write(path)
 	}
 
 	private fun ConfSpaceCompiler.Report.guiError(imgui: Commands) = imgui.run gui@{
