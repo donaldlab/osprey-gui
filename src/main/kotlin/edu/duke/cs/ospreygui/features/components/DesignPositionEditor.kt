@@ -2,11 +2,10 @@ package edu.duke.cs.ospreygui.features.components
 
 import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.tools.ByteFlags
+import cuchaz.kludge.tools.IntFlags
 import cuchaz.kludge.tools.Ref
-import edu.duke.cs.molscope.gui.ClickTracker
-import edu.duke.cs.molscope.gui.SlideCommands
-import edu.duke.cs.molscope.gui.infoTip
-import edu.duke.cs.molscope.gui.styleEnabledIf
+import cuchaz.kludge.tools.divideUp
+import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.tools.identityHashSet
@@ -73,7 +72,7 @@ class DesignPositionEditor(
 			}
 		}
 
-		pos.resetConfSpace()
+		resetPosConfSpace()
 		refresh(view)
 	}
 
@@ -81,7 +80,7 @@ class DesignPositionEditor(
 
 		pos.currentAtoms.removeIf { it in atoms }
 
-		pos.resetConfSpace()
+		resetPosConfSpace()
 		refresh(view)
 	}
 
@@ -148,15 +147,15 @@ class DesignPositionEditor(
 
 	private val DesignPosition.confSpace get() = prep.confSpace.positionConfSpaces.getOrMake(this)
 
-	private fun DesignPosition.resetConfSpace() {
+	private fun resetPosConfSpace() {
 
-		val posType = type
+		val posType = pos.type
 
 		// delete the old conf space
 		prep.confSpace.positionConfSpaces.remove(pos)
 
 		// make a new conf space
-		confSpace.apply {
+		pos.confSpace.apply {
 
 			// find motions for the wildtype fragment, by finding a similar fragment from the library
 			val wtMotions = prep.conflibs
@@ -171,7 +170,11 @@ class DesignPositionEditor(
 
 			// make a new wildtype fragment, if possible
 			wildTypeFragment = try {
-				pos.makeFragment("wt-${name.toTomlKey()}", "WildType", motions = wtMotions)
+				pos.makeFragment(
+					"wt-${pos.name.toTomlKey()}", "WildType @ ${pos.name}",
+					"conf1", "conf1",
+					motions = wtMotions
+				)
 			} catch (ex: DesignPosition.IllegalAnchorsException) {
 				null
 			}
@@ -184,7 +187,7 @@ class DesignPositionEditor(
 				wildTypeFragment
 					?.let { add(it) }
 				prep.conflibs
-					.flatMap { compatibleFragments(it) }
+					.flatMap { pos.compatibleFragments(it) }
 					.filter { it.type == posType }
 					.forEach { add(it) }
 			}
@@ -297,18 +300,28 @@ class DesignPositionEditor(
 		val selectedChain = selectedChain ?: return
 
 		// show all the residues as radios
+		val residuesPerCol = 20
+		val numCols = selectedChain.residues.size.divideUp(residuesPerCol)
 		text("Residues:")
-		child("residues", 500f, 400f, true) {
-			columns(5)
-			for (res in selectedChain.residues) {
-				if (radioButton("${res.id} ${res.type}", res == selectedRes || res == hoveredRes)) {
-					slidewin.showExceptions {
-						selectResidue(view, res)
+		setNextWindowContentSize(numCols*100f, 0f)
+		child("residues", 500f, 480f, true, flags = IntFlags.of(Commands.BeginFlags.HorizontalScrollBar)) {
+
+			columns(numCols, border = true) {
+				for (c in 0 until numCols) {
+					column {
+						for (i in 0 until residuesPerCol) {
+
+							val res = selectedChain.residues.getOrNull(c*residuesPerCol + i) ?: break
+
+							if (radioButton("${res.id} ${res.type}", res == selectedRes || res == hoveredRes)) {
+								slidewin.showExceptions {
+									selectResidue(view, res)
+								}
+							}
+						}
 					}
 				}
-				nextColumn()
 			}
-			columns(1)
 		}
 	}
 
@@ -319,7 +332,7 @@ class DesignPositionEditor(
 
 		// update the design position
 		Proteins.setDesignPosition(pos, res)
-		pos.resetConfSpace()
+		resetPosConfSpace()
 		refresh(view)
 	}
 
@@ -446,7 +459,7 @@ class DesignPositionEditor(
 											anchorInfo.anchor,
 											anchorUpdater(clickedAtom)
 										)
-										pos.resetConfSpace()
+										resetPosConfSpace()
 										/* NOTE:
 											Could set posChanged = true here, but it won't work the way you'd think.
 											By the time atomClickHandler gets called, we'll be on a different stack frame,
@@ -558,7 +571,7 @@ class DesignPositionEditor(
 
 		// finally, handle any pending updates after we changed the position
 		if (posChanged) {
-			pos.resetConfSpace()
+			resetPosConfSpace()
 			refresh(view)
 		}
 	}

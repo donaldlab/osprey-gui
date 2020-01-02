@@ -33,6 +33,7 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	}
 
 	val winState = WindowState()
+	val nameBuf = Commands.TextBuffer(1024)
 
 	val filterList = FilterList(listOf(extension))
 	var dir = Paths.get("").toAbsolutePath()
@@ -60,6 +61,8 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 					molInfos.add(MolInfo(mol, type, molInfos.size))
 				}
 
+				// reset the text buffer
+				nameBuf.text = confSpace.name
 			},
 			whenOpen = {
 				window("Split Conformation Space##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
@@ -82,6 +85,14 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 					spacing()
 					spacing()
 
+					// choose a name
+					inputText("Name", nameBuf)
+
+					// breathe a little
+					spacing()
+					spacing()
+					spacing()
+
 					val selectedMols = molInfos
 						.filter { it.pSelected.value == true }
 						.map { it.mol }
@@ -96,7 +107,7 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 						if (button("Save $selmsg###save") && selectedMols.isNotEmpty()) {
 							FileDialog.saveFile(filterList, dir)?.let { path ->
 								dir = path.parent
-								save(slidewin, path, selectedMols)
+								save(slidewin, path, selectedMols, nameBuf.text)
 							}
 						}
 					}
@@ -105,7 +116,7 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		)
 	}
 
-	private fun save(slidewin: SlideCommands, path: Path, mols: List<Molecule>) = slidewin.showExceptions {
+	private fun save(slidewin: SlideCommands, path: Path, mols: List<Molecule>, newName: String) = slidewin.showExceptions {
 
 		// append the file extension if needed
 		var filename = path.fileName.toString()
@@ -132,6 +143,9 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 			// split the conf space using the selected molecules and save it
 			confSpace
 				.copy(mols)
+				.apply {
+					name = newName
+				}
 				.toToml()
 				.write(pathWithExt)
 

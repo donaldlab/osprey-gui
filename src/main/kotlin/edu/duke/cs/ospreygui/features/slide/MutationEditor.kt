@@ -62,7 +62,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				whenOpen = {
 
 					// draw the window
-					window("Design Position Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
+					window("Edit ${posInfo.pos.name} mutations##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
 						// if we need to reset the tab selection, make the flags for the first tab
 						fun makeFlags() =
@@ -216,6 +216,12 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 								pos.confSpace.mutations.add(info.type)
 							} else {
 								pos.confSpace.mutations.remove(info.type)
+
+								// also, remove the confs for this mutation, if any
+								pos.confSpace.confs
+									.keys
+									.filter { it.type == info.type }
+									.forEach { pos.confSpace.confs.remove(it) }
 							}
 
 							// update the sequence count

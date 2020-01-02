@@ -42,7 +42,8 @@ fun ConfSpace.toToml(): String {
 
 	val posIndices = HashMap<DesignPosition,Int>()
 	for ((moli, mol) in mols.withIndex()) {
-		for (pos in designPositionsByMol.getValue(mol)) {
+		val positions = designPositionsByMol[mol] ?: continue
+		for (pos in positions) {
 
 			// get the position conf space, or skip this pos
 			val posConfSpace = positionConfSpaces[pos] ?: continue
@@ -94,6 +95,13 @@ fun ConfSpace.toToml(): String {
 			)
 			write("confs = [\n")
 			for ((frag, confs) in posConfSpace.confs) {
+
+				// don't write empty conf list, the TOML file won't be parseable
+				// (might be a bug in the TOML parser? I think empty arrays [] are supposed to parse ...)
+				if (confs.isEmpty()) {
+					continue
+				}
+
 				write("\t{ frag = %12s, confs = [ %s ] },\n",
 					frag.id.quote(),
 					confs.joinToString(", ") { it.id.quote() }

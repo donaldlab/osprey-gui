@@ -78,7 +78,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				val numSelected = confInfos.count { it.pSelected.value }
 				val numPossible = frag.confs.size
 
-				val label = "${frag.name}, $numSelected/$numPossible confs###$id"
+				val label = "${frag.name}, $numSelected/$numPossible confs###${posInfo.pos.name}-$id"
 			}
 
 			// collect the fragments
@@ -106,7 +106,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			val numSelected = fragInfos.sumBy { it.numSelected }
 			val numConfs = fragInfos.sumBy { it.numPossible }
 
-			val label = "$type, $numSelected/$numConfs confs###$type"
+			val label = "$type, $numSelected/$numConfs confs###${posInfo.pos.name}-$type"
 		}
 		val mutInfos = ArrayList<MutInfo>()
 		var selectedFragInfo: MutInfo.FragInfo? = null
@@ -134,7 +134,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				whenOpen = {
 
 					// draw the window
-					window("Design Position Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
+					window("Edit ${posInfo.pos.name} conformations##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
 						// if we need to reset the tab selection, make the flags for the first tab
 						fun makeFlags() =
@@ -243,7 +243,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			""".trimMargin())
 			child("confs", 300f, 400f, true) {
 				for (mutInfo in mutInfos) {
-					treeNode(mutInfo.label) {
+					treeNode(mutInfo.label, flags = IntFlags.of(Commands.TreeNodeFlags.DefaultOpen)) {
 						for (fragInfo in mutInfo.fragInfos) {
 							treeNode(fragInfo.label) {
 								for (confInfo in fragInfo.confInfos) {
