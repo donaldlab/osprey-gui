@@ -76,6 +76,7 @@ class ConfSpacePrep(
 				add(ClashViewer())
 			}
 			s.features.menu("Edit") {
+				add(ConfSpaceNameEditor(this@ConfSpacePrep))
 				add(MutationEditor(this@ConfSpacePrep))
 				add(ConformationEditor(this@ConfSpacePrep))
 			}

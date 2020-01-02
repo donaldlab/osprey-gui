@@ -58,8 +58,8 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 							spacing()
 						}
 
-						// show the molecule type
-						selectable("$mol##${System.identityHashCode(mol)}", highlightedMol == mol)
+						// show a selector for the molecule
+						selectable("$type: ${mol.name}###mol$i", highlightedMol == mol)
 						if (isItemHovered()) {
 							hoveredMol = mol
 						}
@@ -82,18 +82,19 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 
 						indent(10f)
 
+						// show extra description
 						when (type) {
 							MoleculeType.Protein -> {
 								mol as Polymer
 								for (chain in mol.chains) {
-									text("chain ${chain.id}: ${chain.residues.size} amino acids")
+									text("${chain.residues.size} amino acids")
 								}
 							}
 							MoleculeType.DNA,
 							MoleculeType.RNA -> {
 								mol as Polymer
 								for (chain in mol.chains) {
-									text("chain ${chain.id}: ${chain.residues.size} bases")
+									text("${chain.residues.size} bases")
 								}
 							}
 							MoleculeType.SmallMolecule,

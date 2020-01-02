@@ -231,12 +231,23 @@ fun Molecule.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair
 	// create a molecule for each item in the partition
 	var mols = partition.flatMap { (moltype, chainId, residues) ->
 
+		// determine a descriptive molecule name based on the molecule type
+		val name = when (moltype) {
+			MoleculeType.Protein -> "Chain $chainId"
+			MoleculeType.DNA -> "Chain $chainId"
+			MoleculeType.RNA -> "Chain $chainId"
+			MoleculeType.Solvent -> moltype.name
+			MoleculeType.AtomicIon -> residues.first().atoms.first().name
+			MoleculeType.Synthetic -> moltype.name
+			MoleculeType.SmallMolecule -> residues.first().type
+		}
+
 		if (moltype.isPolymer) {
 
 			val atomMap = AtomMap()
 
 			// map all the residues to a new polymer
-			val polymer = Polymer(moltype.name)
+			val polymer = Polymer(name)
 			val chain = Polymer.Chain(chainId).also { polymer.chains.add(it) }
 
 			// copy the atoms
@@ -272,7 +283,7 @@ fun Molecule.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair
 
 			// map each residue to a new molecule
 			return@flatMap residues.map { res ->
-				val mol = Molecule(moltype.name, res.type)
+				val mol = Molecule(name, res.type)
 
 				val atomMap = AtomMap()
 
