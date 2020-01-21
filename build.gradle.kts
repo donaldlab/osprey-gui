@@ -40,6 +40,11 @@ tasks.withType<KotlinCompile> {
 	}
 }
 
+tasks.withType<Test> {
+	useJUnitPlatform()
+}
+
+
 // assume we're doing a dev build if the top task is "classes"
 if (gradle.startParameter.taskNames.any { it.endsWith(":classes") }) {
 	System.setProperty("isDev", true.toString())
