@@ -8,6 +8,58 @@ object SQM {
 		BadNetCharge
 	}
 
+	/**
+	 * See AMBER 19 manual pg 148
+	 */
+	data class Options(
+
+		/** level of theory to use for the QM region of the simulation (Hamiltonian) */
+		var qmTheory: String = "AM1",
+
+		/** gradient RMS tolerence */
+		var grmsTol: Double = 0.0005,
+
+		/** self-consistent field convergence */
+		var scfConv: Double = 1e-10,
+
+		/** number of iterations for direct inversion of the iterative subspace */
+		var ndiisAttempts: Int = 700,
+
+		/** maximum number of minimization cycles to allow, using the xmin minimizer */
+		var maxCyc: Int = 9999,
+
+		/** print the progress of the minimization every ntpr steps */
+		var ntpr: Int = 10
+	) {
+		/**
+			Converts the double value to fortran format, eg:
+				1e-10 -> 1.d-10
+				1.2435 -> 1.2345d0
+		*/
+		private fun Double.toFortran() =
+			"%e".format(this).let { str ->
+				if (str.contains('.')) {
+					str.replace("e", "d")
+				} else {
+					str.replace("e", ".d")
+				}
+			}
+
+		override fun toString() =
+			mutableListOf(
+				"qm_theory" to "\"$qmTheory\"",
+				"grms_tol" to grmsTol.toFortran(),
+				"scfconv" to scfConv.toFortran(),
+				"ndiis_attempts" to "$ndiisAttempts",
+				"maxcyc" to "$maxCyc",
+				"ntpr" to "$ntpr"
+			)
+			.joinToString(", ") { (key, value) ->
+				"$key=$value"
+			}
+			.let { "$it," } // need a trailing comma, since this list gets prepended to another list by antechamber
+	}
+
 	data class Results(
 		val exitCode: Int?,
 		var console: List<String>?,

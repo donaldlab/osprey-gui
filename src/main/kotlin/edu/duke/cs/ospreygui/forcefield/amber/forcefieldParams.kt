@@ -56,7 +56,18 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 	 */
 	var chargeMethod = Antechamber.ChargeMethod.AM1BCC
 
-	// TODO: expose the above options for configuration somewhere?
+	/**
+	 * Number of steps of `xmin` minimization to perform during partial charge calculation
+	 * for small molecules.
+	 *
+	 * The default value of 0 assumes the input structure should not be perturbed via minimization.
+	 * ie, 0 minimization steps results in a single point energy calculation.
+	 *
+	 * Minimization with `xmin` is slow, so adding minimization steps can add large amounts of time
+	 * to your conformation space compilations.
+	 */
+	var sqmMinimizationSteps = 0
+
 
 	override fun settings() = LinkedHashMap<String,Any>().apply {
 		this["distanceDependentDielectric"] = distanceDependentDielectric
@@ -112,7 +123,18 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		// get the amber types for the molecule
 		val types = try {
 
-			mol.calcTypesAmber(mol.findTypeOrThrow(), ffname, chargeMethod, netCharge)
+			mol.calcTypesAmber(
+				mol.findTypeOrThrow(),
+				ffname,
+				chargeMethod,
+				netCharge,
+				SQM.Options(
+					maxCyc = sqmMinimizationSteps,
+
+					// print out progress info as frequently as possible
+					ntpr = 1
+				)
+			)
 
 		} catch (ex: Antechamber.Exception) {
 

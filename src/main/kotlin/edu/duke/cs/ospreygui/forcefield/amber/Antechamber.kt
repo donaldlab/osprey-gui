@@ -49,7 +49,8 @@ object Antechamber {
 		atomTypes: AtomTypes,
 		useACDoctor: Boolean = true,
 		generateCharges: ChargeMethod? = null,
-		netCharge: Int? = null
+		netCharge: Int? = null,
+		sqmOptions: SQM.Options = SQM.Options()
 	): Results {
 
 		// make sure antechamber is available for this platform
@@ -69,7 +70,8 @@ object Antechamber {
 				"-o", "mol.mol2",
 				"-fo", "mol2",
 				"-at", atomTypes.id,
-				"-dr", if (useACDoctor) "y" else "n"
+				"-dr", if (useACDoctor) "y" else "n",
+				"-ek", sqmOptions.toString()
 			)
 			if (generateCharges != null) {
 				command += listOf("-c", generateCharges.id)

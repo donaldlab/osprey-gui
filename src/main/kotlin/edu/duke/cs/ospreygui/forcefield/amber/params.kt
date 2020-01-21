@@ -72,7 +72,8 @@ fun Molecule.calcTypesAmber(
 	molType: MoleculeType,
 	ffname: ForcefieldName = molType.defaultForcefieldNameOrThrow,
 	chargeMethod: Antechamber.ChargeMethod? = null,
-	netCharge: Int? = null
+	netCharge: Int? = null,
+	sqmOptions: SQM.Options = SQM.Options()
 ): AmberTypes {
 
 	val dst = this
@@ -90,7 +91,8 @@ fun Molecule.calcTypesAmber(
 				ffname.atomTypesOrThrow,
 				useACDoctor = false,
 				generateCharges = chargeMethod,
-				netCharge = netCharge
+				netCharge = netCharge,
+				sqmOptions = sqmOptions
 			)
 
 			// read the resulting mol2 file

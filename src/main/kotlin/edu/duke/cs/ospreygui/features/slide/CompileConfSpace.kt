@@ -11,6 +11,7 @@ import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.gui.infoTip
+import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.osprey.tools.LZMA2
 import edu.duke.cs.ospreygui.compiler.*
@@ -268,6 +269,14 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 					infoTip("""
 						|Method to generate partial charges for small molecules
 					""".trimMargin())
+
+					inputInt("Partial charge minimization steps", Ref.of(ff::sqmMinimizationSteps))
+					sameLine()
+					infoTip("""
+						|Number of steps of minimization to perform during partial charge
+						|calculation for small molecules. The default of 0 assumes the input
+						|structures should not be perturbed while computing partial charges.
+					""".trimMargin())
 				}
 
 				is EEF1ForcefieldParams -> {
@@ -286,10 +295,48 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		}
 	}
 
+	private inner class NetChargeInfo(val mol: Molecule) {
+
+		val label = mol.toString()
+		// TODO: text storage
+
+		// TODO: storage for each mutation
+
+		val wildType: Ref<Int> = Ref.of(
+			getter = { compiler.netCharges[mol]?.netCharge ?: 0 },
+			setter = { compiler.netCharges[mol]?.netCharge = it }
+		)
+
+		init {
+			// initialize all the net charges to 0
+			wildType.value = 0
+		}
+	}
+	private val netChargeInfos =
+		confSpace.mols
+			.filter { (type, _) -> NetCharges.required(type) }
+			.associate { (_, mol) -> mol to NetChargeInfo(mol) }
+
 	private fun guiNetCharges(imgui: Commands) = imgui.run {
-		// TODO: let the user input net charges for small molecules
-		//  or tell the user they don't have to
-		text("TODO")
+
+		for ((_, mol) in confSpace.mols) {
+			val info = netChargeInfos[mol] ?: continue
+
+			// breathe a little
+			spacing()
+			spacing()
+			spacing()
+
+			text(info.label)
+			child(info.label, 300f, 100f, border = true) {
+
+				inputInt("Wild Type", info.wildType)
+				sameLine()
+				infoTip("""
+					|Input the formal net charge for this molecule before any mutations.
+				""".trimMargin())
+			}
+		}
 	}
 
 

@@ -14,19 +14,26 @@ import java.util.*
  */
 class NetCharges {
 
+	companion object {
+
+		fun required(molType: MoleculeType) =
+			when (molType) {
+
+				// small molecule, needs net charges to compute partial charges
+				MoleculeType.SmallMolecule -> true
+
+				// not a small molecule, no net charges needed
+				else -> false
+			}
+	}
+
 	private val smallMolNetCharges: MutableMap<Molecule,MolNetCharges> = IdentityHashMap()
 
-	operator fun get(mol: Molecule): MolNetCharges? =
-		when (mol.findTypeOrThrow()) {
-
-			MoleculeType.SmallMolecule -> {
-				// small molecule, need net charges
-				smallMolNetCharges[mol]
-					?: throw NoSuchElementException("Small molecule $mol has no net charges configured")
-			}
-
-			// not a small molecule, no net charges needed
-			else -> null
+	operator fun get(mol: Molecule, moltype: MoleculeType = mol.findTypeOrThrow()): MolNetCharges? =
+		if (required(moltype)) {
+			smallMolNetCharges.getOrPut(mol) { MolNetCharges(mol) }
+		} else {
+			null
 		}
 }
 
