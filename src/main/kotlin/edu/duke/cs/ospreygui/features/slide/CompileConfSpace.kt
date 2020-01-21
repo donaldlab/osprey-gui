@@ -14,6 +14,8 @@ import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.osprey.tools.LZMA2
 import edu.duke.cs.ospreygui.compiler.*
+import edu.duke.cs.ospreygui.features.components.Icon
+import edu.duke.cs.ospreygui.features.components.icon
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.amber.AmberForcefieldParams
@@ -25,6 +27,7 @@ import java.math.BigInteger
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.text.NumberFormat
+import java.util.*
 
 
 class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
@@ -56,6 +59,33 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	private var progress: CompilerProgress? = null
 	private var extraInfoBuf: Commands.TextBuffer = Commands.TextBuffer(1024)
 
+	/** Cache the display info about the report, so we don't have to re-compute it every frame */
+	private class ReportInfo(val report: ConfSpaceCompiler.Report) {
+
+		val errorExtra: String? = report.error?.let { error ->
+
+			// collect any extra information info a big buffer
+			val msg = StringBuilder()
+
+			report.error.extraInfo?.let { extra ->
+				msg.append(extra)
+				msg.append("\n")
+			}
+
+			error.causes().forEach { cause ->
+				msg.append(cause.msgOrName())
+				msg.append("\n")
+			}
+
+			msg
+				.takeIf { it.isNotEmpty() }
+				?.toString()
+		}
+
+		// TODO: save cause stack traces somewhere?
+	}
+	private var reportInfos = IdentityHashMap<ConfSpaceCompiler.Report,ReportInfo>()
+
 
 	private fun resizeExtraInfoBufIfNeeded(msg: String): Commands.TextBuffer {
 
@@ -63,6 +93,10 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 
 			// make a bigger buffer
 			extraInfoBuf = Commands.TextBuffer.of(msg)
+		} else {
+
+			// re-use the existing buffer
+			extraInfoBuf.text = msg
 		}
 
 		return extraInfoBuf
@@ -131,11 +165,12 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 						} else {
 
 							// compilation finished, show the report
+							val reportInfo = reportInfos.getOrPut(report) { ReportInfo(report) }
 							val compiled = report.compiled
 							if (compiled != null) {
-								compiled.guiSuccess(imgui, report.warnings)
+								guiSuccess(imgui, slidewin, reportInfo, compiled)
 							} else {
-								report.guiError(imgui)
+								guiError(imgui, slidewin, reportInfo)
 							}
 
 							spacing()
@@ -307,19 +342,29 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		progress = compiler.compile(molLocker)
 	}
 
-	private fun CompiledConfSpace.guiSuccess(imgui: Commands, warnings: List<CompilerWarning>) = imgui.run {
+	private fun guiSuccess(imgui: Commands, slidewin: SlideCommands, reportInfo: ReportInfo, compiled: CompiledConfSpace) = imgui.run {
 
 		// TODO: formatting? make it pretty?
 
 		text("Conformation space compiled successfully!")
 
+		// TODO: render warning texts into the reportInfo
 		// show compiler warnings
+		val warnings = reportInfo.report.warnings
 		if (warnings.isNotEmpty()) {
 			text("Compiler warnings: ${warnings.size}")
 			indent(20f)
 			for (warning in warnings) {
+
+				// show the warning
+				icon(slidewin, Icon.SignWarning)
+				sameLine()
 				text(warning.msg)
-				// TODO: show warning extra info somehow
+
+				// show a button to show more info, if needed
+				warning.extraInfo?.let { extra ->
+					// TODO: show this somehow
+				}
 			}
 			unindent(20f)
 		}
@@ -350,7 +395,7 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 					chosenPath
 				}
 
-				save(pCompressed.value, savePath)
+				compiled.save(pCompressed.value, savePath)
 			}
 		}
 
@@ -376,26 +421,28 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		bytes.write(path)
 	}
 
-	private fun ConfSpaceCompiler.Report.guiError(imgui: Commands) = imgui.run gui@{
+	private fun guiError(imgui: Commands, slidewin: SlideCommands, reportInfo: ReportInfo) = imgui.run gui@{
 
 		// TODO: formatting? make it pretty?
 
 		text("Conformation space failed to compile.")
 
-		val error = error ?: run {
+		val error = reportInfo.report.error ?: run {
 			// this shouldn't happen, but just in case ...
 			text("but no error information was available")
 			return@gui
 		}
 
-		text("Compiler Error:")
-		text(error.message ?: "(no error message)")
+		// show the simple error message
+		icon(slidewin, Icon.SignError)
+		sameLine()
+		text(error.msgOrName())
 
-		error.extraInfo?.let { msg ->
-
+		// show the extra info, if needed
+		reportInfo.errorExtra?.let { extra ->
 			inputTextMultiline(
-				"Extra error information",
-				resizeExtraInfoBufIfNeeded(msg),
+				"",
+				resizeExtraInfoBufIfNeeded(extra),
 				600f, 400f,
 				IntFlags.of(Commands.InputTextFlags.ReadOnly)
 			)
