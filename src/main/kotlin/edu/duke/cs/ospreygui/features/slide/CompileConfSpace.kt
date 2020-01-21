@@ -318,14 +318,8 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 			text("Compiler warnings: ${warnings.size}")
 			indent(20f)
 			for (warning in warnings) {
-
-				// show the warning
 				text(warning.msg)
-
-				// show a button to show more info, if needed
-				warning.extraInfo?.let { extra ->
-					// TODO
-				}
+				// TODO: show warning extra info somehow
 			}
 			unindent(20f)
 		}
@@ -394,10 +388,8 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 			return@gui
 		}
 
-		// TODO: show icon
-		text("(E)")
-		sameLine()
-		text(error.message ?: "(no error message was provided)")
+		text("Compiler Error:")
+		text(error.message ?: "(no error message)")
 
 		error.extraInfo?.let { msg ->
 
