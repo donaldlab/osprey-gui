@@ -81,6 +81,7 @@ fun CompiledConfSpace.toToml(): String {
 		write("\n")
 		write("[pos.$posi]\n")
 		write("name = %s\n", pos.name.doubleQuote())
+		write("wildType = %s\n", pos.wildType.doubleQuote())
 
 		for ((confi, conf) in pos.confs.withIndex()) {
 
@@ -295,6 +296,7 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 
 		// write out the design position properties
 		out.writeUTF(pos.name)
+		out.writeUTF(pos.wildType)
 
 		// write out the fragments
 		out.writeInt(pos.fragments.size)

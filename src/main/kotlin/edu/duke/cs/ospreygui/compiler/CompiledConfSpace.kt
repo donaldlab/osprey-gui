@@ -22,6 +22,7 @@ class CompiledConfSpace(
 
 	data class PosInfo(
 		val name: String,
+		val wildType: String,
 		val fragments: List<FragInfo>,
 		val confs: List<ConfInfo>
 	)

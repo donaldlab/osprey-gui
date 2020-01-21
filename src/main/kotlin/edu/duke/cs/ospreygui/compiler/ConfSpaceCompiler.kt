@@ -260,6 +260,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 				posInfos.add(CompiledConfSpace.PosInfo(
 					posInfo.pos.name,
+					posInfo.pos.type,
 					fragInfos,
 					confInfos
 				))
