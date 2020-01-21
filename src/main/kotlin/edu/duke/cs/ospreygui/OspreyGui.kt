@@ -25,4 +25,7 @@ object OspreyGui {
 
 	fun getResourceAsString(path: String, charset: Charset = Charsets.UTF_8) =
 		getResourceAsStream(path).use { stream -> stream.reader(charset).readText() }
+
+	fun getResourceAsBytes(path: String) =
+		getResourceAsStream(path).use { stream -> stream.readBytes() }
 }
