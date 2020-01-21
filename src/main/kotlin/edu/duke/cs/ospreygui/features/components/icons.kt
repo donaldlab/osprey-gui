@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.features.components
 
 import cuchaz.kludge.imgui.Commands
+import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.render.LoadedImage
 import edu.duke.cs.ospreygui.OspreyGui
@@ -24,8 +25,17 @@ object Icons {
 		loaded.getOrPut(icon) {
 			win.loadImage(OspreyGui.getResourceAsBytes(icon.resourcePath))
 		}
+
+	fun get(slidewin: SlideCommands, icon: Icon) =
+		loaded.getOrPut(icon) {
+			slidewin.loadImage(OspreyGui.getResourceAsBytes(icon.resourcePath))
+		}
 }
 
 fun Commands.icon(win: WindowCommands, icon: Icon) {
 	image(Icons.get(win, icon).descriptor)
+}
+
+fun Commands.icon(slidewin: SlideCommands, icon: Icon) {
+	image(Icons.get(slidewin, icon).descriptor)
 }
