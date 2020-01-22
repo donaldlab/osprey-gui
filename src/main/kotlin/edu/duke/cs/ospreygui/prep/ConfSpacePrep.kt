@@ -73,6 +73,7 @@ class ConfSpacePrep(
 			s.features.menu("View") {
 				add(NavigationTool())
 				add(MenuRenderSettings(defaultRenderSettings))
+				add(MoleculeNavigator())
 				add(ClashViewer())
 			}
 			s.features.menu("Edit") {
