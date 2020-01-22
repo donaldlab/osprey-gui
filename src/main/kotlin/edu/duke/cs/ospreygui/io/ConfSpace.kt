@@ -155,8 +155,13 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 		atomIndices[i]
 			?: throw TomlParseException("no atom with index $i", pos)
 
-	// read the fragments
-	val frags = ConfLib.fragmentsFrom(doc)
+	// read the fragments, if any
+	val frags =
+		if (doc.contains("frag")) {
+			ConfLib.fragmentsFrom(doc)
+		} else {
+			HashMap()
+		}
 	fun getFrag(id: String, pos: TomlPosition?) =
 		frags[id] ?: throw TomlParseException("no fragment with id $id", pos)
 	
@@ -167,111 +172,113 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 
 		name = confSpaceTable.getStringOrThrow("name")
 
-		// read the positions
-		val positionsTable = confSpaceTable.getTableOrThrow("positions")
-		for (poskey in positionsTable.keySet()) {
-			val posTable = positionsTable.getTableOrThrow(poskey)
-			val posPos = positionsTable.inputPositionOf(poskey)
+		// read the positions, if any
+		val positionsTable = confSpaceTable.getTable("positions")
+		if (positionsTable != null) {
+			for (poskey in positionsTable.keySet()) {
+				val posTable = positionsTable.getTableOrThrow(poskey)
+				val posPos = positionsTable.inputPositionOf(poskey)
 
-			val moli = posTable.getIntOrThrow("mol")
-			val mol = getMol(moli, posPos)
+				val moli = posTable.getIntOrThrow("mol")
+				val mol = getMol(moli, posPos)
 
-			designPositionsByMol.getOrPut(mol) { ArrayList() }.add(DesignPosition(
-				name = posTable.getStringOrThrow("name", posPos),
-				type = posTable.getStringOrThrow("type", posPos),
-				mol = mol
-			).apply pos@{
+				designPositionsByMol.getOrPut(mol) { ArrayList() }.add(DesignPosition(
+					name = posTable.getStringOrThrow("name", posPos),
+					type = posTable.getStringOrThrow("type", posPos),
+					mol = mol
+				).apply pos@{
 
-				// read atoms
-				val atomsArray = posTable.getArrayOrThrow("atoms", posPos)
-				for (i in 0 until atomsArray.size()) {
-					currentAtoms.add(getAtom(atomsArray.getInt(i), posPos))
-				}
-
-				// read the pos conf space
-				val posConfSpaceTable = posTable.getTableOrThrow("confspace", posPos)
-				val posConfSpacePos = posTable.inputPositionOf("confspace")
-
-				positionConfSpaces.getOrMake(this@pos).apply {
-
-					// get the wild type fragment, if any
-					wildTypeFragment = posConfSpaceTable.getString("wtfrag")?.let { getFrag(it, posConfSpacePos) }
-
-					// read the mutations
-					val mutationsArray = posConfSpaceTable.getArrayOrThrow("mutations", posConfSpacePos)
-					for (i in 0 until mutationsArray.size()) {
-						mutations.add(mutationsArray.getString(i))
+					// read atoms
+					val atomsArray = posTable.getArrayOrThrow("atoms", posPos)
+					for (i in 0 until atomsArray.size()) {
+						currentAtoms.add(getAtom(atomsArray.getInt(i), posPos))
 					}
 
-					// read the confs
-					val confsArray = posConfSpaceTable.getArrayOrThrow("confs", posConfSpacePos)
-					for (i in 0 until confsArray.size()) {
-						val confTable = confsArray.getTable(i)
-						val confPos = confsArray.inputPositionOf(i)
+					// read the pos conf space
+					val posConfSpaceTable = posTable.getTableOrThrow("confspace", posPos)
+					val posConfSpacePos = posTable.inputPositionOf("confspace")
 
-						val frag = getFrag(confTable.getStringOrThrow("frag"), confPos)
-						confs[frag] = identityHashSet<ConfLib.Conf>().apply {
-							val table = confTable.getArrayOrThrow("confs", confPos)
-							for (j in 0 until table.size()) {
-								val confId = table.getString(j)
-								val pos = table.inputPositionOf(j)
+					positionConfSpaces.getOrMake(this@pos).apply {
 
-								val conf = frag.confs[confId]
-									?: throw TomlParseException("no conf with id $confId in fragment ${frag.id}", pos)
-								add(conf)
+						// get the wild type fragment, if any
+						wildTypeFragment = posConfSpaceTable.getString("wtfrag")?.let { getFrag(it, posConfSpacePos) }
+
+						// read the mutations
+						val mutationsArray = posConfSpaceTable.getArrayOrThrow("mutations", posConfSpacePos)
+						for (i in 0 until mutationsArray.size()) {
+							mutations.add(mutationsArray.getString(i))
+						}
+
+						// read the confs
+						val confsArray = posConfSpaceTable.getArrayOrThrow("confs", posConfSpacePos)
+						for (i in 0 until confsArray.size()) {
+							val confTable = confsArray.getTable(i)
+							val confPos = confsArray.inputPositionOf(i)
+
+							val frag = getFrag(confTable.getStringOrThrow("frag"), confPos)
+							confs[frag] = identityHashSet<ConfLib.Conf>().apply {
+								val table = confTable.getArrayOrThrow("confs", confPos)
+								for (j in 0 until table.size()) {
+									val confId = table.getString(j)
+									val pos = table.inputPositionOf(j)
+
+									val conf = frag.confs[confId]
+										?: throw TomlParseException("no conf with id $confId in fragment ${frag.id}", pos)
+									add(conf)
+								}
+							}
+						}
+
+						// read the motion settings
+						posConfSpaceTable.getTable("motionSettings")?.let { motionSettingsTable ->
+							for (fragId in motionSettingsTable.keySet()) {
+								val table = motionSettingsTable.getTableOrThrow(fragId)
+								val pos = motionSettingsTable.inputPositionOf(fragId)
+
+								val frag = getFrag(fragId, pos)
+								motionSettings[frag] = ConfSpace.PositionConfSpace.MotionSettings(
+									includeHGroupRotations = table.getBooleanOrThrow("includeHGroupRotations", pos),
+									dihedralRadiusDegrees = table.getDoubleOrThrow("dihedralRadiusDegrees", pos)
+								)
 							}
 						}
 					}
 
-					// read the motion settings
-					posConfSpaceTable.getTable("motionSettings")?.let { motionSettingsTable ->
-						for (fragId in motionSettingsTable.keySet()) {
-							val table = motionSettingsTable.getTableOrThrow(fragId)
-							val pos = motionSettingsTable.inputPositionOf(fragId)
+					// read anchor groups
+					val anchorGroupsTable = posConfSpaceTable.getTableOrThrow("anchorGroups", posConfSpacePos)
+					for (anchorGroupKey in anchorGroupsTable.keySet()) {
+						val anchorGroupTable = anchorGroupsTable.getTableOrThrow(anchorGroupKey)
+						val anchorGroupPos = anchorGroupsTable.inputPositionOf(anchorGroupKey)
+						val anchorArray = anchorGroupTable.getArrayOrThrow("anchors", anchorGroupPos)
 
-							val frag = getFrag(fragId, pos)
-							motionSettings[frag] = ConfSpace.PositionConfSpace.MotionSettings(
-								includeHGroupRotations = table.getBooleanOrThrow("includeHGroupRotations", pos),
-								dihedralRadiusDegrees = table.getDoubleOrThrow("dihedralRadiusDegrees", pos)
-							)
-						}
-					}
-				}
+						anchorGroups.add(ArrayList<DesignPosition.Anchor>().apply {
 
-				// read anchor groups
-				val anchorGroupsTable = posConfSpaceTable.getTableOrThrow("anchorGroups", posConfSpacePos)
-				for (anchorGroupKey in anchorGroupsTable.keySet()) {
-					val anchorGroupTable = anchorGroupsTable.getTableOrThrow(anchorGroupKey)
-					val anchorGroupPos = anchorGroupsTable.inputPositionOf(anchorGroupKey)
-					val anchorArray = anchorGroupTable.getArrayOrThrow("anchors", anchorGroupPos)
+							for (i in 0 until anchorArray.size()) {
+								val anchorTable = anchorArray.getTable(i)
+								val anchorPos = anchorArray.inputPositionOf(i)
 
-					anchorGroups.add(ArrayList<DesignPosition.Anchor>().apply {
+								val anchorAtomsArray = anchorTable.getArrayOrThrow("atoms", anchorPos)
 
-						for (i in 0 until anchorArray.size()) {
-							val anchorTable = anchorArray.getTable(i)
-							val anchorPos = anchorArray.inputPositionOf(i)
-
-							val anchorAtomsArray = anchorTable.getArrayOrThrow("atoms", anchorPos)
-
-							when (anchorTable.getStringOrThrow("type", anchorPos)) {
-								"single" ->
-									add(anchorSingle(
-										a = getAtom(anchorAtomsArray.getInt(0), anchorPos),
-										b = getAtom(anchorAtomsArray.getInt(1), anchorPos),
-										c = getAtom(anchorAtomsArray.getInt(2), anchorPos)
-									))
-								"double" ->
-									add(anchorDouble(
-										a = getAtom(anchorAtomsArray.getInt(0), anchorPos),
-										b = getAtom(anchorAtomsArray.getInt(1), anchorPos),
-										c = getAtom(anchorAtomsArray.getInt(2), anchorPos),
-										d = getAtom(anchorAtomsArray.getInt(3), anchorPos)
-									))
+								when (anchorTable.getStringOrThrow("type", anchorPos)) {
+									"single" ->
+										add(anchorSingle(
+											a = getAtom(anchorAtomsArray.getInt(0), anchorPos),
+											b = getAtom(anchorAtomsArray.getInt(1), anchorPos),
+											c = getAtom(anchorAtomsArray.getInt(2), anchorPos)
+										))
+									"double" ->
+										add(anchorDouble(
+											a = getAtom(anchorAtomsArray.getInt(0), anchorPos),
+											b = getAtom(anchorAtomsArray.getInt(1), anchorPos),
+											c = getAtom(anchorAtomsArray.getInt(2), anchorPos),
+											d = getAtom(anchorAtomsArray.getInt(3), anchorPos)
+										))
+								}
 							}
-						}
-					})
-				}
-			})
+						})
+					}
+				})
+			}
 		}
 	}
 }
