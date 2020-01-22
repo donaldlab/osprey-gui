@@ -17,6 +17,8 @@ import java.nio.ByteBuffer
 
 class ProbeView : RenderView {
 
+	override var isVisible = true
+
 	private var sequence = 0
 
 	inner class Visibility {
