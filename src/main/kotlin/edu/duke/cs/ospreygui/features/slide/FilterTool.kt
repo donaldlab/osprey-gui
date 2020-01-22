@@ -59,7 +59,7 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 						}
 
 						// show a selector for the molecule
-						selectable("$type: ${mol.name}###mol$i", highlightedMol == mol)
+						selectable("$type: $mol###mol$i", highlightedMol == mol)
 						if (isItemHovered()) {
 							hoveredMol = mol
 						}
