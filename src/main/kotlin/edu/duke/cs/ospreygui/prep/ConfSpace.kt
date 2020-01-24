@@ -75,13 +75,17 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 
 		fun sequenceSpaceSize(): BigInteger =
 			confSpaces.values
-				.map { it.mutations.size.toBigInteger() }
-				.reduce { a, b -> a.multiply(b) }
+				.takeIf { it.isNotEmpty() }
+				?.map { it.mutations.size.toBigInteger() }
+				?.reduce { a, b -> a.multiply(b) }
+				?: BigInteger.ZERO
 
 		fun confSpaceSize(): BigInteger =
 			confSpaces.values
-				.map { it.numConfs().toBigInteger() }
-				.reduce { a, b -> a.multiply(b) }
+				.takeIf { it.isNotEmpty() }
+				?.map { it.numConfs().toBigInteger() }
+				?.reduce { a, b -> a.multiply(b) }
+				?: BigInteger.ZERO
 	}
 	val positionConfSpaces = PositionConfSpaces()
 

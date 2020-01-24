@@ -315,8 +315,10 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 	private fun updateSequenceCounts() {
 		molInfos.forEach { it.updateSequenceCount() }
 		numSequences = molInfos
-			.map { it.numSequences }
-			.reduce { a, b -> a*b }
+			.takeIf { it.isNotEmpty() }
+			?.map { it.numSequences }
+			?.reduce { a, b -> a*b }
+			?: BigInteger.ZERO
 	}
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
