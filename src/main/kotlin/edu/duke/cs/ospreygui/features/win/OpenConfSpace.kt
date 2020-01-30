@@ -44,7 +44,7 @@ class OpenConfSpace : WindowFeature {
 			// so the GUI can use them
 			conflibs.add(ConfLib(
 				name = "Conformation Space",
-				fragments = confSpace.fragments()
+				fragments = confSpace.libraryFragments()
 					.associateByTo(IdentityHashMap()) { it.id },
 				description = "from the conformation space named: \"${confSpace.name}\""
 			))

@@ -81,27 +81,21 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				val label = "${frag.name}, $numSelected/$numPossible confs###${posInfo.pos.name}-$id"
 			}
 
-			// collect the fragments
+			// collect the fragments from the conf libs
 			val fragInfos = prep.conflibs
-				.flatMap { conflib ->
-					conflib.fragments
-						.values
-						.filter { it.type == type && posInfo.pos.isFragmentCompatible(it) }
-						.map { FragInfo(conflib, it) }
-				}
-				.let { fragInfos ->
-
-					// do we have a compatible wildtype fragment?
+				.flatMap { conflib -> conflib.fragments.values.map { conflib to it } }
+				.toMutableList()
+				.let { frags ->
+					// prepend the wild-type fragment, if any
 					val wtFrag = posInfo.confSpace.wildTypeFragment
-						.takeIf { it?.type == type && posInfo.pos.isFragmentCompatible(it) }
-					return@let if (wtFrag != null) {
-						// yup, prepend it
-						listOf(FragInfo(null, wtFrag)) + fragInfos
+					if (wtFrag != null) {
+						listOf(null to wtFrag) + frags
 					} else {
-						// nope, keep the current fragments
-						fragInfos
+						frags
 					}
 				}
+				.filter { (_, frag) -> frag.type == type && posInfo.pos.isFragmentCompatible(frag) }
+				.map { (conflib, frag) -> FragInfo(conflib, frag) }
 
 			val numSelected = fragInfos.sumBy { it.numSelected }
 			val numConfs = fragInfos.sumBy { it.numPossible }

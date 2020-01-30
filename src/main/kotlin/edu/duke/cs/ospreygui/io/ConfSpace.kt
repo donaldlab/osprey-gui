@@ -27,7 +27,7 @@ fun ConfSpace.toToml(): String {
 			?: throw NoSuchElementException("no index for atom $this")
 
 	// write down all the fragments
-	val frags = fragments()
+	val frags = libraryFragments() + wildTypeFragments()
 	write("\n")
 	val (fragsToml, idsByFrag) = frags.toToml(resolveIdCollisions = true)
 	write(fragsToml)

@@ -28,16 +28,25 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 			.flatMap { (_, positions) -> positions }
 
 	/**
-	 * Collect all the unique fragments from the conf space.
+	 * Collect all the unique library (ie non-wild-type) fragments used by the conf space.
 	 */
-	fun fragments(): List<ConfLib.Fragment> =
+	fun libraryFragments(): List<ConfLib.Fragment> =
 		designPositionsByMol
 			.values
 			.flatten()
 			.mapNotNull { positionConfSpaces[it] }
-			.flatMap { it.confs.keys + it.wildTypeFragment }
-			.filterNotNull()
+			.flatMap { posConfSpace -> posConfSpace.confs.keys.filter { it !== posConfSpace.wildTypeFragment } }
 			.toCollection(identityHashSet())
+			.sortedBy { it.id }
+
+	/**
+	 * Collect all the wild-type fragments from the conf space, whether used or not.
+	 */
+	fun wildTypeFragments(): List<ConfLib.Fragment> =
+		designPositionsByMol
+			.values
+			.flatten()
+			.mapNotNull { positionConfSpaces[it]?.wildTypeFragment }
 			.sortedBy { it.id }
 
 	class PositionConfSpace {
