@@ -151,8 +151,8 @@ class TestConfSpaceCompiler : SharedSpec({
 	fun AssignedCoords.calcEEF1() = confSpace.ecalcs[1].calcEnergy(this)
 
 	fun AssignedCoords.allInters() = PosInterGen(null, null).all(confSpace, assignments)
-	fun AssignedCoords.calcEnergy() = CPUConfEnergyCalculator(confSpace, 1).calcEnergy(assignments, allInters())
-	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace, 1).minimizeEnergy(assignments, allInters())
+	fun AssignedCoords.calcEnergy() = CPUConfEnergyCalculator(confSpace).calcEnergy(assignments, allInters())
+	fun AssignedCoords.minimizeEnergy() = CPUConfEnergyCalculator(confSpace).minimizeEnergy(assignments, allInters())
 
 	fun Group.testConf(
 		compiledConfSpace: CompiledConfSpace,
