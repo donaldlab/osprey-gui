@@ -6,6 +6,8 @@ import org.joml.Vector3d
 class CompiledConfSpace(
 	val name: String,
 	val forcefields: List<ForcefieldInfo>,
+	val molInfos: List<MolInfo>,
+	val resInfos: List<ResInfo>,
 	val staticAtoms: List<AtomInfo>,
 	/** in the same order as the forcefields */
 	val staticEnergies: List<Double>,
@@ -18,6 +20,18 @@ class CompiledConfSpace(
 		val name: String,
 		val ospreyImplementation: String,
 		val settings: List<Pair<String,Any>>
+	)
+
+	data class MolInfo(
+		val name: String,
+		val type: String?
+	)
+
+	data class ResInfo(
+		val chainId: String,
+		val id: String,
+		val type: String,
+		val indexInChain: Int
 	)
 
 	data class PosInfo(
@@ -45,7 +59,9 @@ class CompiledConfSpace(
 
 	data class AtomInfo(
 		val name: String,
-		val pos: Vector3d
+		val pos: Vector3d,
+		val molIndex: Int,
+		val resIndex: Int
 	)
 
 	sealed class MotionInfo {

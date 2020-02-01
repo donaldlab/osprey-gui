@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.compiler
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.*
 import edu.duke.cs.ospreygui.motions.dihedralAngle
 import edu.duke.cs.ospreygui.forcefield.Forcefield
@@ -220,9 +221,12 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			fixedAtoms.updateStatic()
 			fixedAtomsTask.increment()
 
+			// prep for atom compilation
+			val infoIndexer = InfoIndexer()
+
 			// compile the static atoms
 			val staticAtoms = fixedAtoms.statics
-				.map { it.atom.compile(it.name) }
+				.map { it.atom.compile(infoIndexer, it.mol) }
 			fixedAtomsTask.increment()
 
 			// calculate the internal energies for the static atoms
@@ -255,7 +259,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				// compile the conformations
 				val confInfos = ArrayList<CompiledConfSpace.ConfInfo>()
 				posInfo.forEachConf(molLocker) { confInfo ->
-					confInfos.add(confInfo.compile(fixedAtoms, params))
+					confInfos.add(confInfo.compile(infoIndexer, fixedAtoms, params))
 				}
 
 				posInfos.add(CompiledConfSpace.PosInfo(
@@ -298,6 +302,8 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				CompiledConfSpace(
 					confSpace.name,
 					forcefieldInfos,
+					infoIndexer.molInfos,
+					infoIndexer.resInfos,
 					staticAtoms,
 					staticEnergies,
 					posInfos,
@@ -313,6 +319,43 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 			// return a report with only warnings and errors, but no compiled conf space
 			progress.report = Report(warnings, error, null)
+		}
+	}
+
+	private class InfoIndexer {
+
+		val molInfos = ArrayList<CompiledConfSpace.MolInfo>()
+		val resInfos = ArrayList<CompiledConfSpace.ResInfo>()
+
+		fun indexOfMol(mol: Molecule): Int {
+
+			val info = CompiledConfSpace.MolInfo(mol.name, mol.type)
+
+			var index = molInfos.indexOf(info)
+			if (index < 0) {
+				index = molInfos.size
+				molInfos.add(info)
+			}
+
+			return index
+		}
+
+		fun indexOfRes(chain: Polymer.Chain, res: Polymer.Residue): Int {
+
+			val indexInChain = chain.residues
+				.indexOf(res)
+				.takeIf { it >= 0 }
+				?: throw IllegalArgumentException("residue $res is not in chain $chain")
+
+			val info = CompiledConfSpace.ResInfo(chain.id, res.id, res.type, indexInChain)
+
+			var index = resInfos.indexOf(info)
+			if (index < 0) {
+				index = resInfos.size
+				resInfos.add(info)
+			}
+
+			return index
 		}
 	}
 
@@ -333,7 +376,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compiles the conformation
 	 */
-	private fun ConfSpaceIndex.ConfInfo.compile(fixedAtoms: FixedAtoms, params: MolsParams): CompiledConfSpace.ConfInfo {
+	private fun ConfSpaceIndex.ConfInfo.compile(infoIndexer: InfoIndexer, fixedAtoms: FixedAtoms, params: MolsParams): CompiledConfSpace.ConfInfo {
 
 		// collect the atoms for this conf (including dynamic fixed atoms), and assign indices
 		val confAtoms = AtomIndex(fragInfo.orderAtoms(fixedAtoms[posInfo].dynamics))
@@ -358,7 +401,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		return CompiledConfSpace.ConfInfo(
 			id = id,
 			type = fragInfo.frag.type,
-			atoms = confAtoms.map { it.compile() },
+			atoms = confAtoms.map { it.compile(infoIndexer, posInfo.pos.mol) },
 			fragIndex = fragInfo.index,
 			motions = motions,
 			internalEnergies = internalEnergies
@@ -404,10 +447,15 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		}
 	}
 
-	private fun Atom.compile(name: String = this.name): CompiledConfSpace.AtomInfo =
+	private fun Atom.compile(infoIndexer: InfoIndexer, mol: Molecule): CompiledConfSpace.AtomInfo =
 		CompiledConfSpace.AtomInfo(
 			name,
-			Vector3d(pos.checkForErrors(name))
+			Vector3d(pos.checkForErrors(name)),
+			infoIndexer.indexOfMol(mol),
+			(mol as? Polymer)
+				?.findChainAndResidue(this)
+				?.let { (chain, res) -> infoIndexer.indexOfRes(chain, res) }
+				?: -1
 		)
 
 	class MolInfo(

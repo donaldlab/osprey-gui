@@ -31,16 +31,16 @@ import java.util.*
  */
 class FixedAtoms(
 	confSpaceIndex: ConfSpaceIndex,
-	fixedAtoms: Map<Molecule,Set<Atom>>
+	fixedAtoms: Map<Molecule,List<Atom>>
 ) {
 
 	// give the fixed atoms mutable collections, so we can move atoms out
-	private val fixedAtoms: MutableMap<Molecule,MutableSet<Atom>> =
+	private val fixedAtoms: MutableMap<Molecule,MutableList<Atom>> =
 		fixedAtoms.entries.associateIdentity { (mol, atoms) ->
-			mol to atoms.toIdentitySet()
+			mol to atoms.toMutableList()
 		}
 
-	fun fixed(mol: Molecule): Set<Atom> =
+	fun fixed(mol: Molecule): List<Atom> =
 		fixedAtoms[mol]
 			?: throw NoSuchElementException("no fixed atoms for molecule: $mol")
 

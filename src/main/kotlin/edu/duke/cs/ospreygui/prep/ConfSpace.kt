@@ -101,7 +101,7 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 	/**
 	 * Get all the atoms that aren't part of design positions.
 	 */
-	fun fixedAtoms(): Map<Molecule,Set<Atom>> =
+	fun fixedAtoms(): Map<Molecule,List<Atom>> =
 		mols
 			.associateIdentity { (_, mol) ->
 				val posAtoms = (designPositionsByMol[mol]
@@ -110,7 +110,6 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 					.toIdentitySet()
 				mol to mol.atoms
 					.filter { it !in posAtoms }
-					.toIdentitySet()
 			}
 
 	/**
