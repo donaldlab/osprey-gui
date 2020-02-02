@@ -262,6 +262,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 	private inner class MolInfo(val molType: MoleculeType, val mol: Molecule) {
 
+		val label = mol.toString()
 		val posInfos = ArrayList<PosInfo>()
 		var numSequences = BigInteger.ZERO
 
@@ -350,63 +351,57 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				// draw the window
 				window("Mutation Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-					for ((i, molInfo) in molInfos.withIndex()) {
-						withId(i) {
+					tabBar("tabs") {
 
-							if (i > 0) {
-								// let the entries breathe
-								spacing()
-								spacing()
-								separator()
-								spacing()
-								spacing()
-							}
+						for (molInfo in molInfos) {
+							tabItem(molInfo.label) {
 
-							text("${molInfo.mol}: ${molInfo.posInfos.size} positions(s)")
-							child("positions", 300f, 200f, true) {
-								for (posInfo in molInfo.posInfos) {
-									selectable(posInfo.pos.name, posInfo.pSelected)
+								text("${molInfo.posInfos.size} positions(s)")
+								child("positions", 300f, 200f, true) {
+									for (posInfo in molInfo.posInfos) {
+										selectable(posInfo.pos.name, posInfo.pSelected)
+									}
 								}
-							}
 
-							if (button("Add")) {
-
-								// start the position editor
-								mutEditor = MutEditor(molInfo.makeNewPosition())
-							}
-
-							sameLine()
-
-							val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
-							styleEnabledIf(canEdit) {
-								if (button("Edit") && canEdit) {
+								if (button("Add")) {
 
 									// start the position editor
-									molInfo.posInfos
-										.find { it.pSelected.value }
-										?.let { mutEditor = MutEditor(it) }
+									mutEditor = MutEditor(molInfo.makeNewPosition())
 								}
-							}
 
-							sameLine()
+								sameLine()
 
-							styleEnabledIf(molInfo.posInfos.any { it.pSelected.value }) {
-								if (button("Remove")) {
-									molInfo.posInfos
-										.filter { it.pSelected.value }
-										.forEach {
-											molInfo.posInfos.remove(it)
-											prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(it.pos)
-											prep.confSpace.positionConfSpaces.remove(it.pos)
-										}
-									updateSequenceCounts()
+								val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
+								styleEnabledIf(canEdit) {
+									if (button("Edit") && canEdit) {
+
+										// start the position editor
+										molInfo.posInfos
+											.find { it.pSelected.value }
+											?.let { mutEditor = MutEditor(it) }
+									}
 								}
+
+								sameLine()
+
+								styleEnabledIf(molInfo.posInfos.any { it.pSelected.value }) {
+									if (button("Remove")) {
+										molInfo.posInfos
+											.filter { it.pSelected.value }
+											.forEach {
+												molInfo.posInfos.remove(it)
+												prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(it.pos)
+												prep.confSpace.positionConfSpaces.remove(it.pos)
+											}
+										updateSequenceCounts()
+									}
+								}
+
+								spacing()
+
+								// show the number of sequences so far
+								text("Sequences: ${sequenceFormatter.format(molInfo.numSequences)}")
 							}
-
-							spacing()
-
-							// show the number of sequences so far
-							text("Sequences: ${sequenceFormatter.format(molInfo.numSequences)}")
 						}
 					}
 

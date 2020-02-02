@@ -42,11 +42,12 @@ fun ConfSpace.toToml(): String {
 
 	val posIndices = HashMap<DesignPosition,Int>()
 	for ((moli, mol) in mols.withIndex()) {
-		val positions = designPositionsByMol[mol] ?: continue
-		for (pos in positions) {
+
+		// write the design positions, if any
+		designPositionsByMol[mol]?.forEach pos@{ pos ->
 
 			// get the position conf space, or skip this pos
-			val posConfSpace = positionConfSpaces[pos] ?: continue
+			val posConfSpace = positionConfSpaces[pos] ?: return@pos
 
 			val posi = posIndices.size
 			posIndices[pos] = posi
@@ -115,6 +116,16 @@ fun ConfSpace.toToml(): String {
 				write("[confspace.positions.$posi.confspace.motionSettings.${frag.id}]\n")
 				write("includeHGroupRotations = %s\n", motionSettings.includeHGroupRotations)
 				write("dihedralRadiusDegrees = %s\n", motionSettings.dihedralRadiusDegrees)
+			}
+		}
+
+		// write the molecule motion settings
+		molMotionSettings[mol]?.let { settings ->
+			write("\n")
+			write("[confspace.molMotionSettings.$moli]\n")
+			if (settings.hasTranslationRotation) {
+				write("maxTranslationDist = %s\n", settings.maxTranslationDist)
+				write("maxRotationDegrees = %s\n", settings.maxRotationDegrees)
 			}
 		}
 	}
@@ -279,6 +290,26 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 					}
 				})
 			}
+		}
+
+		// read the molecule motions, if any
+		val molMotionSettingsTable = confSpaceTable.getTable("molMotionSettings")
+		if (molMotionSettingsTable != null) {
+			mols
+				.map { (_, mol) -> mol }
+				.withIndex()
+				.forEach { (moli, mol) ->
+
+					val key = "$moli"
+					val settingsTable = molMotionSettingsTable.getTable(key)
+					if (settingsTable != null) {
+
+						molMotionSettings[mol] = ConfSpace.MoleculeMotionSettings().apply {
+							settingsTable.getDouble("maxTranslationDist")?.let { maxTranslationDist = it }
+							settingsTable.getDouble("maxRotationDegrees")?.let { maxRotationDegrees = it }
+						}
+					}
+				}
 		}
 	}
 }

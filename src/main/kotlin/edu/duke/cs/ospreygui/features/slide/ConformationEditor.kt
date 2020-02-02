@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.features.slide
 import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.tools.IntFlags
 import cuchaz.kludge.tools.Ref
+import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
@@ -21,6 +22,7 @@ import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.confRuntimeId
 import edu.duke.cs.ospreygui.io.fragRuntimeId
+import edu.duke.cs.ospreygui.motions.TranslationRotation
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
@@ -523,8 +525,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 						""".trimMargin())
 
 						if (pJiggle.value) {
-							motionInfos.forEach { it.jiggle(rand) }
-							view.moleculeChanged()
+							motionInfos.forEach { it.jiggle(rand, view) }
 						}
 
 					} else {
@@ -550,10 +551,23 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 	private var confEditor: ConfEditor? = null
 	private val winState = WindowState()
 
-	inner class MolInfo(val mol: Molecule, val molType: MoleculeType) {
+	private inner class MolInfo(val mol: Molecule, val molType: MoleculeType) {
 
+		val label = mol.toString()
 		val posInfos = ArrayList<PosInfo>()
 		var numConfs: BigInteger = BigInteger.ZERO
+
+		val motionSettings get() =
+			prep.confSpace.molMotionSettings
+				.getOrPut(mol) { ConfSpace.MoleculeMotionSettings() }
+
+		val useTransRot = Ref.of(motionSettings.hasTranslationRotation)
+		var transRotInfo =
+			if (useTransRot.value) {
+				MotionInfo.TranslationRotationInfo(mol, motionSettings)
+			} else {
+				null
+			}
 
 		fun updateCounts() {
 			numConfs = BigInteger.ONE
@@ -643,100 +657,142 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			},
 			whenOpen = {
 
+				val views = slide.views.filterIsInstance<MoleculeRenderView>()
+
 				// draw the window
 				window("Flexibility Editor##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-					// TODO: show each molecule GUI in a separate tab? or column?
+					tabBar("tabs") {
 
-					for ((i, molInfo) in molInfos.values.withIndex()) {
-						withId(i) {
+						for (molInfo in molInfos.values) {
+							tabItem(molInfo.label) {
 
-							if (i > 0) {
-								// let the entries breathe
+								text("Mutable Positions:")
 								spacing()
-								spacing()
-								separator()
-								spacing()
-								spacing()
-							}
-
-							text("${molInfo.mol}")
-							indent(20f)
-
-							text("Mutable Positions:")
-							spacing()
-							columns(2)
-							indent(20f)
-							val mutInfos = molInfo.posInfos.filter { it.isMutable }
-							for (posInfo in mutInfos) {
-
-								selectable(posInfo.pos.name, posInfo.pSelected)
-								nextColumn()
-								text("${posInfo.confSpace.numConfs()} confs")
-								nextColumn()
-							}
-							columns(1)
-							if (mutInfos.isEmpty()) {
-								text("(no mutable positions)")
-							}
-							unindent(20f)
-							spacing()
-
-							text("Flexible Positions:")
-							child("flexpos", 300f, 200f, true) {
 								columns(2)
-								for (flexInfo in molInfo.posInfos.filter { it.isFlexible }) {
+								indent(20f)
+								val mutInfos = molInfo.posInfos.filter { it.isMutable }
+								for (posInfo in mutInfos) {
 
-									selectable(flexInfo.pos.name, flexInfo.pSelected)
+									selectable(posInfo.pos.name, posInfo.pSelected)
 									nextColumn()
-									text("${flexInfo.confSpace.numConfs()} confs")
+									text("${posInfo.confSpace.numConfs()} confs")
 									nextColumn()
 								}
 								columns(1)
-							}
+								if (mutInfos.isEmpty()) {
+									text("(no mutable positions)")
+								}
+								unindent(20f)
+								spacing()
 
-							if (button("Add")) {
+								text("Flexible Positions:")
+								child("flexpos", 300f, 200f, true) {
+									columns(2)
+									for (flexInfo in molInfo.posInfos.filter { it.isFlexible }) {
 
-								// start the conformation editor
-								confEditor = ConfEditor(molInfo, molInfo.makeNewPosition())
-							}
+										selectable(flexInfo.pos.name, flexInfo.pSelected)
+										nextColumn()
+										text("${flexInfo.confSpace.numConfs()} confs")
+										nextColumn()
+									}
+									columns(1)
+								}
 
-							sameLine()
-
-							val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
-							styleEnabledIf(canEdit) {
-								if (button("Edit") && canEdit) {
+								if (button("Add")) {
 
 									// start the conformation editor
-									molInfo.posInfos
-										.find { it.pSelected.value }
-										?.let {
-											confEditor = ConfEditor(molInfo, it)
+									confEditor = ConfEditor(molInfo, molInfo.makeNewPosition())
+								}
+
+								sameLine()
+
+								val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
+								styleEnabledIf(canEdit) {
+									if (button("Edit") && canEdit) {
+
+										// start the conformation editor
+										molInfo.posInfos
+											.find { it.pSelected.value }
+											?.let {
+												confEditor = ConfEditor(molInfo, it)
+											}
+									}
+								}
+
+								sameLine()
+
+								// allow removing flexible positions only
+								styleEnabledIf(molInfo.posInfos.any { it.pSelected.value && it.isFlexible }) {
+									if (button("Remove")) {
+										molInfo.posInfos
+											.filter { it.pSelected.value && it.isFlexible }
+											.forEach {
+												molInfo.posInfos.remove(it)
+												prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(it.pos)
+												prep.confSpace.positionConfSpaces.remove(it.pos)
+											}
+										updateCounts()
+									}
+								}
+
+								spacing()
+
+								text("Conformations: ${confFormatter.format(molInfo.numConfs)}")
+
+								spacing()
+								spacing()
+								spacing()
+
+								val view = views
+									.find { it.mol == molInfo.mol }
+									?: throw Error("can't show motions GUI, molecule has no render view")
+
+								// show translation and rotation options
+								if (checkbox("Translate and Rotate", molInfo.useTransRot)) {
+									if (molInfo.useTransRot.value) {
+
+										// enable the translation and rotation with default settings
+										molInfo.motionSettings.apply {
+											maxTranslationDist = 1.2 // angstroms
+											maxRotationDegrees = 5.0
 										}
+										molInfo.transRotInfo = MotionInfo.TranslationRotationInfo(molInfo.mol, molInfo.motionSettings)
+
+									} else {
+
+										// disable the translation and rotation
+										molInfo.motionSettings.apply {
+											maxTranslationDist = 0.0
+											maxRotationDegrees = 0.0
+										}
+
+										// cleanup the translation and rotation motion
+										molInfo.transRotInfo?.reset(view)
+										molInfo.transRotInfo = null
+									}
+								}
+								molInfo.transRotInfo?.let { transRotInfo ->
+									// TODO: put this GUI somewhere else?
+
+									indent(20f)
+
+									if (inputDouble("Max Distance (Angstroms)", Ref.of(molInfo.motionSettings::maxTranslationDist))) {
+										transRotInfo.updateBounds()
+									}
+									if (inputDouble("Max Rotation (Degrees)", Ref.of(molInfo.motionSettings::maxRotationDegrees))) {
+										transRotInfo.updateBounds()
+									}
+
+									spacing()
+									spacing()
+									spacing()
+
+									transRotInfo.gui(imgui, view)
+
+									unindent(20f)
 								}
 							}
-
-							sameLine()
-
-							// allow removing flexible positions only
-							styleEnabledIf(molInfo.posInfos.any { it.pSelected.value && it.isFlexible }) {
-								if (button("Remove")) {
-									molInfo.posInfos
-										.filter { it.pSelected.value && it.isFlexible }
-										.forEach {
-											molInfo.posInfos.remove(it)
-											prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(it.pos)
-											prep.confSpace.positionConfSpaces.remove(it.pos)
-										}
-									updateCounts()
-								}
-							}
-
-							spacing()
-
-							text("Conformations: ${confFormatter.format(molInfo.numConfs)}")
-
-							unindent(20f)
 						}
 					}
 
@@ -752,6 +808,16 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			},
 			onClose = {
 
+				// reset translations and rotations
+				val views = slide.views.filterIsInstance<MoleculeRenderView>()
+				for (molInfo in molInfos.values) {
+					views
+						.find { it.mol == molInfo.mol }
+						?.let { view ->
+							molInfo.transRotInfo?.reset(view)
+						}
+				}
+
 				// cleanup infos
 				molInfos.clear()
 			}
@@ -764,7 +830,7 @@ private sealed class MotionInfo {
 
 	abstract val label: String
 	abstract fun gui(imgui: Commands, view: MoleculeRenderView)
-	abstract fun jiggle(rand: Random)
+	abstract fun jiggle(rand: Random, view: MoleculeRenderView)
 
 	class DihedralInfo(
 		val id: Int,
@@ -816,15 +882,108 @@ private sealed class MotionInfo {
 			}
 		}
 
-		override fun jiggle(rand: Random) {
+		override fun jiggle(rand: Random, view: MoleculeRenderView) {
 			angleInfo?.run {
-				pValue.value = if (minValue != maxValue) {
-					rand.nextDouble(minValue.toDouble(), maxValue.toDouble()).toFloat()
-				} else {
-					minValue
-				}
+				pValue.value = rand.nextFloatIn(minValue, maxValue)
 				dihedral.setDegrees(pValue.value.toDouble())
+				view.moleculeChanged()
 			}
 		}
 	}
+
+	class TranslationRotationInfo(
+		val mol: Molecule,
+		val settings: ConfSpace.MoleculeMotionSettings
+	) : MotionInfo() {
+
+		val transRot = TranslationRotation(mol)
+
+		val pPsi = Ref.of(0.0f)
+		val pTheta = Ref.of(0.0f)
+		val pPhi = Ref.of(0.0f)
+		val px = Ref.of(0.0f)
+		val py = Ref.of(0.0f)
+		val pz = Ref.of(0.0f)
+
+		var rmax = 0.0f
+		var rmin = 0.0f
+		var tmax = 0.0f
+		var tmin = 0.0f
+
+		init {
+			updateBounds()
+		}
+
+		override val label = "Translation and Rotation of $mol"
+
+		fun updateBounds() {
+			rmax = settings.maxRotationDegrees.toFloat()
+			rmin = -rmax
+			tmax = settings.maxTranslationDist.toFloat()
+			tmin = -tmax
+		}
+
+		private fun updateMol(view: MoleculeRenderView) {
+			transRot.set(
+				pPsi.value.toDouble().toRadians(),
+				pTheta.value.toDouble().toRadians(),
+				pPhi.value.toDouble().toRadians(),
+				px.value.toDouble(),
+				py.value.toDouble(),
+				pz.value.toDouble()
+			)
+			view.moleculeChanged()
+		}
+
+		override fun gui(imgui: Commands, view: MoleculeRenderView) = imgui.run {
+
+			text("Tait-Bryan Rotation:")
+			if (sliderFloat("Psi (X)", pPsi, rmin, rmax, "%.3f")) {
+				updateMol(view)
+			}
+			if (sliderFloat("Theta (Y)", pTheta, rmin, rmax, "%.3f")) {
+				updateMol(view)
+			}
+			if (sliderFloat("Phi (Z)", pPhi, rmin, rmax, "%.3f")) {
+				updateMol(view)
+			}
+
+			text("Cartesian Translation:")
+			if (sliderFloat("X", px, tmin, tmax, "%.3f")) {
+				updateMol(view)
+			}
+			if (sliderFloat("Y", py, tmin, tmax, "%.3f")) {
+				updateMol(view)
+			}
+			if (sliderFloat("Z", pz, tmin, tmax, "%.3f")) {
+				updateMol(view)
+			}
+		}
+
+		override fun jiggle(rand: Random, view: MoleculeRenderView) {
+
+			pPsi.value = rand.nextFloatIn(rmin, rmax)
+			pTheta.value = rand.nextFloatIn(rmin, rmax)
+			pPhi.value = rand.nextFloatIn(rmin, rmax)
+
+			px.value = rand.nextFloatIn(tmin, tmax)
+			py.value = rand.nextFloatIn(tmin, tmax)
+			pz.value = rand.nextFloatIn(tmin, tmax)
+
+			updateMol(view)
+		}
+
+		fun reset(view: MoleculeRenderView) {
+			transRot.reset()
+			view.moleculeChanged()
+		}
+	}
 }
+
+
+private fun Random.nextFloatIn(min: Float, max: Float): Float =
+	if (min != max) {
+		nextDouble(min.toDouble(), max.toDouble()).toFloat()
+	} else {
+		min
+	}

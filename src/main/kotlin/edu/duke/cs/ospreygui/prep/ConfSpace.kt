@@ -98,6 +98,17 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 	}
 	val positionConfSpaces = PositionConfSpaces()
 
+	data class MoleculeMotionSettings(
+		var maxTranslationDist: Double = 0.0,
+		var maxRotationDegrees: Double = 0.0
+	) {
+
+		val hasTranslationRotation get() =
+			maxTranslationDist > 0
+				|| maxRotationDegrees > 0
+	}
+	val molMotionSettings = IdentityHashMap<Molecule,MoleculeMotionSettings>()
+
 	/**
 	 * Get all the atoms that aren't part of design positions.
 	 */
@@ -164,67 +175,71 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 			// make an atom map across the two molecules
 			val oldToNew = oldMol.mapAtomsByValueTo(newMol)
 
-			// copy the design positions
-			val oldPositions = old.designPositionsByMol[oldMol] ?: continue
+			// copy the design positions, if needed
+			old.designPositionsByMol[oldMol]?.let { oldPositions ->
 
-			val newPositions = ArrayList<DesignPosition>()
-			new.designPositionsByMol[newMol] = newPositions
+				val newPositions = ArrayList<DesignPosition>()
+				new.designPositionsByMol[newMol] = newPositions
 
-			for (oldPos in oldPositions) {
+				for (oldPos in oldPositions) {
 
-				val newPos = DesignPosition(
-					oldPos.name,
-					oldPos.type,
-					newMol
-				)
-
-				// copy the anchors
-				newPos.anchorGroups.addAll(oldPos.anchorGroups.map { oldAnchors ->
-					oldAnchors
-						.map { oldAnchor ->
-							oldAnchor.copyToPos(newPos, oldToNew)
-						}
-						.toMutableList()
-				})
-
-				// copy the current atoms
-				newPos.currentAtoms.addAll(oldPos.currentAtoms.map { atom ->
-					oldToNew.getBOrThrow(atom)
-				})
-
-				newPositions.add(newPos)
-
-				// copy the position conf space
-				val oldPosConfSpace = old.positionConfSpaces[oldPos] ?: continue
-				val newPosConfSpace = new.positionConfSpaces.getOrMake(newPos)
-
-				// copy the wild-type fragment, if needed
-				oldPosConfSpace.wildTypeFragment?.let { oldWTFrag ->
-					val oldWTConf = oldWTFrag.confs.values.first()
-					newPosConfSpace.wildTypeFragment = newPos.makeFragment(
-						fragId = oldWTFrag.id,
-						fragName = oldWTFrag.name,
-						confId = oldWTConf.id,
-						confName = oldWTConf.name,
-						motions = oldWTFrag.motions
+					val newPos = DesignPosition(
+						oldPos.name,
+						oldPos.type,
+						newMol
 					)
 
-					// TODO: reset the atom ids to match the old atom ids?
-				}
+					// copy the anchors
+					newPos.anchorGroups.addAll(oldPos.anchorGroups.map { oldAnchors ->
+						oldAnchors
+							.map { oldAnchor ->
+								oldAnchor.copyToPos(newPos, oldToNew)
+							}
+							.toMutableList()
+					})
 
-				// copy the mutations
-				newPosConfSpace.mutations.addAll(oldPosConfSpace.mutations)
+					// copy the current atoms
+					newPos.currentAtoms.addAll(oldPos.currentAtoms.map { atom ->
+						oldToNew.getBOrThrow(atom)
+					})
 
-				// copy the conformations
-				for ((frag, confs) in oldPosConfSpace.confs) {
-					newPosConfSpace.confs[frag] = confs.toCollection(identityHashSet())
-				}
+					newPositions.add(newPos)
 
-				// copy the motions settings
-				for ((frag, oldSettings) in oldPosConfSpace.motionSettings) {
-					newPosConfSpace.motionSettings[frag] = oldSettings.copy()
+					// copy the position conf space
+					val oldPosConfSpace = old.positionConfSpaces[oldPos] ?: continue
+					val newPosConfSpace = new.positionConfSpaces.getOrMake(newPos)
+
+					// copy the wild-type fragment, if needed
+					oldPosConfSpace.wildTypeFragment?.let { oldWTFrag ->
+						val oldWTConf = oldWTFrag.confs.values.first()
+						newPosConfSpace.wildTypeFragment = newPos.makeFragment(
+							fragId = oldWTFrag.id,
+							fragName = oldWTFrag.name,
+							confId = oldWTConf.id,
+							confName = oldWTConf.name,
+							motions = oldWTFrag.motions
+						)
+
+						// TODO: reset the atom ids to match the old atom ids?
+					}
+
+					// copy the mutations
+					newPosConfSpace.mutations.addAll(oldPosConfSpace.mutations)
+
+					// copy the conformations
+					for ((frag, confs) in oldPosConfSpace.confs) {
+						newPosConfSpace.confs[frag] = confs.toCollection(identityHashSet())
+					}
+
+					// copy the motions settings
+					for ((frag, oldSettings) in oldPosConfSpace.motionSettings) {
+						newPosConfSpace.motionSettings[frag] = oldSettings.copy()
+					}
 				}
 			}
+
+			// copy the molecule motion settings
+			new.molMotionSettings[newMol] = old.molMotionSettings[oldMol]?.copy()
 		}
 
 		return new

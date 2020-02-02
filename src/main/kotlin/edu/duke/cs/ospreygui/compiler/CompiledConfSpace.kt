@@ -24,7 +24,8 @@ class CompiledConfSpace(
 
 	data class MolInfo(
 		val name: String,
-		val type: String?
+		val type: String?,
+		val motions: List<MotionInfo>
 	)
 
 	data class ResInfo(
@@ -71,6 +72,12 @@ class CompiledConfSpace(
 			val maxDegrees: Double,
 			val abcd: List<Int>,
 			val rotated: List<Int>
+		) : MotionInfo()
+
+		data class TranslationRotation(
+			val maxTranslationDistance: Double,
+			val maxRotationRadians: Double,
+			val centroid: Vector3d
 		) : MotionInfo()
 	}
 }

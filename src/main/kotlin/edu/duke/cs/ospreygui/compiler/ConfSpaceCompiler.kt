@@ -1,5 +1,6 @@
 package edu.duke.cs.ospreygui.compiler
 
+import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
@@ -221,8 +222,17 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			fixedAtoms.updateStatic()
 			fixedAtomsTask.increment()
 
+			// compile molecule motions
+			val molInfos = confSpaceIndex.mols.map { mol ->
+				CompiledConfSpace.MolInfo(
+					mol.name,
+					mol.type,
+					confSpace.molMotionSettings[mol]?.compile(mol) ?: emptyList()
+				)
+			}
+
 			// prep for atom compilation
-			val infoIndexer = InfoIndexer()
+			val infoIndexer = InfoIndexer(confSpaceIndex.mols.zip(molInfos))
 
 			// compile the static atoms
 			val staticAtoms = fixedAtoms.statics
@@ -302,7 +312,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				CompiledConfSpace(
 					confSpace.name,
 					forcefieldInfos,
-					infoIndexer.molInfos,
+					molInfos,
 					infoIndexer.resInfos,
 					staticAtoms,
 					staticEnergies,
@@ -322,23 +332,15 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		}
 	}
 
-	private class InfoIndexer {
+	private class InfoIndexer(val molInfos: List<Pair<Molecule,CompiledConfSpace.MolInfo>>) {
 
-		val molInfos = ArrayList<CompiledConfSpace.MolInfo>()
 		val resInfos = ArrayList<CompiledConfSpace.ResInfo>()
 
-		fun indexOfMol(mol: Molecule): Int {
-
-			val info = CompiledConfSpace.MolInfo(mol.name, mol.type)
-
-			var index = molInfos.indexOf(info)
-			if (index < 0) {
-				index = molInfos.size
-				molInfos.add(info)
-			}
-
-			return index
-		}
+		fun indexOfMol(mol: Molecule): Int =
+			molInfos
+				.indexOfFirst { (m, _) -> m === mol }
+				.takeIf { it >= 0 }
+				?: throw IllegalArgumentException("molecule has no molecule info: $mol")
 
 		fun indexOfRes(chain: Polymer.Chain, res: Polymer.Residue): Int {
 
@@ -358,6 +360,31 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			return index
 		}
 	}
+
+	/**
+	 * Compiles the motions for this molecule
+	 */
+	private fun ConfSpace.MoleculeMotionSettings.compile(mol: Molecule): List<CompiledConfSpace.MotionInfo> {
+
+		val out = ArrayList<CompiledConfSpace.MotionInfo>()
+
+		// make translations and rotations if needed
+		if (hasTranslationRotation) {
+			out.add(CompiledConfSpace.MotionInfo.TranslationRotation(
+				maxTranslationDist,
+				maxRotationDegrees.toRadians(),
+				centroid = Vector3d().apply {
+					for (atom in mol.atoms) {
+						add(atom.pos)
+					}
+					div(mol.atoms.size.toDouble())
+				}
+			))
+		}
+
+		return out
+	}
+
 
 	/**
 	 * Compiles the fragment

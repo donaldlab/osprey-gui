@@ -63,6 +63,22 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 		} else {
 			out.writeByte(0)
 		}
+
+		// write the motions, if any
+		out.writeInt(molInfo.motions.size)
+		for (motion in molInfo.motions) {
+			when (motion) {
+
+				is CompiledConfSpace.MotionInfo.TranslationRotation -> {
+					out.writeUTF("translationRotation")
+					out.writeDouble(motion.maxTranslationDistance)
+					out.writeDouble(motion.maxRotationRadians)
+					out.write(motion.centroid)
+				}
+
+				else -> throw IllegalArgumentException("motion not supported on molecules: ${motion::class.java.simpleName}")
+			}
+		}
 	}
 
 	// write out the resdidue infos
@@ -136,6 +152,8 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 							out.writeInt(atomi)
 						}
 					}
+
+					else -> throw IllegalArgumentException("motion not supported on conformations: ${motion::class.java.simpleName}")
 				}
 			}
 
