@@ -4,14 +4,15 @@ import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.identityHashMapOf
-import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
+import edu.duke.cs.ospreygui.motions.ConfMotion
+import edu.duke.cs.ospreygui.motions.DihedralAngle
+import edu.duke.cs.ospreygui.motions.MolMotion
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
-import io.kotlintest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotlintest.shouldBe
 import org.joml.Vector3d
 
@@ -57,24 +58,30 @@ fun makeTestConfSpace(): ConfSpace {
 			mutations.add(pro.type)
 
 			// add some confs
-			confs[wtFrag] = wtFrag.confs.values.toCollection(identityHashSet())
-			confs[leu] = leu.getConfs("pp", "tp", "tt")
-			confs[ala] = ala.getConfs("ALA")
-			confs[pro] = pro.getConfs("down", "up")
+			confs.addAll(wtFrag)
+			confs.addAll(leu, "pp", "tp", "tt")
+			confs.addAll(ala)
+			confs.addAll(pro)
 
 			// add some continuous flexibility
-			motionSettings[wtFrag] = ConfSpace.PositionConfSpace.MotionSettings(
-				includeHGroupRotations = false,
-				dihedralRadiusDegrees = 9.0
-			)
-			motionSettings[leu] = ConfSpace.PositionConfSpace.MotionSettings(
-				includeHGroupRotations = false,
-				dihedralRadiusDegrees = 9.0
-			)
-			motionSettings[ala] = ConfSpace.PositionConfSpace.MotionSettings(
-				includeHGroupRotations = true,
-				dihedralRadiusDegrees = 30.0
-			)
+			for (frag in listOf(wtFrag, leu)) {
+				val settings = DihedralAngle.LibrarySettings(
+					radiusDegrees = 9.0,
+					includeHydroxyls = true,
+					includeNonHydroxylHGroups = false
+				)
+				for (space in confs.getByFragment(frag)) {
+					space.motions.addAll(DihedralAngle.ConfDescription.makeFromLibrary(pos1, space.frag, space.conf, settings))
+				}
+			}
+			for (space in confs.getByFragment(ala)) {
+				val settings = DihedralAngle.LibrarySettings(
+					radiusDegrees = 30.0,
+					includeHydroxyls = true,
+					includeNonHydroxylHGroups = true
+				)
+				space.motions.addAll(DihedralAngle.ConfDescription.makeFromLibrary(pos1, space.frag, space.conf, settings))
+			}
 		}
 		positionConfSpaces.getOrMake(pos2).apply {
 
@@ -84,7 +91,7 @@ fun makeTestConfSpace(): ConfSpace {
 			mutations.add(gly.type)
 
 			// add the conf
-			confs[gly] = gly.getConfs("GLY")
+			confs.addAll(gly, "GLY")
 
 			// no continuous flexibility, it's glycine ...
 		}
@@ -179,8 +186,8 @@ fun makeTestConfSpace(): ConfSpace {
 			)
 
 			// add some confs
-			confs[wtFrag] = wtFrag.confs.values.toMutableSet()
-			confs[bar] = bar.getConfs("bar1", "bar2")
+			confs.addAll(wtFrag)
+			confs.addAll(bar)
 
 			// no motion settings, ie no continuous flexibility
 		}
@@ -189,6 +196,18 @@ fun makeTestConfSpace(): ConfSpace {
 
 class TestConfSpace : SharedSpec({
 
+	infix fun ConfMotion.Description.shouldBeMotion(other: ConfMotion.Description) {
+
+		// just make sure the types are correct for now
+		this::class shouldBe other::class
+	}
+
+	infix fun MolMotion.Description.shouldBeMotion(other: MolMotion.Description) {
+
+		// just make sure the types are correct for now
+		this::class shouldBe other::class
+	}
+
 	infix fun ConfSpace.shouldBeConfSpace(exp: ConfSpace) {
 
 		val obs = this
@@ -196,12 +215,22 @@ class TestConfSpace : SharedSpec({
 		obs.name shouldBe exp.name
 
 		// check the molecules
-		obs.mols
-			.map { (type, mol) -> type to mol.type }
-			.shouldBe(
-				exp.mols
-					.map { (type, mol) -> type to mol.type }
-			)
+		for ((obsPair, expPair) in obs.mols.zip(exp.mols)) {
+			val (obsType, obsMol) = obsPair
+			val (expType, expMol) = expPair
+
+			obsType shouldBe expType
+			obsMol.name shouldBe expMol.name
+			obsMol.type shouldBe expMol.type
+
+			// check the molecule motions
+			val obsMotions = obs.molMotions.getOrDefault(obsMol, mutableListOf())
+			val expMotions = exp.molMotions.getOrDefault(expMol, mutableListOf())
+			obsMotions.size shouldBe expMotions.size
+			for ((obsMotion, expMotion) in obsMotions.zip(expMotions)) {
+				obsMotion shouldBeMotion expMotion
+			}
+		}
 
 		// check the design positions
 		obs.positions().size shouldBe exp.positions().size
@@ -236,21 +265,15 @@ class TestConfSpace : SharedSpec({
 
 			// check the confs
 			obsPosConfSpace.confs.size shouldBe expPosConfSpace.confs.size
-			val fragIds = obsPosConfSpace.confs.map { (frag, _) -> frag.id }
-			fragIds shouldContainExactlyInAnyOrder expPosConfSpace.confs.map { (frag, _) -> frag.id }
-			for (fragId in fragIds) {
+			for ((obsSpace, expSpace) in obsPosConfSpace.confs.zip(expPosConfSpace.confs)) {
 
-				// check the fragments
-				val obsFrag = obsPosConfSpace.confs.keys.find { it.id == fragId }!!
-				val expFrag = expPosConfSpace.confs.keys.find { it.id == fragId }!!
-				obsFrag shouldBeFrag expFrag
+				obsSpace.frag shouldBeFrag expSpace.frag
+				obsSpace.conf shouldBeConf expSpace.conf
 
-				// check the fragment confs
-				val obsConfs = obsPosConfSpace.confs[obsFrag]!!.sortedBy { it.id }
-				val expConfs = expPosConfSpace.confs[expFrag]!!.sortedBy { it.id }
-				obsConfs.size shouldBe expConfs.size
-				for ((obsConf, expConf) in obsConfs.zip(expConfs)) {
-					obsConf shouldBeConf expConf
+				// check the motions
+				obsSpace.motions.size shouldBe expSpace.motions.size
+				for ((obsMotion, expMotion) in obsSpace.motions.zip(expSpace.motions)) {
+					obsMotion shouldBeMotion expMotion
 				}
 			}
 		}

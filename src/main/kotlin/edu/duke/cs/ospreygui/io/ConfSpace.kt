@@ -2,10 +2,12 @@ package edu.duke.cs.ospreygui.io
 
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.tools.identityHashSet
-import edu.duke.cs.ospreygui.forcefield.amber.partitionAndAtomMap
+import edu.duke.cs.ospreygui.forcefield.amber.findTypeOrThrow
+import edu.duke.cs.ospreygui.motions.DihedralAngle
+import edu.duke.cs.ospreygui.motions.TranslationRotation
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
+import edu.duke.cs.ospreygui.tools.UnsupportedClassException
 import org.tomlj.Toml
 import org.tomlj.TomlPosition
 
@@ -27,8 +29,9 @@ fun ConfSpace.toToml(): String {
 			?: throw NoSuchElementException("no index for atom $this")
 
 	// write down all the fragments
-	val frags = libraryFragments() + wildTypeFragments()
+	val wtFrags = wildTypeFragments()
 	write("\n")
+	val frags = libraryFragments() + wtFrags
 	val (fragsToml, idsByFrag) = frags.toToml(resolveIdCollisions = true)
 	write(fragsToml)
 
@@ -94,38 +97,53 @@ fun ConfSpace.toToml(): String {
 			write("mutations = [ %s ]\n",
 				posConfSpace.mutations.joinToString(", ") { it.quote() }
 			)
-			write("confs = [\n")
-			for ((frag, confs) in posConfSpace.confs) {
 
-				// don't write empty conf list, the TOML file won't be parseable
-				// (might be a bug in the TOML parser? I think empty arrays [] are supposed to parse ...)
-				if (confs.isEmpty()) {
-					continue
+			// write the conf conf spaces (in a sorted order)
+			for ((confi, space) in posConfSpace.confs.withIndex()) {
+
+				write("[confspace.positions.$posi.confspace.confs.$confi]\n")
+				write("frag = %s\n", space.frag.id.quote())
+				write("conf = %s\n", space.conf.id.quote())
+
+				// write the motions, if any
+				if (space.motions.isNotEmpty()) {
+					write("motions = [\n")
+					for (motion in space.motions) {
+						when (motion) {
+
+							is DihedralAngle.ConfDescription -> {
+								write("\t{ type = %s, index = %d, minDegrees = %12.6f, maxDegrees = %12.6f },\n",
+									"dihedralAngle".quote(),
+									space.frag.motions
+										.indexOf(motion.motion)
+										.takeIf { it >= 0 }
+										?: throw NoSuchElementException("dihedral angle motion is not in fragment"),
+									motion.minDegrees,
+									motion.maxDegrees
+								)
+							}
+
+							else -> throw UnsupportedClassException("don't know how to save conformation motion", motion)
+						}
+					}
+					write("]\n")
 				}
-
-				write("\t{ frag = %12s, confs = [ %s ] },\n",
-					frag.id.quote(),
-					confs.joinToString(", ") { it.id.quote() }
-				)
-			}
-			write("]\n")
-
-			// write the motion settings
-			for ((frag, motionSettings) in posConfSpace.motionSettings) {
-				write("\n")
-				write("[confspace.positions.$posi.confspace.motionSettings.${frag.id}]\n")
-				write("includeHGroupRotations = %s\n", motionSettings.includeHGroupRotations)
-				write("dihedralRadiusDegrees = %s\n", motionSettings.dihedralRadiusDegrees)
 			}
 		}
 
-		// write the molecule motion settings
-		molMotionSettings[mol]?.let { settings ->
+		// write the molecule motions, if any
+		molMotions[mol]?.forEachIndexed { motioni, motion ->
 			write("\n")
-			write("[confspace.molMotionSettings.$moli]\n")
-			if (settings.hasTranslationRotation) {
-				write("maxTranslationDist = %s\n", settings.maxTranslationDist)
-				write("maxRotationDegrees = %s\n", settings.maxRotationDegrees)
+			write("[confspace.molMotions.$moli.$motioni]\n")
+			when (motion) {
+
+				is TranslationRotation.MolDescription -> {
+					write("type = %s\n", "translationRotation".quote())
+					write("maxTranslationDist = %12.6f\n", motion.maxTranslationDist)
+					write("maxRotationDegrees = %12.6f\n", motion.maxRotationDegrees)
+				}
+
+				else -> throw UnsupportedClassException("don't know how to save molecule motion", motion)
 			}
 		}
 	}
@@ -135,7 +153,13 @@ fun ConfSpace.toToml(): String {
 
 private fun String.quote() = "'$this'"
 
-fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
+fun ConfSpace.Companion.fromToml(toml: String): ConfSpace =
+	fromTomlWithConfLib(toml).first
+
+/**
+ * Returns the conformation space, and the library conformations (ie non-wild-type fragments) as a ConfLib
+ */
+fun ConfSpace.Companion.fromTomlWithConfLib(toml: String): Pair<ConfSpace,ConfLib> {
 
 	// parse the TOML
 	val doc = Toml.parse(toml)
@@ -145,20 +169,21 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 
 	// read the molecules
 	val molsAndAtoms = Molecule.fromOMOLWithAtoms(doc)
-	val (mols, partitionAtomMap) = molsAndAtoms
-		.map { (mol, _) -> mol }
-		.partitionAndAtomMap(combineSolvent = true)
 	fun getMol(i: Int, pos: TomlPosition?) =
-		mols.getOrNull(i)
-			?.let { (_, mol) -> mol }
+		molsAndAtoms.getOrNull(i)
+			?.let { (mol, _) -> mol }
 			?: throw TomlParseException("no molecule found with index $i", pos)
+
+	// calculate the types for the molecules
+	val typesAndMols =
+		molsAndAtoms
+			.map { (mol, _) -> mol.findTypeOrThrow() to mol }
 
 	// build the atom lookup
 	val atomIndices = HashMap<Int,Atom>().apply {
 		for ((_, atomIndices) in molsAndAtoms) {
-			for ((i, atomA) in atomIndices) {
-				val atomB = partitionAtomMap.getBOrThrow(atomA)
-				put(i, atomB)
+			for ((i, atom) in atomIndices) {
+				put(i, atom)
 			}
 		}
 	}
@@ -179,7 +204,7 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 	// read the conf space
 	val confSpaceTable = doc.getTableOrThrow("confspace")
 
-	return ConfSpace(mols).apply {
+	val confSpace = ConfSpace(typesAndMols).apply {
 
 		name = confSpaceTable.getStringOrThrow("name")
 
@@ -221,36 +246,44 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 						}
 
 						// read the confs
-						val confsArray = posConfSpaceTable.getArrayOrThrow("confs", posConfSpacePos)
-						for (i in 0 until confsArray.size()) {
-							val confTable = confsArray.getTable(i)
-							val confPos = confsArray.inputPositionOf(i)
+						val confsTable = posConfSpaceTable.getTable("confs")
+						if (confsTable != null) {
+							for (confkey in confsTable.keySet()) {
+								val confTable = confsTable.getTableOrThrow(confkey)
+								val confPos = confsTable.inputPositionOf(confkey)
 
-							val frag = getFrag(confTable.getStringOrThrow("frag"), confPos)
-							confs[frag] = identityHashSet<ConfLib.Conf>().apply {
-								val table = confTable.getArrayOrThrow("confs", confPos)
-								for (j in 0 until table.size()) {
-									val confId = table.getString(j)
-									val pos = table.inputPositionOf(j)
+								val frag = getFrag(confTable.getStringOrThrow("frag"), confPos)
 
-									val conf = frag.confs[confId]
-										?: throw TomlParseException("no conf with id $confId in fragment ${frag.id}", pos)
-									add(conf)
+								val confId = confTable.getStringOrThrow("conf")
+								val conf = frag.confs[confId]
+									?: throw TomlParseException("no conf with id $confId in fragment ${frag.id}", confPos)
+
+								// make the conf conf space
+								confs.add(frag, conf).apply {
+
+									// read the motions, if any
+									val motionsArray = confTable.getArray("motions")
+									if (motionsArray != null) {
+										for (motioni in 0 until motionsArray.size()) {
+											val motionTable = motionsArray.getTable(motioni)
+											val motionPos = motionsArray.inputPositionOf(motioni)
+
+											when (motionTable.getStringOrThrow("type", motionPos)) {
+
+												"dihedralAngle" -> {
+													val index = motionTable.getIntOrThrow("index", motionPos)
+													motions.add(DihedralAngle.ConfDescription(
+														this@pos,
+														(frag.motions.getOrNull(index) as? ConfLib.ContinuousMotion.DihedralAngle)
+															?: throw NoSuchElementException("no dihedral motion at fragment $frag at index $index"),
+														motionTable.getDoubleOrThrow("minDegrees"),
+														motionTable.getDoubleOrThrow("maxDegrees")
+													))
+												}
+											}
+										}
+									}
 								}
-							}
-						}
-
-						// read the motion settings
-						posConfSpaceTable.getTable("motionSettings")?.let { motionSettingsTable ->
-							for (fragId in motionSettingsTable.keySet()) {
-								val table = motionSettingsTable.getTableOrThrow(fragId)
-								val pos = motionSettingsTable.inputPositionOf(fragId)
-
-								val frag = getFrag(fragId, pos)
-								motionSettings[frag] = ConfSpace.PositionConfSpace.MotionSettings(
-									includeHGroupRotations = table.getBooleanOrThrow("includeHGroupRotations", pos),
-									dihedralRadiusDegrees = table.getDoubleOrThrow("dihedralRadiusDegrees", pos)
-								)
 							}
 						}
 					}
@@ -293,23 +326,44 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 		}
 
 		// read the molecule motions, if any
-		val molMotionSettingsTable = confSpaceTable.getTable("molMotionSettings")
-		if (molMotionSettingsTable != null) {
-			mols
-				.map { (_, mol) -> mol }
-				.withIndex()
-				.forEach { (moli, mol) ->
+		val molMotionsTable = confSpaceTable.getTable("molMotions")
+		if (molMotionsTable != null) {
 
-					val key = "$moli"
-					val settingsTable = molMotionSettingsTable.getTable(key)
-					if (settingsTable != null) {
+			for (molkey in molMotionsTable.keySet()) {
+				val moli = molkey.toInt()
+				val (_, mol) = mols[moli]
 
-						molMotionSettings[mol] = ConfSpace.MoleculeMotionSettings().apply {
-							settingsTable.getDouble("maxTranslationDist")?.let { maxTranslationDist = it }
-							settingsTable.getDouble("maxRotationDegrees")?.let { maxRotationDegrees = it }
+				val motionsTable = molMotionsTable.getTable(molkey)
+				if (motionsTable != null) {
+
+					for (motionkey in motionsTable.keySet()) {
+						val motionTable = motionsTable.getTableOrThrow(motionkey)
+
+						when (motionTable.getString("type")) {
+
+							"translationRotation" -> {
+								molMotions.getOrPut(mol) { ArrayList() }.add(TranslationRotation.MolDescription(
+									mol,
+									motionTable.getDoubleOrThrow("maxTranslationDist"),
+									motionTable.getDoubleOrThrow("maxRotationDegrees")
+								))
+							}
 						}
 					}
 				}
+			}
 		}
 	}
+
+	val wtFragIds = confSpace.wildTypeFragments()
+		.map { it.id }
+		.toSet()
+
+	val confLib = ConfLib(
+		name = "Conformation Space",
+		fragments = frags.filter { (id, _) -> id !in wtFragIds },
+		description = "from the conformation space named: \"${confSpace.name}\""
+	)
+
+	return confSpace to confLib
 }

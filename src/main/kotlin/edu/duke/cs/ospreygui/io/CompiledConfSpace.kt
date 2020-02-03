@@ -5,6 +5,7 @@ import cuchaz.kludge.tools.y
 import cuchaz.kludge.tools.z
 import edu.duke.cs.ospreygui.compiler.AtomPairs
 import edu.duke.cs.ospreygui.compiler.CompiledConfSpace
+import edu.duke.cs.ospreygui.tools.UnsupportedClassException
 import org.joml.Vector3dc
 import java.io.ByteArrayOutputStream
 import java.io.DataOutput
@@ -76,7 +77,7 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 					out.write(motion.centroid)
 				}
 
-				else -> throw IllegalArgumentException("motion not supported on molecules: ${motion::class.java.simpleName}")
+				else -> throw UnsupportedClassException("motion not supported on molecules", motion)
 			}
 		}
 	}
@@ -153,7 +154,7 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 						}
 					}
 
-					else -> throw IllegalArgumentException("motion not supported on conformations: ${motion::class.java.simpleName}")
+					else -> throw UnsupportedClassException("motion not supported on conformations", motion)
 				}
 			}
 

@@ -2,15 +2,14 @@ package edu.duke.cs.ospreygui.compiler
 
 import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.*
-import edu.duke.cs.ospreygui.motions.dihedralAngle
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
-import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.motions.*
 import edu.duke.cs.ospreygui.prep.ConfSpace
+import edu.duke.cs.ospreygui.tools.UnsupportedClassException
 import edu.duke.cs.ospreygui.tools.pairs
 import org.joml.Vector3d
 import kotlin.collections.ArrayList
@@ -227,7 +226,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				CompiledConfSpace.MolInfo(
 					mol.name,
 					mol.type,
-					confSpace.molMotionSettings[mol]?.compile(mol) ?: emptyList()
+					confSpace.molMotions[mol]?.map { it.compile(mol) } ?: emptyList()
 				)
 			}
 
@@ -323,6 +322,9 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		} catch (t: Throwable) {
 
+			// dump the error to the console, just in case any developers are watching
+			t.printStackTrace(System.err)
+
 			// wrap the exception in a compiler error if needed
 			val error = t as? CompilerError
 				?: CompilerError("Error", null, t)
@@ -364,25 +366,20 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compiles the motions for this molecule
 	 */
-	private fun ConfSpace.MoleculeMotionSettings.compile(mol: Molecule): List<CompiledConfSpace.MotionInfo> {
+	private fun MolMotion.Description.compile(mol: Molecule): CompiledConfSpace.MotionInfo = when (this) {
 
-		val out = ArrayList<CompiledConfSpace.MotionInfo>()
-
-		// make translations and rotations if needed
-		if (hasTranslationRotation) {
-			out.add(CompiledConfSpace.MotionInfo.TranslationRotation(
-				maxTranslationDist,
-				maxRotationDegrees.toRadians(),
-				centroid = Vector3d().apply {
-					for (atom in mol.atoms) {
-						add(atom.pos)
-					}
-					div(mol.atoms.size.toDouble())
+		is TranslationRotation.MolDescription -> CompiledConfSpace.MotionInfo.TranslationRotation(
+			maxTranslationDist,
+			maxRotationDegrees.toRadians(),
+			centroid = Vector3d().apply {
+				for (atom in mol.atoms) {
+					add(atom.pos)
 				}
-			))
-		}
+				div(mol.atoms.size.toDouble())
+			}
+		)
 
-		return out
+		else -> throw UnsupportedClassException("don't know how to compile molecule motion", this)
 	}
 
 
@@ -408,14 +405,6 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		// collect the atoms for this conf (including dynamic fixed atoms), and assign indices
 		val confAtoms = AtomIndex(fragInfo.orderAtoms(fixedAtoms[posInfo].dynamics))
 
-		// compile the continuous motions, if any
-		val motions =
-			posInfo.posConfSpace.motionSettings[fragInfo.frag]
-				?.let { settings ->
-					fragInfo.frag.motions.mapNotNull { it.compile(this, settings, confAtoms, fixedAtoms) }
-				}
-				?: emptyList()
-
 		// compute the internal energies of the conformation atoms
 		val internalEnergies = forcefields.map { ff ->
 			val fragParams = params[ff, fragInfo]
@@ -430,7 +419,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			type = fragInfo.frag.type,
 			atoms = confAtoms.map { it.compile(infoIndexer, posInfo.pos.mol) },
 			fragIndex = fragInfo.index,
-			motions = motions,
+			motions = confConfSpace.motions.map { it.compile(confAtoms, fixedAtoms) },
 			internalEnergies = internalEnergies
 		)
 	}
@@ -438,40 +427,29 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compiles the continuous motion
 	 */
-	private fun ConfLib.ContinuousMotion.compile(
-		confInfo: ConfSpaceIndex.ConfInfo,
-		settings: ConfSpace.PositionConfSpace.MotionSettings,
+	private fun ConfMotion.Description.compile(
 		confAtoms: AtomIndex,
 		fixedAtoms: FixedAtoms
-	): CompiledConfSpace.MotionInfo? {
-		when (this) {
+	): CompiledConfSpace.MotionInfo = when (this) {
 
-			is ConfLib.ContinuousMotion.DihedralAngle -> {
+		is DihedralAngle.ConfDescription -> {
 
-				// filter out h-group rotations when needed
-				val isHGroupRotation = affectedAtoms(confInfo.fragInfo.frag)
-					.let { atoms ->
-						atoms.isNotEmpty() && atoms.all { it.element == Element.Hydrogen }
-					}
-				if (isHGroupRotation && !settings.includeHGroupRotations) {
-					return null
-				}
+			val a = pos.atomResolverOrThrow.resolveOrThrow(motion.a)
+			val b = pos.atomResolverOrThrow.resolveOrThrow(motion.b)
+			val c = pos.atomResolverOrThrow.resolveOrThrow(motion.c)
+			val d = pos.atomResolverOrThrow.resolveOrThrow(motion.d)
 
-				// make the dihedral angle on the molecule
-				val dihedral = confInfo.posInfo.pos.dihedralAngle(this)
-				val initialDegrees = dihedral.measureDegrees()
-
-				// compile the dihedral angle
-				return CompiledConfSpace.MotionInfo.DihedralAngle(
-					minDegrees = initialDegrees - settings.dihedralRadiusDegrees,
-					maxDegrees = initialDegrees + settings.dihedralRadiusDegrees,
-					abcd = listOf(dihedral.a, dihedral.b, dihedral.c, dihedral.d)
-						.map { confAtoms.getOrStatic(it, fixedAtoms) },
-					rotated = dihedral.rotatedAtoms
-						.map { confAtoms.getOrThrow(it) }
-				)
-			}
+			CompiledConfSpace.MotionInfo.DihedralAngle(
+				minDegrees,
+				maxDegrees,
+				abcd = listOf(a, b, c, d)
+					.map { confAtoms.getOrStatic(it, fixedAtoms) },
+				rotated = DihedralAngle.findRotatedAtoms(pos.mol, b, c)
+					.map { confAtoms.getOrThrow(it) }
+			)
 		}
+
+		else -> throw UnsupportedClassException("don't know how to compile conformation motion", this)
 	}
 
 	private fun Atom.compile(infoIndexer: InfoIndexer, mol: Molecule): CompiledConfSpace.AtomInfo =

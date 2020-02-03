@@ -218,10 +218,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 								pos.confSpace.mutations.remove(info.type)
 
 								// also, remove the confs for this mutation, if any
-								pos.confSpace.confs
-									.keys
-									.filter { it.type == info.type }
-									.forEach { pos.confSpace.confs.remove(it) }
+								pos.confSpace.confs.removeByFragmentType(info.type)
 							}
 
 							// update the sequence count

@@ -5,9 +5,9 @@ import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
-import edu.duke.cs.ospreygui.motions.dihedralAngle
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.fromOMOL
+import edu.duke.cs.ospreygui.motions.DihedralAngle
 import edu.duke.cs.ospreygui.show
 import io.kotlintest.matchers.beLessThanOrEqualTo
 import io.kotlintest.matchers.collections.shouldContain
@@ -596,12 +596,14 @@ class TestMutation : SharedSpec({
 
 			// build the dihedral angle
 			val chi1 = frag.motions[0] as ConfLib.ContinuousMotion.DihedralAngle
-			pos.dihedralAngle(chi1).run {
-				mol shouldBeSameInstanceAs pos.mol
-				a.name shouldBe "N"
-				b.name shouldBe "CA"
-				c.name shouldBe "CB"
-				d.name shouldBe "CG1"
+			DihedralAngle.ConfDescription.make(pos, chi1, conf, radiusDegrees = 9.0).run {
+				make().run {
+					mol shouldBeSameInstanceAs pos.mol
+					a.name shouldBe "N"
+					b.name shouldBe "CA"
+					c.name shouldBe "CB"
+					d.name shouldBe "CG1"
+				}
 			}
 		}
 	}

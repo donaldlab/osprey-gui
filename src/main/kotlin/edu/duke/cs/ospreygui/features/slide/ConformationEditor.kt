@@ -8,16 +8,11 @@ import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
-import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.motions.DihedralAngle
-import edu.duke.cs.ospreygui.motions.dihedralAngle
-import edu.duke.cs.ospreygui.motions.supportsDihedralAngle
 import edu.duke.cs.ospreygui.features.components.ConfLibPicker
 import edu.duke.cs.ospreygui.features.components.DesignPositionEditor
-import edu.duke.cs.ospreygui.features.components.default
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.confRuntimeId
@@ -51,25 +46,42 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			onAdd = { resetInfos() }
 		}
 
-		val pIncludeHGroupRotations = Ref.of(false)
-		val pDihedralRadiusDegrees = Ref.of(0f)
+		val pDihedralRadiusDegrees = Ref.of(
+			getter = { posEditor.dihedralSettings.radiusDegrees.toFloat() },
+			setter = { posEditor.dihedralSettings.radiusDegrees = it.toDouble() }
+		)
+		val pDihedralIncludeHydroxyls = Ref.of(posEditor.dihedralSettings::includeHydroxyls)
+		val pDihedralIncludeNonHydroxylHGroups = Ref.of(posEditor.dihedralSettings::includeNonHydroxylHGroups)
 
 		inner class MutInfo(val type: String) {
 
 			inner class FragInfo(val conflib: ConfLib?, val frag: ConfLib.Fragment) {
 
+				val mutInfo get() = this@MutInfo
+
 				val id = conflib.fragRuntimeId(frag)
-				val confs = posInfo.confSpace.confs
-					.getOrPut(frag) { identityHashSet() }
-				val motionSettings = posInfo.confSpace.motionSettings
-					.getOrPut(frag) { ConfSpace.PositionConfSpace.MotionSettings.default() }
 
 				inner class ConfInfo(val conf: ConfLib.Conf) {
+
+					val fragInfo get() = this@FragInfo
 
 					val id = conflib.confRuntimeId(frag, conf)
 					val label = "${conf.name}##$id"
 
-					val pSelected = Ref.of(conf in confs)
+					val pSelected = Ref.of(posInfo.confSpace.confs.contains(frag, conf))
+
+					fun add() {
+						posInfo.confSpace.confs.add(frag, conf).run {
+
+						// add default dihedral angles from the conformation library
+						DihedralAngle.ConfDescription.makeFromLibrary(posInfo.pos, frag, conf, posEditor.dihedralSettings)
+							.forEach { motions.add(it) }
+						}
+					}
+
+					fun remove() = posInfo.confSpace.confs.remove(frag, conf)
+					fun get() = posInfo.confSpace.confs.get(frag, conf)
+					fun included() = posInfo.confSpace.confs.contains(frag, conf)
 				}
 
 				// collect the conformations
@@ -253,9 +265,9 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 										// mark the conf as included or not in the design position conf space
 										if (confInfo.pSelected.value) {
-											fragInfo.confs.add(confInfo.conf)
+											confInfo.add()
 										} else {
-											fragInfo.confs.remove(confInfo.conf)
+											confInfo.remove()
 										}
 
 										changed = true
@@ -273,7 +285,11 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			if (button("Select all")) {
 				for (mutInfo in mutInfos) {
 					for (fragInfo in mutInfo.fragInfos) {
-						fragInfo.confs.addAll(fragInfo.confInfos.map { it.conf })
+						for (confInfo in fragInfo.confInfos) {
+							if (!confInfo.included()) {
+								confInfo.add()
+							}
+						}
 					}
 				}
 				changed = true
@@ -282,7 +298,9 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			if (button("Deselect all")) {
 				for (mutInfo in mutInfos) {
 					for (fragInfo in mutInfo.fragInfos) {
-						fragInfo.confs.clear()
+						for (confInfo in fragInfo.confInfos) {
+							confInfo.remove()
+						}
 					}
 				}
 				changed = true
@@ -351,60 +369,21 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 			motionInfos.clear()
 
+			// get the selected fragment,conformation
 			val fragInfo = selectedFragInfo ?: return
 			val confInfo = selectedConfInfo ?: return
+			val space = confInfo.get() ?: return
 
-			// find the motion settings for this fragment
-			selectedFragInfo?.motionSettings?.let { motionSettings ->
-				pIncludeHGroupRotations.value = motionSettings.includeHGroupRotations
-				pDihedralRadiusDegrees.value = motionSettings.dihedralRadiusDegrees.toFloat()
-			}
-
-			val match = posInfo.pos.findAnchorMatch(fragInfo.frag)
-				?: throw RuntimeException("no anchor match")
-
-			// get the coords for an atom pointer
-			fun ConfLib.AtomPointer.resolveCoords(): Vector3d =
-				when (this) {
-					is ConfLib.AtomInfo -> {
-						// easy peasy
-						confInfo.conf.coords.getValue(this)
-					}
-					is ConfLib.AnchorAtomPointer -> {
-						// a bit more work ...
-						val posAnchor = match.findPosAnchor(anchor)
-							?: throw RuntimeException("no matched anchor")
-						posAnchor.anchorAtoms[index].pos
-					}
-					else -> throw IllegalArgumentException("unrecognized atom pointer type: ${this::class.simpleName}")
-				}
-
-
-			// build the continuous motions for the selected fragment, if any
-			motions@for (motion in fragInfo.frag.motions) {
+			for (motion in fragInfo.frag.motions) {
 				when (motion) {
+
 					is ConfLib.ContinuousMotion.DihedralAngle -> {
-
-						// filter out h-group rotations if needed
-						val isHGroupRotation = motion.affectedAtoms(fragInfo.frag)
-							.let { atoms ->
-								atoms.isNotEmpty() && atoms.all { it.element == Element.Hydrogen }
-							}
-						if (!pIncludeHGroupRotations.value && isHGroupRotation) {
-							continue@motions
-						}
-
 						motionInfos.add(MotionInfo.DihedralInfo(
 							motionInfos.size,
-							posInfo.pos,
 							motion,
-							initialDegrees = DihedralAngle.measureDegrees(
-								motion.a.resolveCoords(),
-								motion.b.resolveCoords(),
-								motion.c.resolveCoords(),
-								motion.d.resolveCoords()
-							),
-							radiusDegrees = pDihedralRadiusDegrees.value.toDouble()
+							posInfo,
+							space,
+							posEditor.dihedralSettings.radiusDegrees
 						))
 					}
 				}
@@ -418,10 +397,13 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			child("foo", 600f, 1f) {}
 
 			columns(2) {
-				column(300f) { // settings/frags/confs column
+				column(300f) { // frags/confs column
 
-					text("Choose a fragment to test:")
-					child("testFrags", 280f, 200f, true) {
+					text("Choose a fragment:")
+					child("testFrags", 280f, 270f, true) {
+
+						var hasSelections = false
+
 						for (mutInfo in mutInfos) {
 							for (fragInfo in mutInfo.fragInfos) {
 
@@ -433,52 +415,26 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 								if (radioButton("${fragInfo.frag.name}##fragRadio-${fragInfo.id}", selectedFragInfo === fragInfo)) {
 									selectConf(view, fragInfo, firstConfInfo)
 								}
+
+								hasSelections = true
 							}
+						}
+
+						if (!hasSelections) {
+							text("No fragments to show here.")
+							text("Try including some conformations")
+							text("at this design position.")
 						}
 					}
 
-					val fragInfo = selectedFragInfo
-					if (fragInfo != null) {
-
-						spacing()
-
-						text("${fragInfo.frag.name} Settings:")
-						child("settings", border = true) {
-
-							text("Dihedral angle radius (in degrees)")
-							sameLine()
-							infoTip("""
-								|For degrees of freedom that are dihedral angles, this value
-								|specifies the half-width (ie radius) of the interval of allowed angles.
-							""".trimMargin())
-
-							if (sliderFloat("##dihedralRadius", pDihedralRadiusDegrees, 0f, 180f, "%.1f")) {
-								fragInfo.motionSettings.dihedralRadiusDegrees = pDihedralRadiusDegrees.value.toDouble()
-								resetMotionInfos()
-							}
-							sameLine()
-							infoTip("Ctrl-click to type a precise value")
-
-							spacing()
-
-							if (checkbox("Include H-group rotations", pIncludeHGroupRotations)) {
-								fragInfo.motionSettings.includeHGroupRotations = pIncludeHGroupRotations.value
-								resetMotionInfos()
-							}
-						}
-					}
-				}
-				column(300f) { // motions column
-
-					text("Choose a conformation to test:")
-					child("testConfs", 280f, 140f, true) {
+					text("Choose a conformation:")
+					child("testConfs", 280f, 270f, true) {
 						val fragInfo = selectedFragInfo
 						if (fragInfo != null) {
-
 							for (confInfo in fragInfo.confInfos) {
 
 								// only show selected confs
-								if (confInfo.conf !in fragInfo.confs) {
+								if (!confInfo.included()) {
 									continue
 								}
 
@@ -488,15 +444,94 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 							}
 						}
 					}
+				}
+				column(300f) col@{ // motions column
+
+					val confInfo = selectedConfInfo ?: return@col
+
+					text("Dihedral Angle Settings:")
+					indent(20f)
+
+					text("Angle radius (in degrees)")
+					sameLine()
+					infoTip("""
+						|This value specifies the half-width (ie radius) of the interval of allowed angles.
+					""".trimMargin())
+
+					sliderFloat("##dihedralRadius", pDihedralRadiusDegrees, 0f, 180f, "%.1f")
+					sameLine()
+					infoTip("Ctrl-click to type a precise value")
 
 					spacing()
 
-					text("Degrees of Freedom:")
+					checkbox("Include Hydroxyls", pDihedralIncludeHydroxyls)
+
+					spacing()
+
+					checkbox("Include Non-Hydroxyl H-groups", pDihedralIncludeNonHydroxylHGroups)
+					sameLine()
+					infoTip("e.g. Methyls, Methylenes")
+
+					fun ConfSpace.ConfConfSpace.resetDihedralAngles() {
+
+						// recreate all the dihedral angles with the new settings
+						motions.removeIf { it is DihedralAngle.ConfDescription }
+						motions.addAll(DihedralAngle.ConfDescription.makeFromLibrary(
+							posInfo.pos,
+							frag,
+							conf,
+							posEditor.dihedralSettings
+						))
+					}
+
+					if (button("Reset ${confInfo.fragInfo.frag.name}/${confInfo.conf.name}")) {
+						confInfo.get()?.resetDihedralAngles()
+						resetMotionInfos()
+					}
+					sameLine()
+					infoTip("Resets dihedral angles for just this selected conformation.")
+
+					if (button("Reset ${confInfo.fragInfo.frag.name}")) {
+						confInfo.fragInfo.confInfos
+							.mapNotNull { it.get() }
+							.forEach { it.resetDihedralAngles() }
+						resetMotionInfos()
+					}
+					sameLine()
+					infoTip("Resets dihedral angles for all conformations in this selected fragment.")
+
+					if (button("Reset ${confInfo.fragInfo.mutInfo.type}")) {
+						confInfo.fragInfo.mutInfo.fragInfos
+							.flatMap { it.confInfos }
+							.mapNotNull { it.get() }
+							.forEach { it.resetDihedralAngles() }
+						resetMotionInfos()
+					}
+					sameLine()
+					infoTip("Resets dihedral angles for all conformations in this selected mutation.")
+
+					if (button("Reset design position")) {
+						mutInfos
+							.flatMap { it.fragInfos }
+							.flatMap { it.confInfos }
+							.mapNotNull { it.get() }
+							.forEach { it.resetDihedralAngles() }
+						resetMotionInfos()
+					}
+					sameLine()
+					infoTip("Resets dihedral angles for all conformations in this design position.")
+
+
+					unindent(20f)
+
+					spacing()
+
+					text("Degrees of Freedom for: ${confInfo.fragInfo.frag.name}/${confInfo.conf.name}")
 					indent(20f)
 
 					if (motionInfos.isNotEmpty()) {
 
-						for (motionInfo in motionInfos) {
+						for ((i, motionInfo) in motionInfos.withIndex()) {
 
 							// breathe a little
 							spacing()
@@ -505,8 +540,10 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 							spacing()
 							spacing()
 
-							text(motionInfo.label)
-							motionInfo.gui(imgui, view)
+							withId(i) {
+								text(motionInfo.label)
+								motionInfo.gui(imgui, view)
+							}
 						}
 
 						spacing()
@@ -557,22 +594,20 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		val posInfos = ArrayList<PosInfo>()
 		var numConfs: BigInteger = BigInteger.ZERO
 
-		val motionSettings get() =
-			prep.confSpace.molMotionSettings
-				.getOrPut(mol) { ConfSpace.MoleculeMotionSettings() }
+		val motions get() =
+			prep.confSpace.molMotions
+				.getOrPut(mol) { ArrayList() }
 
-		val useTransRot = Ref.of(motionSettings.hasTranslationRotation)
-		var transRotInfo =
-			if (useTransRot.value) {
-				MotionInfo.TranslationRotationInfo(mol, motionSettings)
-			} else {
-				null
-			}
+		var transRotInfo = motions
+			.filterIsInstance<TranslationRotation.MolDescription>()
+			.firstOrNull()
+			?.let { MotionInfo.TranslationRotationInfo(it) }
+		val useTransRot = Ref.of(transRotInfo != null)
 
 		fun updateCounts() {
 			numConfs = BigInteger.ONE
 			for (posInfo in posInfos) {
-				numConfs *= posInfo.confSpace.numConfs().toBigInteger()
+				numConfs *= posInfo.confSpace.confs.size.toBigInteger()
 			}
 		}
 
@@ -676,7 +711,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 									selectable(posInfo.pos.name, posInfo.pSelected)
 									nextColumn()
-									text("${posInfo.confSpace.numConfs()} confs")
+									text("${posInfo.confSpace.confs.size} confs")
 									nextColumn()
 								}
 								columns(1)
@@ -693,7 +728,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 										selectable(flexInfo.pos.name, flexInfo.pSelected)
 										nextColumn()
-										text("${flexInfo.confSpace.numConfs()} confs")
+										text("${flexInfo.confSpace.confs.size} confs")
 										nextColumn()
 									}
 									columns(1)
@@ -750,22 +785,22 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 								// show translation and rotation options
 								if (checkbox("Translate and Rotate", molInfo.useTransRot)) {
+
+									// remove any existing translations
+									molInfo.motions.removeIf { it is TranslationRotation.MolDescription }
+
 									if (molInfo.useTransRot.value) {
 
-										// enable the translation and rotation with default settings
-										molInfo.motionSettings.apply {
-											maxTranslationDist = 1.2 // angstroms
+										// add the translation and rotation with default settings
+										val desc = TranslationRotation.MolDescription(
+											molInfo.mol,
+											maxTranslationDist = 1.2, // angstroms
 											maxRotationDegrees = 5.0
-										}
-										molInfo.transRotInfo = MotionInfo.TranslationRotationInfo(molInfo.mol, molInfo.motionSettings)
+										)
+										molInfo.motions.add(desc)
+										molInfo.transRotInfo = MotionInfo.TranslationRotationInfo(desc)
 
 									} else {
-
-										// disable the translation and rotation
-										molInfo.motionSettings.apply {
-											maxTranslationDist = 0.0
-											maxRotationDegrees = 0.0
-										}
 
 										// cleanup the translation and rotation motion
 										molInfo.transRotInfo?.reset(view)
@@ -777,10 +812,10 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 									indent(20f)
 
-									if (inputDouble("Max Distance (Angstroms)", Ref.of(molInfo.motionSettings::maxTranslationDist))) {
+									if (inputDouble("Max Distance (Angstroms)", Ref.of(transRotInfo.desc::maxTranslationDist))) {
 										transRotInfo.updateBounds()
 									}
-									if (inputDouble("Max Rotation (Degrees)", Ref.of(molInfo.motionSettings::maxRotationDegrees))) {
+									if (inputDouble("Max Rotation (Degrees)", Ref.of(transRotInfo.desc::maxRotationDegrees))) {
 										transRotInfo.updateBounds()
 									}
 
@@ -823,163 +858,196 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			}
 		)
 	}
-}
 
 
-private sealed class MotionInfo {
+	private sealed class MotionInfo {
 
-	abstract val label: String
-	abstract fun gui(imgui: Commands, view: MoleculeRenderView)
-	abstract fun jiggle(rand: Random, view: MoleculeRenderView)
+		abstract val label: String
+		abstract fun gui(imgui: Commands, view: MoleculeRenderView)
+		abstract fun jiggle(rand: Random, view: MoleculeRenderView)
 
-	class DihedralInfo(
-		val id: Int,
-		pos: DesignPosition,
-		motion: ConfLib.ContinuousMotion.DihedralAngle,
-		val initialDegrees: Double,
-		val radiusDegrees: Double
-	) : MotionInfo() {
+		class DihedralInfo(
+			val id: Int,
+			val motion: ConfLib.ContinuousMotion.DihedralAngle,
+			val posInfo: PosInfo,
+			val space: ConfSpace.ConfConfSpace,
+			val defaultRadiusDegrees: Double
+		) : MotionInfo() {
 
-		inner class AngleInfo(pos: DesignPosition, motion: ConfLib.ContinuousMotion.DihedralAngle) {
+			fun getDescription() =
+				space
+					.motions
+					.filterIsInstance<DihedralAngle.ConfDescription>()
+					.find { it.motion === motion }
 
-			val dihedral = pos.dihedralAngle(motion)
-				.apply {
-					setDegrees(initialDegrees)
+			val pIncluded = Ref.of(getDescription() != null)
+
+			inner class ActiveAngle(val desc: DihedralAngle.ConfDescription) {
+
+				val dihedral = desc.make()
+
+				val minValue = desc.minDegrees.toFloat()
+				val maxValue = desc.maxDegrees.toFloat()
+				val radius = (maxValue - minValue)/2f
+
+				// start in the center of the interval
+				val pValue = Ref.of((minValue + maxValue)/2f)
+
+				// copy the original coordinates
+				val coords = dihedral.rotatedAtoms.map { Vector3d(it.pos) }
+
+				fun reset() {
+					// restore the original coordinates
+					for (i in coords.indices) {
+						dihedral.rotatedAtoms[i].pos.set(coords[i])
+					}
 				}
-
-			val minValue = (initialDegrees - radiusDegrees).toFloat()
-			val maxValue = (initialDegrees + radiusDegrees).toFloat()
-
-			val label = "Dihedral Angle: ${dihedral.a.name}, ${dihedral.b.name}, ${dihedral.c.name}, ${dihedral.d.name}"
-
-			val pValue = Ref.of(initialDegrees.toFloat())
-		}
-
-		val angleInfo =
-			if (pos.supportsDihedralAngle(motion)) {
-				AngleInfo(pos, motion)
-			} else {
-				null
 			}
 
-		override val label = angleInfo?.label ?: "Dihedral Angle: (Incompatible)"
+			var activeAngle =
+				getDescription()?.let { desc -> ActiveAngle(desc) }
 
-		override fun gui(imgui: Commands, view: MoleculeRenderView): Unit = imgui.run {
-			angleInfo?.run {
-				text("Range: %.1f to %.1f".format(minValue, maxValue))
-				if (sliderFloat("Angle##motion-$id", pValue, minValue, maxValue, format = "%.1f")) {
+			override val label = run {
+				val match = posInfo.pos.findAnchorMatch(space.frag)
+					?: return@run "Dihedral Angle"
+				val atomNames = listOf(motion.a, motion.b, motion.c, motion.d)
+					.map { match.resolveName(it) }
+				"Dihedral Angle: ${atomNames.joinToString(", ")}"
+			}
+
+			override fun gui(imgui: Commands, view: MoleculeRenderView): Unit = imgui.run {
+
+				// show a checkbox to enable/disable the dihedral angle
+				if (checkbox("Included", pIncluded)) {
+					if (pIncluded.value) {
+
+						// add the motion, with default settings
+						val desc = DihedralAngle.ConfDescription.make(posInfo.pos, motion, space.conf, defaultRadiusDegrees)
+						space.motions.add(desc)
+						activeAngle = ActiveAngle(desc).apply {
+							dihedral.setDegrees(pValue.value.toDouble())
+						}
+						view.moleculeChanged()
+
+					} else {
+
+						// remove the motion
+						space.motions.removeIf {
+							(it as? DihedralAngle.ConfDescription)?.motion === motion
+						}
+
+						activeAngle?.reset()
+						activeAngle = null
+						view.moleculeChanged()
+					}
+				}
+
+				// show a slider to manipulate the dihedral angle
+				activeAngle?.run {
+					text("Radius: %.1f degrees".format(radius))
+					text("Range: %.1f to %.1f degrees".format(minValue, maxValue))
+					if (sliderFloat("Angle##motion-$id", pValue, minValue, maxValue, format = "%.1f")) {
+						dihedral.setDegrees(pValue.value.toDouble())
+						view.moleculeChanged()
+					}
+				}
+			}
+
+			override fun jiggle(rand: Random, view: MoleculeRenderView) {
+				activeAngle?.run {
+					pValue.value = rand.nextFloatIn(minValue, maxValue)
 					dihedral.setDegrees(pValue.value.toDouble())
 					view.moleculeChanged()
 				}
-			} ?: run {
-				sameLine()
-				infoTip("""
-					|This dihedral angle degree of freedom has been defined by the fragment,
-					|but for some reason, it cannot be matched to the atoms in this design
-					|position. This is most likely an error in the definition of the fragment
-					|and its degrees of freedom.
-				""".trimMargin())
 			}
 		}
 
-		override fun jiggle(rand: Random, view: MoleculeRenderView) {
-			angleInfo?.run {
-				pValue.value = rand.nextFloatIn(minValue, maxValue)
-				dihedral.setDegrees(pValue.value.toDouble())
+		class TranslationRotationInfo(val desc: TranslationRotation.MolDescription) : MotionInfo() {
+
+			val transRot = desc.make()
+
+			val pPsi = Ref.of(0.0f)
+			val pTheta = Ref.of(0.0f)
+			val pPhi = Ref.of(0.0f)
+			val px = Ref.of(0.0f)
+			val py = Ref.of(0.0f)
+			val pz = Ref.of(0.0f)
+
+			var rmax = 0.0f
+			var rmin = 0.0f
+			var tmax = 0.0f
+			var tmin = 0.0f
+
+			init {
+				updateBounds()
+			}
+
+			override val label = "Translation and Rotation of ${desc.mol}"
+
+			fun updateBounds() {
+				rmax = desc.maxRotationDegrees.toFloat()
+				rmin = -rmax
+				tmax = desc.maxTranslationDist.toFloat()
+				tmin = -tmax
+			}
+
+			private fun updateMol(view: MoleculeRenderView) {
+				transRot.set(
+					pPsi.value.toDouble().toRadians(),
+					pTheta.value.toDouble().toRadians(),
+					pPhi.value.toDouble().toRadians(),
+					px.value.toDouble(),
+					py.value.toDouble(),
+					pz.value.toDouble()
+				)
+				view.moleculeChanged()
+			}
+
+			override fun gui(imgui: Commands, view: MoleculeRenderView) = imgui.run {
+
+				text("Tait-Bryan Rotation:")
+				if (sliderFloat("Psi (X)", pPsi, rmin, rmax, "%.3f")) {
+					updateMol(view)
+				}
+				if (sliderFloat("Theta (Y)", pTheta, rmin, rmax, "%.3f")) {
+					updateMol(view)
+				}
+				if (sliderFloat("Phi (Z)", pPhi, rmin, rmax, "%.3f")) {
+					updateMol(view)
+				}
+
+				text("Cartesian Translation:")
+				if (sliderFloat("X", px, tmin, tmax, "%.3f")) {
+					updateMol(view)
+				}
+				if (sliderFloat("Y", py, tmin, tmax, "%.3f")) {
+					updateMol(view)
+				}
+				if (sliderFloat("Z", pz, tmin, tmax, "%.3f")) {
+					updateMol(view)
+				}
+			}
+
+			override fun jiggle(rand: Random, view: MoleculeRenderView) {
+
+				pPsi.value = rand.nextFloatIn(rmin, rmax)
+				pTheta.value = rand.nextFloatIn(rmin, rmax)
+				pPhi.value = rand.nextFloatIn(rmin, rmax)
+
+				px.value = rand.nextFloatIn(tmin, tmax)
+				py.value = rand.nextFloatIn(tmin, tmax)
+				pz.value = rand.nextFloatIn(tmin, tmax)
+
+				updateMol(view)
+			}
+
+			fun reset(view: MoleculeRenderView) {
+				transRot.reset()
 				view.moleculeChanged()
 			}
 		}
 	}
-
-	class TranslationRotationInfo(
-		val mol: Molecule,
-		val settings: ConfSpace.MoleculeMotionSettings
-	) : MotionInfo() {
-
-		val transRot = TranslationRotation(mol)
-
-		val pPsi = Ref.of(0.0f)
-		val pTheta = Ref.of(0.0f)
-		val pPhi = Ref.of(0.0f)
-		val px = Ref.of(0.0f)
-		val py = Ref.of(0.0f)
-		val pz = Ref.of(0.0f)
-
-		var rmax = 0.0f
-		var rmin = 0.0f
-		var tmax = 0.0f
-		var tmin = 0.0f
-
-		init {
-			updateBounds()
-		}
-
-		override val label = "Translation and Rotation of $mol"
-
-		fun updateBounds() {
-			rmax = settings.maxRotationDegrees.toFloat()
-			rmin = -rmax
-			tmax = settings.maxTranslationDist.toFloat()
-			tmin = -tmax
-		}
-
-		private fun updateMol(view: MoleculeRenderView) {
-			transRot.set(
-				pPsi.value.toDouble().toRadians(),
-				pTheta.value.toDouble().toRadians(),
-				pPhi.value.toDouble().toRadians(),
-				px.value.toDouble(),
-				py.value.toDouble(),
-				pz.value.toDouble()
-			)
-			view.moleculeChanged()
-		}
-
-		override fun gui(imgui: Commands, view: MoleculeRenderView) = imgui.run {
-
-			text("Tait-Bryan Rotation:")
-			if (sliderFloat("Psi (X)", pPsi, rmin, rmax, "%.3f")) {
-				updateMol(view)
-			}
-			if (sliderFloat("Theta (Y)", pTheta, rmin, rmax, "%.3f")) {
-				updateMol(view)
-			}
-			if (sliderFloat("Phi (Z)", pPhi, rmin, rmax, "%.3f")) {
-				updateMol(view)
-			}
-
-			text("Cartesian Translation:")
-			if (sliderFloat("X", px, tmin, tmax, "%.3f")) {
-				updateMol(view)
-			}
-			if (sliderFloat("Y", py, tmin, tmax, "%.3f")) {
-				updateMol(view)
-			}
-			if (sliderFloat("Z", pz, tmin, tmax, "%.3f")) {
-				updateMol(view)
-			}
-		}
-
-		override fun jiggle(rand: Random, view: MoleculeRenderView) {
-
-			pPsi.value = rand.nextFloatIn(rmin, rmax)
-			pTheta.value = rand.nextFloatIn(rmin, rmax)
-			pPhi.value = rand.nextFloatIn(rmin, rmax)
-
-			px.value = rand.nextFloatIn(tmin, tmax)
-			py.value = rand.nextFloatIn(tmin, tmax)
-			pz.value = rand.nextFloatIn(tmin, tmax)
-
-			updateMol(view)
-		}
-
-		fun reset(view: MoleculeRenderView) {
-			transRot.reset()
-			view.moleculeChanged()
-		}
-	}
 }
-
 
 private fun Random.nextFloatIn(min: Float, max: Float): Float =
 	if (min != max) {

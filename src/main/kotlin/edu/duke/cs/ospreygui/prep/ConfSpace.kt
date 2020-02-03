@@ -7,13 +7,14 @@ import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.motions.ConfMotion
+import edu.duke.cs.ospreygui.motions.MolMotion
 import java.math.BigInteger
 import java.util.*
 
 
 class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 
-	// TODO: edit the name in the UI somewhere?
 	var name = "Conformation Space"
 
 	val designPositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = IdentityHashMap()
@@ -35,7 +36,10 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 			.values
 			.flatten()
 			.mapNotNull { positionConfSpaces[it] }
-			.flatMap { posConfSpace -> posConfSpace.confs.keys.filter { it !== posConfSpace.wildTypeFragment } }
+			.flatMap { posConfSpace ->
+				posConfSpace.confs.fragments()
+					.filter { it !== posConfSpace.wildTypeFragment }
+			}
 			.toCollection(identityHashSet())
 			.sortedBy { it.id }
 
@@ -49,11 +53,15 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 			.mapNotNull { positionConfSpaces[it]?.wildTypeFragment }
 			.sortedBy { it.id }
 
+	class ConfConfSpace(val frag: ConfLib.Fragment, val conf: ConfLib.Conf) {
+
+		val motions: MutableList<ConfMotion.Description> = ArrayList()
+	}
+
 	class PositionConfSpace {
 
 		var wildTypeFragment: ConfLib.Fragment? = null
 		val mutations: MutableSet<String> = HashSet()
-		val confs: MutableMap<ConfLib.Fragment,MutableSet<ConfLib.Conf>> = IdentityHashMap()
 
 		/**
 		 * Returns true iff the position allows a sequence type other than the wildtype.
@@ -61,18 +69,74 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 		fun isMutable() =
 			mutations.any { it != wildTypeFragment?.type }
 
-		fun numConfs() =
-			confs.values.sumBy { it.size }
+		inner class Confs : Iterable<ConfConfSpace> {
 
-		data class MotionSettings(
-			var includeHGroupRotations: Boolean,
-			var dihedralRadiusDegrees: Double
-		) {
-			companion object {
-				// blank for now, but defined so it can be extended
+			private val byFragConf = IdentityHashMap<ConfLib.Fragment,MutableMap<ConfLib.Conf,ConfConfSpace>>()
+
+			fun fragments() =
+				byFragConf
+					.keys
+					.sortedBy { frag -> frag.id }
+
+			override fun iterator() =
+				fragments()
+					.mapNotNull { frag -> byFragConf[frag] }
+					.flatMap { spaces -> spaces.values.sortedBy { it.conf.id } }
+					.iterator()
+
+			val size get() =
+				byFragConf
+					.values
+					.sumBy { it.size }
+
+			fun get(frag: ConfLib.Fragment, conf: ConfLib.Conf) =
+				byFragConf[frag]?.get(conf)
+
+			fun getByFragment(frag: ConfLib.Fragment): List<ConfConfSpace> =
+				byFragConf[frag]?.values?.toList() ?: emptyList()
+
+			fun contains(frag: ConfLib.Fragment, conf: ConfLib.Conf) =
+				get(frag, conf) != null
+
+			fun getOrAdd(frag: ConfLib.Fragment, conf: ConfLib.Conf) =
+				get(frag, conf) ?: add(frag, conf)
+
+			fun add(frag: ConfLib.Fragment, conf: ConfLib.Conf): ConfConfSpace {
+
+				// don't add duplicates
+				if (get(frag, conf) != null) {
+					throw IllegalStateException("position already has conformation ${frag.id}, ${conf.id}")
+				}
+
+				// add it
+				val confConfSpace = ConfConfSpace(frag, conf)
+				byFragConf
+					.getOrPut(frag) { IdentityHashMap() }
+					.put(conf, confConfSpace)
+				return confConfSpace
 			}
+
+			fun addAll(frag: ConfLib.Fragment, confs: Iterable<ConfLib.Conf>) {
+				for (conf in confs) {
+					add(frag, conf)
+				}
+			}
+
+			fun addAll(frag: ConfLib.Fragment, vararg confIds: String) =
+				addAll(frag, frag.getConfs(*confIds))
+
+			fun addAll(frag: ConfLib.Fragment) =
+				addAll(frag, frag.confs.values)
+
+			fun remove(frag: ConfLib.Fragment, conf: ConfLib.Conf) =
+				byFragConf[frag]?.remove(conf)
+
+			fun removeByFragmentType(type: String) =
+				byFragConf.values.forEach { spaces ->
+					spaces.values.removeIf { space -> space.frag.type == type }
+				}
 		}
-		val motionSettings: MutableMap<ConfLib.Fragment,MotionSettings> = IdentityHashMap()
+		val confs = Confs()
 	}
 	class PositionConfSpaces {
 
@@ -92,22 +156,13 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 		fun confSpaceSize(): BigInteger =
 			confSpaces.values
 				.takeIf { it.isNotEmpty() }
-				?.map { it.numConfs().toBigInteger() }
+				?.map { it.confs.size.toBigInteger() }
 				?.reduce { a, b -> a.multiply(b) }
 				?: BigInteger.ZERO
 	}
 	val positionConfSpaces = PositionConfSpaces()
 
-	data class MoleculeMotionSettings(
-		var maxTranslationDist: Double = 0.0,
-		var maxRotationDegrees: Double = 0.0
-	) {
-
-		val hasTranslationRotation get() =
-			maxTranslationDist > 0
-				|| maxRotationDegrees > 0
-	}
-	val molMotionSettings = IdentityHashMap<Molecule,MoleculeMotionSettings>()
+	val molMotions = IdentityHashMap<Molecule,MutableList<MolMotion.Description>>()
 
 	/**
 	 * Get all the atoms that aren't part of design positions.
@@ -226,20 +281,22 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 					// copy the mutations
 					newPosConfSpace.mutations.addAll(oldPosConfSpace.mutations)
 
-					// copy the conformations
-					for ((frag, confs) in oldPosConfSpace.confs) {
-						newPosConfSpace.confs[frag] = confs.toCollection(identityHashSet())
-					}
-
-					// copy the motions settings
-					for ((frag, oldSettings) in oldPosConfSpace.motionSettings) {
-						newPosConfSpace.motionSettings[frag] = oldSettings.copy()
+					for (oldSpace in oldPosConfSpace.confs) {
+						val newSpace = newPosConfSpace.confs.add(oldSpace.frag, oldSpace.conf)
+						for (oldMotion in oldSpace.motions) {
+							newSpace.motions.add(oldMotion.copyTo(newPos))
+						}
 					}
 				}
 			}
 
 			// copy the molecule motion settings
-			new.molMotionSettings[newMol] = old.molMotionSettings[oldMol]?.copy()
+			val oldMotions = old.molMotions[oldMol]
+			if (oldMotions != null) {
+				new.molMotions[newMol] = oldMotions
+					.map { it.copyTo(newMol) }
+					.toMutableList()
+			}
 		}
 
 		return new

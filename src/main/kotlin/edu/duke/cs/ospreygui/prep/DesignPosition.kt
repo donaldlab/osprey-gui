@@ -5,6 +5,7 @@ import cuchaz.kludge.tools.toString
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.tools.normalizeZeroToTwoPI
 import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.tools.UnsupportedClassException
 import org.joml.Quaterniond
 import org.joml.Vector3d
 import java.util.*
@@ -56,6 +57,49 @@ class DesignPosition(
 			pairs
 				.find { it.second === fragAnchor }
 				?.first
+
+		// NOTE: don't try to add a resolveCoords() function here
+		// it won't work the way you want, since library conformation atoms are
+		// in a different coordinate space than design position atoms
+		// instead, use AtomPointer.resolveCoords(Conf)
+
+		/** get the name from an atom pointer */
+		fun resolveName(p: ConfLib.AtomPointer): String? =
+			when (p) {
+				is ConfLib.AtomInfo -> {
+					// easy peasy
+					p.name
+				}
+				is ConfLib.AnchorAtomPointer -> {
+					// a bit more work ...
+					val posAnchor = findPosAnchor(p.anchor)
+						?: throw RuntimeException("no matched anchor")
+					posAnchor.anchorAtoms.getOrNull(p.index)?.name
+				}
+				else -> throw UnsupportedClassException("unrecognized atom pointer type", this)
+			}
+
+		fun resolveNameOrThrow(p: ConfLib.AtomPointer) =
+			resolveName(p) ?: throw NoSuchElementException("no atom found for pointer $p")
+
+		/** get the element from an atom pointer */
+		fun resolveElement(p: ConfLib.AtomPointer): Element? =
+			when (p) {
+				is ConfLib.AtomInfo -> {
+					// easy peasy
+					p.element
+				}
+				is ConfLib.AnchorAtomPointer -> {
+					// a bit more work ...
+					val posAnchor = findPosAnchor(p.anchor)
+						?: throw RuntimeException("no matched anchor")
+					posAnchor.anchorAtoms.getOrNull(p.index)?.element
+				}
+				else -> throw UnsupportedClassException("unrecognized atom pointer type", this)
+			}
+
+		fun resolveElementOrThrow(p: ConfLib.AtomPointer) =
+			resolveElement(p) ?: throw NoSuchElementException("no atom found for pointer $p")
 	}
 
 	fun findAnchorMatch(frag: ConfLib.Fragment): AnchorMatch? =
@@ -185,7 +229,7 @@ class DesignPosition(
 							?.anchorAtoms
 							?.get(p.index)
 					}
-					else -> throw IllegalArgumentException("unrecognized atom pointer type: ${p::class.simpleName}")
+					else -> throw UnsupportedClassException("unrecognized atom pointer type", p)
 				}
 		}
 	}

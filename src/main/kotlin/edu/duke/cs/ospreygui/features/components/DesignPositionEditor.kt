@@ -8,11 +8,10 @@ import cuchaz.kludge.tools.divideUp
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.RenderEffect
-import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.toTomlKey
-import edu.duke.cs.ospreygui.prep.ConfSpace
+import edu.duke.cs.ospreygui.motions.DihedralAngle
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
@@ -24,6 +23,12 @@ class DesignPositionEditor(
 ) {
 
 	val mol = pos.mol
+
+	val dihedralSettings = DihedralAngle.LibrarySettings(
+		radiusDegrees = 9.0,
+		includeHydroxyls = true,
+		includeNonHydroxylHGroups = false
+	)
 
 	private val clickTracker = ClickTracker()
 	private var autoSelectHydrogens = Ref.of(true)
@@ -193,14 +198,14 @@ class DesignPositionEditor(
 			}
 
 			for (frag in frags) {
+				for (conf in frag.confs.values) {
+					confs.add(frag, conf).apply {
 
-				// select all conformations by default
-				confs[frag] = identityHashSet<ConfLib.Conf>().apply {
-					addAll(frag.confs.values)
+						// add default dihedral angles from the conformation library
+						DihedralAngle.ConfDescription.makeFromLibrary(pos, frag, conf, dihedralSettings)
+							.forEach { motions.add(it) }
+					}
 				}
-
-				// make the default motions settings for each included framgent
-				motionSettings[frag] = ConfSpace.PositionConfSpace.MotionSettings.default()
 			}
 		}
 	}
@@ -584,13 +589,6 @@ class DesignPositionEditor(
 		currentAtoms.clear()
 	}
 }
-
-
-fun ConfSpace.PositionConfSpace.MotionSettings.Companion.default() =
-	ConfSpace.PositionConfSpace.MotionSettings(
-		includeHGroupRotations = false,
-		dihedralRadiusDegrees = 9.0
-	)
 
 private val selectedEffect = RenderEffect(
 	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),

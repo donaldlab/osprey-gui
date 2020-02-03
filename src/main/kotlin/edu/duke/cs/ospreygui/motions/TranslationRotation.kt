@@ -5,7 +5,19 @@ import org.joml.Quaterniond
 import org.joml.Vector3d
 
 
-class TranslationRotation(val mol: Molecule) {
+class TranslationRotation(val mol: Molecule): MolMotion {
+
+	class MolDescription(
+		val mol: Molecule,
+		var maxTranslationDist: Double,
+		var maxRotationDegrees: Double
+	) : MolMotion.Description {
+
+		override fun copyTo(mol: Molecule) =
+			MolDescription(mol, maxTranslationDist, maxRotationDegrees)
+
+		override fun make() = TranslationRotation(mol)
+	}
 
 	// copy the coords
 	val coords = mol.atoms

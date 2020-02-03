@@ -10,3 +10,7 @@ fun <T> List<T>.pairs(): List<Pair<T,T>> =
 			.map { item to it }
 	}
 	.flatten()
+
+
+class UnsupportedClassException(val msg: String, val obj: Any)
+	: RuntimeException("$msg: ${obj::class.simpleName}")

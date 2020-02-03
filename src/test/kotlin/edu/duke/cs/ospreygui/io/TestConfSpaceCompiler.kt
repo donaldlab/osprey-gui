@@ -6,8 +6,6 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.identityHashMapOf
 import edu.duke.cs.molscope.tools.identityHashSet
-import edu.duke.cs.molscope.tools.identityHashSetOf
-import edu.duke.cs.osprey.confspace.compiled.motions.DihedralAngle
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.absolutely
@@ -23,9 +21,11 @@ import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
 import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
+import edu.duke.cs.osprey.confspace.compiled.motions.DihedralAngle as CompiledDihedralAngle
 import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
 import edu.duke.cs.osprey.energy.compiled.PosInterGen
 import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
+import edu.duke.cs.ospreygui.motions.DihedralAngle
 import io.kotlintest.shouldBe
 
 
@@ -97,9 +97,8 @@ class TestConfSpaceCompiler : SharedSpec({
 			for ((pos, id) in assignments) {
 				val (fragId, confId) = id.split(":")
 				val posConfSpace = positionConfSpaces[pos]!!
-				val frag = posConfSpace.confs.keys.find { it.id == fragId }!!
-				val conf = posConfSpace.confs[frag]!!.find { it.id == confId }!!
-				pos.setConf(frag, conf)
+				val confConfSpace = posConfSpace.confs.find { it.frag.id == fragId && it.conf.id == confId }!!
+				pos.setConf(confConfSpace.frag, confConfSpace.conf)
 			}
 
 			// get the molecule from the positions
@@ -238,10 +237,10 @@ class TestConfSpaceCompiler : SharedSpec({
 					mutations.add(ser.type)
 
 					// add some confs
-					confs[wtFrag1] = identityHashSetOf(wtFrag1.confs.values.first())
-					confs[gly] = gly.getConfs("GLY")
-					confs[asp] = asp.getConfs("p30", "t70", "m-20")
-					confs[ser] = ser.getConfs("p_-60", "p_180", "t_0", "m_-60")
+					confs.addAll(wtFrag1)
+					confs.addAll(gly)
+					confs.addAll(asp, "p30", "t70", "m-20")
+					confs.addAll(ser, "p_-60", "p_180", "t_0", "m_-60")
 				}
 
 				// configure pos 2
@@ -262,11 +261,11 @@ class TestConfSpaceCompiler : SharedSpec({
 					mutations.add(pro.type)
 
 					// add some confs
-					confs[wtFrag2] = identityHashSetOf(wtFrag2.confs.values.first())
-					confs[gly] = gly.getConfs("GLY")
-					confs[leu] = leu.getConfs("pp", "tp", "tt")
-					confs[ala] = ala.getConfs("ALA")
-					confs[pro] = pro.getConfs("down", "up")
+					confs.addAll(wtFrag2)
+					confs.addAll(gly)
+					confs.addAll(leu, "pp", "tp", "tt")
+					confs.addAll(ala)
+					confs.addAll(pro)
 				}
 			}
 			val compiledConfSpace = confSpace.compile()
@@ -321,23 +320,29 @@ class TestConfSpaceCompiler : SharedSpec({
 					mutations.add(lys.type)
 
 					// add some confs
-					confs[ala] = ala.getConfs("ALA")
-					confs[leu] = leu.getConfs("pp", "tp", "tt")
-					confs[lys] = lys.getConfs("ptpt", "tptm", "mttt")
+					confs.addAll(ala)
+					confs.addAll(leu, "pp", "tp", "tt")
+					confs.addAll(lys, "ptpt", "tptm", "mttt")
 
 					// add continuous degrees of freedom
-					motionSettings[ala] = ConfSpace.PositionConfSpace.MotionSettings(
-						includeHGroupRotations = true,
-						dihedralRadiusDegrees = 5.0
-					)
-					motionSettings[leu] = ConfSpace.PositionConfSpace.MotionSettings(
-						includeHGroupRotations = false,
-						dihedralRadiusDegrees = 9.0
-					)
-					motionSettings[lys] = ConfSpace.PositionConfSpace.MotionSettings(
-						includeHGroupRotations = false,
-						dihedralRadiusDegrees = 9.0
-					)
+					for (space in confs.getByFragment(ala)) {
+						val settings = DihedralAngle.LibrarySettings(
+							radiusDegrees = 5.0,
+							includeHydroxyls = true,
+							includeNonHydroxylHGroups = true
+						)
+						space.motions.addAll(DihedralAngle.ConfDescription.makeFromLibrary(pos1, space.frag, space.conf, settings))
+					}
+					for (frag in listOf(leu, lys)) {
+						val settings = DihedralAngle.LibrarySettings(
+							radiusDegrees = 9.0,
+							includeHydroxyls = false,
+							includeNonHydroxylHGroups = false
+						)
+						for (space in confs.getByFragment(frag)) {
+							space.motions.addAll(DihedralAngle.ConfDescription.makeFromLibrary(pos1, space.frag, space.conf, settings))
+						}
+					}
 				}
 			}
 			val compiledConfSpace = confSpace.compile()
@@ -346,7 +351,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 				// make sure we got the right dofs
 				dofs.size shouldBe 1
-				dofs[0].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+				dofs[0].shouldBeTypeOf<CompiledDihedralAngle.Dof> { angle ->
 					(angle.max() - angle.min()).toDegrees() shouldBe 10.0.absolutely(1e-9)
 				}
 
@@ -363,7 +368,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				// make sure we got the right dofs
 				dofs.size shouldBe 2
 				for (i in 0 until 2) {
-					dofs[i].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+					dofs[i].shouldBeTypeOf<CompiledDihedralAngle.Dof> { angle ->
 						(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
 					}
 				}
@@ -381,7 +386,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				// make sure we got the right dofs
 				dofs.size shouldBe 2
 				for (i in 0 until 2) {
-					dofs[i].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+					dofs[i].shouldBeTypeOf<CompiledDihedralAngle.Dof> { angle ->
 						(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
 					}
 				}
@@ -399,7 +404,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				// make sure we got the right dofs
 				dofs.size shouldBe 4
 				for (i in 0 until 4) {
-					dofs[i].shouldBeTypeOf<DihedralAngle.Dof> { angle ->
+					dofs[i].shouldBeTypeOf<CompiledDihedralAngle.Dof> { angle ->
 						(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
 					}
 				}

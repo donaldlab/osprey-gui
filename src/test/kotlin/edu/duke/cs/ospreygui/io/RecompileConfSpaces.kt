@@ -39,7 +39,7 @@ fun main() {
 
 				println("compiling $basename ...")
 				val report = compile().run {
-					printUntilFinish()
+					printUntilFinish(5000)
 					report!!
 				}
 

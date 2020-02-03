@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.motions
 import cuchaz.kludge.tools.toDegrees
 import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.tools.normalizeMinusPIToPI
 import edu.duke.cs.ospreygui.io.ConfLib
@@ -20,17 +21,87 @@ class DihedralAngle(
 	val b: Atom,
 	val c: Atom,
 	val d: Atom
-) {
+) : ConfMotion, MolMotion {
 
-	// grab all the atoms connected to c not through b-c
-	val rotatedAtoms = mol
-		.bfs(
-			source = c,
-			visitSource = false,
-			shouldVisit = { _, to, _ -> to !== b }
-		)
-		.map { it.atom }
-		.toList()
+	data class LibrarySettings(
+		var radiusDegrees: Double,
+		var includeHydroxyls: Boolean,
+		/** eg Methyls, Methylenes */
+		var includeNonHydroxylHGroups: Boolean
+	)
+
+	class ConfDescription(
+		val pos: DesignPosition,
+		val motion: ConfLib.ContinuousMotion.DihedralAngle,
+		val minDegrees: Double,
+		val maxDegrees: Double
+	) : ConfMotion.Description {
+
+		override fun copyTo(pos: DesignPosition) =
+			ConfDescription(
+				pos,
+				motion,
+				minDegrees,
+				maxDegrees
+			)
+
+		override fun make() =
+			DihedralAngle(
+				pos.mol,
+				pos.atomResolverOrThrow.resolveOrThrow(motion.a),
+				pos.atomResolverOrThrow.resolveOrThrow(motion.b),
+				pos.atomResolverOrThrow.resolveOrThrow(motion.c),
+				pos.atomResolverOrThrow.resolveOrThrow(motion.d)
+			)
+
+		companion object {
+
+			fun make(pos: DesignPosition, motion: ConfLib.ContinuousMotion.DihedralAngle, conf: ConfLib.Conf, radiusDegrees: Double): ConfDescription {
+
+				val initialDegrees = measureDegrees(
+					motion.a.resolveCoordsOrThrow(conf),
+					motion.b.resolveCoordsOrThrow(conf),
+					motion.c.resolveCoordsOrThrow(conf),
+					motion.d.resolveCoordsOrThrow(conf)
+				)
+
+				return ConfDescription(
+					pos,
+					motion,
+					minDegrees = initialDegrees - radiusDegrees,
+					maxDegrees = initialDegrees + radiusDegrees
+				)
+			}
+
+			fun makeFromLibrary(pos: DesignPosition, frag: ConfLib.Fragment, conf: ConfLib.Conf, settings: LibrarySettings) =
+				frag.motions
+					.filterIsInstance<ConfLib.ContinuousMotion.DihedralAngle>()
+					.mapNotNull desc@{ motion ->
+
+						val match = pos.findAnchorMatch(frag)
+							?: throw RuntimeException("no anchor match")
+
+						// filter out H-group rotations if needed
+						val rotatedAtoms = motion.affectedAtoms(frag)
+						val isHGroup = rotatedAtoms.isNotEmpty() && rotatedAtoms.all { it.element == Element.Hydrogen }
+						val isHydroxyl = isHGroup && rotatedAtoms.size == 1 && match.resolveElementOrThrow(motion.c) == Element.Oxygen
+						val isNonHydroxylHGroup = isHGroup && !isHydroxyl
+
+						if (isHydroxyl && !settings.includeHydroxyls) {
+							return@desc null
+						}
+						if (isNonHydroxylHGroup && !settings.includeNonHydroxylHGroups) {
+							return@desc null
+						}
+
+						return@desc make(pos, motion, conf, settings.radiusDegrees)
+					}
+		}
+	}
+
+	// TODO: molecule description
+
+	val rotatedAtoms = findRotatedAtoms(mol, b, c)
 
 	/**
 	 * Returns the dihedral angle in degrees in the interval (-180,180]
@@ -87,6 +158,17 @@ class DihedralAngle(
 
 	companion object {
 
+		/** grab all the atoms connected to c not through b-c */
+		fun findRotatedAtoms(mol: Molecule, b: Atom, c: Atom) =
+			mol
+				.bfs(
+					source = c,
+					visitSource = false,
+					shouldVisit = { _, to, _ -> to !== b }
+				)
+				.map { it.atom }
+				.toList()
+
 		/**
 		 * Returns the dihedral angle in radians in the interval (-180,180]
 		 */
@@ -127,18 +209,3 @@ class DihedralAngle(
 		}
 	}
 }
-
-fun DesignPosition.dihedralAngle(dihedral: ConfLib.ContinuousMotion.DihedralAngle) =
-	DihedralAngle(
-		mol,
-		atomResolverOrThrow.resolveOrThrow(dihedral.a),
-		atomResolverOrThrow.resolveOrThrow(dihedral.b),
-		atomResolverOrThrow.resolveOrThrow(dihedral.c),
-		atomResolverOrThrow.resolveOrThrow(dihedral.d)
-	)
-
-fun DesignPosition.supportsDihedralAngle(dihedral: ConfLib.ContinuousMotion.DihedralAngle) =
-	listOf(dihedral.a, dihedral.b, dihedral.c, dihedral.c)
-		.all {
-			atomResolver?.resolve(it) != null
-		}

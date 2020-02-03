@@ -44,6 +44,8 @@ class ConfLib(
 	fun confRuntimeId(frag: Fragment, conf: Conf) =
 		"$runtimeId.${frag.id}.${conf.id}"
 
+	override fun toString() = "$name ($runtimeId)"
+
 	data class AtomInfo(
 		val id: Int,
 		val name: String,
@@ -52,6 +54,9 @@ class ConfLib(
 
 		override fun matchIn(atoms: List<AtomInfo>, anchors: List<Anchor>) =
 			atoms.find { it.name == name }
+
+		override fun resolveCoords(conf: Conf) =
+			conf.coords[this]
 	}
 
 	data class Bond(
@@ -149,18 +154,39 @@ class ConfLib(
 
 	sealed class AnchorCoords {
 
+		abstract fun getCoords(index: Int): Vector3d?
+
 		data class Single(
 			val a: Vector3d,
 			val b: Vector3d,
 			val c: Vector3d
-		) : AnchorCoords()
+		) : AnchorCoords() {
+
+			override fun getCoords(index: Int) =
+				when (index) {
+					0 -> a
+					1 -> b
+					2 -> c
+					else -> null
+				}
+		}
 
 		data class Double(
 			val a: Vector3d,
 			val b: Vector3d,
 			val c: Vector3d,
 			val d: Vector3d
-		) : AnchorCoords()
+		) : AnchorCoords() {
+
+			override fun getCoords(index: Int) =
+				when (index) {
+					0 -> a
+					1 -> b
+					2 -> c
+					3 -> d
+					else -> null
+				}
+		}
 	}
 
 	data class Conf(
@@ -180,6 +206,19 @@ class ConfLib(
 
 		fun matchInOrThrow(atoms: List<AtomInfo>, anchors: List<Anchor>): AtomPointer =
 			matchIn(atoms, anchors) ?: throw NoSuchElementException("no match found for $this")
+
+		/**
+		 * Looks up the atom coordinates in the conformation,
+		 * whether the pointer be to a conformation atom or an anchor atom.
+		 */
+		fun resolveCoords(conf: Conf): Vector3d?
+
+		fun resolveCoordsOrThrow(conf: Conf) =
+			resolveCoords(conf) ?: throw NoSuchElementException("no coords found for atom pointer $this")
+
+		companion object {
+			// defined so we can extend it
+		}
 	}
 
 	data class AnchorAtomPointer(
@@ -193,6 +232,10 @@ class ConfLib(
 				?.let {
 					AnchorAtomPointer(it, index)
 				}
+
+		override fun resolveCoords(conf: Conf) =
+			conf.anchorCoords[anchor]?.getCoords(index)
+
 
 		override fun toString() = "${this::class.simpleName}[${anchor.id},$index]"
 	}

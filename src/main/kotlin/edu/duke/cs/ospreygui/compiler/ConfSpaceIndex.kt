@@ -15,9 +15,11 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 	inner class ConfInfo(
 		val posInfo: PosInfo,
 		val fragInfo: FragInfo,
-		val conf: ConfLib.Conf,
+		val confConfSpace: ConfSpace.ConfConfSpace,
 		val index: Int
 	) {
+		val conf get() = confConfSpace.conf
+
 		val id = "${fragInfo.frag.id}:${conf.id}"
 	}
 
@@ -55,21 +57,21 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 		val index: Int
 	) {
 
-		// choose an order for the fragments, and assign indices
+		// index the fragments
 		val fragments =
-			posConfSpace.confs.keys
-				.sortedBy { it.id }
+			posConfSpace.confs.fragments()
 				.mapIndexed { i, frag -> FragInfo(this, frag, i) }
 
-		// flatten all the conformations across fragments, choose an order, and assign indices
+		// index the conformations
 		val confs =
 			fragments
 				.flatMap { fragInfo ->
-					posConfSpace.confs.getValue(fragInfo.frag)
-						.sortedBy { it.id }
-						.map { fragInfo to it }
+					posConfSpace.confs.getByFragment(fragInfo.frag)
+						.map { space -> fragInfo to space }
 				}
-				.mapIndexed { i, (fragInfo, conf) -> ConfInfo(this, fragInfo, conf, i) }
+				.mapIndexed { i, (fragInfo, space) ->
+					ConfInfo(this, fragInfo, space, i)
+				}
 
 		/**
 		 * Iterates over the conformations in the position conf space,
