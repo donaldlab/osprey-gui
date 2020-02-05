@@ -99,7 +99,54 @@ class DihedralAngle(
 		}
 	}
 
-	// TODO: molecule description
+	class MolDescription(
+		val mol: Molecule,
+		val a: Atom,
+		val b: Atom,
+		val c: Atom,
+		val d: Atom,
+		val minDegrees: Double,
+		val maxDegrees: Double
+	) : MolMotion.Description {
+
+		val rotatedAtoms = findRotatedAtoms(mol, b, c)
+
+		override fun copyTo(mol: Molecule): MolDescription {
+			val map = this.mol.mapAtomsByValueTo(mol)
+			return MolDescription(
+				mol,
+				map.getBOrThrow(a),
+				map.getBOrThrow(b),
+				map.getBOrThrow(c),
+				map.getBOrThrow(d),
+				minDegrees,
+				maxDegrees
+			)
+		}
+
+		override fun make() =
+			DihedralAngle(mol, a, b, c, d)
+
+		override fun getAffectedAtoms() = rotatedAtoms
+
+		companion object {
+
+			fun make(mol: Molecule, a: Atom, b: Atom, c: Atom, d: Atom, radiusDegrees: Double): MolDescription {
+
+				val initialDegrees = measureDegrees(a.pos, b.pos, c.pos, d.pos)
+
+				return MolDescription(
+					mol,
+					a,
+					b,
+					c,
+					d,
+					minDegrees = initialDegrees - radiusDegrees,
+					maxDegrees = initialDegrees + radiusDegrees
+				)
+			}
+		}
+	}
 
 	val rotatedAtoms = findRotatedAtoms(mol, b, c)
 

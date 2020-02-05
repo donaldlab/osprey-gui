@@ -26,6 +26,7 @@ import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
 import edu.duke.cs.osprey.energy.compiled.PosInterGen
 import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
 import edu.duke.cs.ospreygui.motions.DihedralAngle
+import io.kotlintest.matchers.numerics.shouldBeGreaterThan
 import io.kotlintest.shouldBe
 
 
@@ -355,6 +356,9 @@ class TestConfSpaceCompiler : SharedSpec({
 					(angle.max() - angle.min()).toDegrees() shouldBe 10.0.absolutely(1e-9)
 				}
 
+				// we shouldn't have static atom pairs
+				getIndices(0).size() shouldBe 0
+
 				// check minimized energy
 				(-48.01726089618421).let {
 					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
@@ -372,6 +376,9 @@ class TestConfSpaceCompiler : SharedSpec({
 						(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
 					}
 				}
+
+				// we shouldn't have static atom pairs
+				getIndices(0).size() shouldBe 0
 
 				// check minimized energy
 				(-44.76305148873534).let {
@@ -391,6 +398,9 @@ class TestConfSpaceCompiler : SharedSpec({
 					}
 				}
 
+				// we shouldn't have static atom pairs
+				getIndices(0).size() shouldBe 0
+
 				// check minimized energy
 				(-24.801305933011164).let {
 					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
@@ -409,8 +419,51 @@ class TestConfSpaceCompiler : SharedSpec({
 					}
 				}
 
+				// we shouldn't have static atom pairs
+				getIndices(0).size() shouldBe 0
+
 				// check minimized energy
 				(-64.30395031713154).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy() shouldBeLessThan it
+				}
+			}
+		}
+
+		group("no positions, molecule dihedral") {
+
+			val mol = loadMol()
+			val res72 = mol.findChainOrThrow("A").findResidueOrThrow("72")
+
+			val confSpace = ConfSpace(listOf(MoleculeType.Protein to mol)).apply {
+
+				// make a dihedral on the N-terminal cap
+				val motions = molMotions.getOrPut(mol) { ArrayList() }
+				motions.add(DihedralAngle.MolDescription.make(
+					mol,
+					res72.findAtomOrThrow("C"),
+					res72.findAtomOrThrow("CA"),
+					res72.findAtomOrThrow("N"),
+					res72.findAtomOrThrow("H1"),
+					9.0
+				))
+			}
+			val compiledConfSpace = confSpace.compile()
+
+			testConf(compiledConfSpace) {
+
+				// make sure we got the right dofs
+				dofs.size shouldBe 1
+				dofs[0].shouldBeTypeOf<CompiledDihedralAngle.Dof> { angle ->
+					(angle.max() - angle.min()).toDegrees() shouldBe 18.0.absolutely(1e-9)
+				}
+
+				// we should have static atom pairs too
+				getIndices(0).size() shouldBeGreaterThan 0
+
+				// check minimized energy
+				(-50.6633531679957).let {
 					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
 					calcEnergy().shouldBeEnergy(it)
 					minimizeEnergy() shouldBeLessThan it

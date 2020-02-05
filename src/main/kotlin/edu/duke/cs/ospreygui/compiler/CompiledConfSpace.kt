@@ -24,9 +24,10 @@ class CompiledConfSpace(
 
 	data class MolInfo(
 		val name: String,
-		val type: String?,
-		val motions: List<MotionInfo>
-	)
+		val type: String?
+	) {
+		val motions = ArrayList<MotionInfo>()
+	}
 
 	data class ResInfo(
 		val chainId: String,

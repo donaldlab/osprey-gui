@@ -3,7 +3,6 @@ package edu.duke.cs.ospreygui.compiler
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
-import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.molscope.tools.associateIdentity
 import java.util.*
 

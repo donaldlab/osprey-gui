@@ -10,49 +10,63 @@ import java.nio.file.Paths
 
 /**
  * Just a simple tool to easily recompile all the conf spaces
- * in Osprey's test suite to the new version of the compiled conf space format.
+ * in Osprey's test suite and examples to the new version of the compiled conf space format.
  */
 fun main() {
 
 	val extension = ".confspace.toml"
-	val dir = Paths.get("../osprey3/test-resources/confSpaces")
+	val ospreyDir = Paths.get("../osprey3")
+	val dirs = listOf(
+		"test-resources/confSpaces",
+		"examples/python.ccs/F98Y"
+	).map { ospreyDir.resolve(it) }
 
-	Files.list(dir)
-		.filter { it.fileName.toString().endsWith(extension) }
-		.forEach { inPath ->
+	val netChargesByMolName = mapOf(
+		"NDP" to -3,
+		"06W" to -1
+	)
 
-			val filename = inPath.fileName.toString()
-			val basename = filename.substring(0, filename.length - extension.length)
+	for (dir in dirs) {
+		Files.list(dir)
+			.filter { it.fileName.toString().endsWith(extension) }
+			.forEach { inPath ->
 
-			// load the conf space
-			println("loading $basename ...")
-			val confSpace = ConfSpace.fromToml(inPath.read())
+				val filename = inPath.fileName.toString()
+				val basename = filename.substring(0, filename.length - extension.length)
 
-			// compile it
-			ConfSpaceCompiler(confSpace).run {
+				// load the conf space
+				println("loading $basename ...")
+				val confSpace = ConfSpace.fromToml(inPath.read())
 
-				// use default setings
-				addForcefield(Forcefield.Amber96)
-				addForcefield(Forcefield.EEF1)
+				// compile it
+				ConfSpaceCompiler(confSpace).run {
 
-				// TODO: how to input net charges?
+					// use default setings
+					addForcefield(Forcefield.Amber96)
+					addForcefield(Forcefield.EEF1)
 
-				println("compiling $basename ...")
-				val report = compile().run {
-					printUntilFinish(5000)
-					report!!
+					// add necessary net charges
+					for ((type, mol) in confSpace.mols) {
+						netCharges.get(mol, type)?.netCharge = netChargesByMolName.getValue(mol.name)
+					}
+
+					println("compiling $basename ...")
+					val report = compile().run {
+						printUntilFinish(5000)
+						report!!
+					}
+
+					// if there was an error, throw it
+					report.error?.let { throw Error("can't compile $basename", it) }
+
+					// otherwise, yay it worked!
+					val compiledConfSpace = report.compiled!!
+
+					// save the compressed conf space
+					val outPath = inPath.parent.resolve("$basename.ccs.xz")
+					println("saving $basename ...")
+					LZMA2.compress(compiledConfSpace.toBytes()).write(outPath)
 				}
-
-				// if there was an error, throw it
-				report.error?.let { throw Error("can't compile $basename", it) }
-
-				// otherwise, yay it worked!
-				val compiledConfSpace = report.compiled!!
-
-				// save the compressed conf space
-				val outPath = inPath.parent.resolve("$basename.ccs.xz")
-				println("saving $basename ...")
-				LZMA2.compress(compiledConfSpace.toBytes()).write(outPath)
 			}
-		}
+	}
 }

@@ -17,6 +17,8 @@ class TranslationRotation(val mol: Molecule): MolMotion {
 			MolDescription(mol, maxTranslationDist, maxRotationDegrees)
 
 		override fun make() = TranslationRotation(mol)
+
+		override fun getAffectedAtoms() = mol.atoms
 	}
 
 	// copy the coords

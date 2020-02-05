@@ -12,6 +12,14 @@ class AtomPairs(index: ConfSpaceIndex) {
 		val paramsi: Int
 	)
 
+	inner class Static(private val list: ArrayList<AtomPair> = ArrayList()) : List<AtomPair> by list {
+
+		fun add(atomi1: Int, atomi2: Int, params: List<Double>) {
+			list.add(AtomPair(atomi1, atomi2, paramsCache.index(params)))
+		}
+	}
+	val static = Static()
+
 	inner class PosSingles(index: ConfSpaceIndex) {
 
 		// pre-allocate enough storage for every position and fragment
@@ -35,8 +43,8 @@ class AtomPairs(index: ConfSpaceIndex) {
 			list[posi1][fragi1]
 				?: throw NoSuchElementException("position:conformation $posi1:$fragi1 is not in this conf space")
 	}
-	val singles = PosSingles(index)
-	val statics = PosSingles(index)
+	val pos = PosSingles(index)
+	val posStatic = PosSingles(index)
 
 	inner class PosPairs(index: ConfSpaceIndex) {
 
@@ -71,7 +79,7 @@ class AtomPairs(index: ConfSpaceIndex) {
 			list[posIndex(posi1, posi2)][fragi1][fragi2]
 				?: throw NoSuchElementException("position:conformation pair $posi1:$fragi2 - $posi2:$fragi2 is not in this conf space")
 	}
-	val pairs = PosPairs(index)
+	val posPos = PosPairs(index)
 
 	/**
 	 * Different atom pairs will often yield the exact same forcefield parameters.

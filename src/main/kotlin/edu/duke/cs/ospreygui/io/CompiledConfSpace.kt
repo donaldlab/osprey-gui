@@ -69,14 +69,8 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 		out.writeInt(molInfo.motions.size)
 		for (motion in molInfo.motions) {
 			when (motion) {
-
-				is CompiledConfSpace.MotionInfo.TranslationRotation -> {
-					out.writeUTF("translationRotation")
-					out.writeDouble(motion.maxTranslationDistance)
-					out.writeDouble(motion.maxRotationRadians)
-					out.write(motion.centroid)
-				}
-
+				is CompiledConfSpace.MotionInfo.DihedralAngle -> out.write(motion)
+				is CompiledConfSpace.MotionInfo.TranslationRotation -> out.write(motion)
 				else -> throw UnsupportedClassException("motion not supported on molecules", motion)
 			}
 		}
@@ -139,21 +133,7 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 			out.writeInt(conf.motions.size)
 			for (motion in conf.motions) {
 				when (motion) {
-
-					is CompiledConfSpace.MotionInfo.DihedralAngle -> {
-						out.writeUTF("dihedral")
-						out.writeDouble(motion.minDegrees)
-						out.writeDouble(motion.maxDegrees)
-						out.writeInt(motion.abcd[0])
-						out.writeInt(motion.abcd[1])
-						out.writeInt(motion.abcd[2])
-						out.writeInt(motion.abcd[3])
-						out.writeInt(motion.rotated.size)
-						for (atomi in motion.rotated) {
-							out.writeInt(atomi)
-						}
-					}
-
+					is CompiledConfSpace.MotionInfo.DihedralAngle -> out.write(motion)
 					else -> throw UnsupportedClassException("motion not supported on conformations", motion)
 				}
 			}
@@ -166,24 +146,14 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 	}
 
 	// write out atom pairs
+	for (ffi in atomPairs.indices) {
+		out.write(atomPairs[ffi].static)
+	}
 	for ((posi1, pos1) in positions.withIndex()) {
 		for (fragi1 in pos1.fragments.indices) {
-
 			for (ffi in atomPairs.indices) {
-
-				// write the pos atom pairs
-				val singles = atomPairs[ffi].singles[posi1, fragi1]
-				out.writeInt(singles.size)
-				for (atomPair in singles) {
-					out.write(atomPair)
-				}
-
-				// write the pos-static atom pairs
-				val statics = atomPairs[ffi].statics[posi1, fragi1]
-				out.writeInt(statics.size)
-				for (atomPair in statics) {
-					out.write(atomPair)
-				}
+				out.write(atomPairs[ffi].pos[posi1, fragi1])
+				out.write(atomPairs[ffi].posStatic[posi1, fragi1])
 			}
 		}
 	}
@@ -198,7 +168,7 @@ fun CompiledConfSpace.toBytes(): ByteArray {
 
 					// write the pos-pos atom pairs
 					for (ffi in atomPairs.indices) {
-						val pairs = atomPairs[ffi].pairs[posi1, fragi1, posi2, fragi2]
+						val pairs = atomPairs[ffi].posPos[posi1, fragi1, posi2, fragi2]
 						out.writeInt(pairs.size)
 						for (atomPair in pairs) {
 							out.write(atomPair)
@@ -236,4 +206,32 @@ private fun DataOutput.write(atomPair: AtomPairs.AtomPair) {
 	writeInt(atomPair.atomi1)
 	writeInt(atomPair.atomi2)
 	writeInt(atomPair.paramsi)
+}
+
+private fun DataOutput.write(atomPairs: List<AtomPairs.AtomPair>) {
+	writeInt(atomPairs.size)
+	for (atomPair in atomPairs) {
+		write(atomPair)
+	}
+}
+
+private fun DataOutput.write(motion: CompiledConfSpace.MotionInfo.DihedralAngle) {
+	writeUTF("dihedralAngle")
+	writeDouble(motion.minDegrees)
+	writeDouble(motion.maxDegrees)
+	writeInt(motion.abcd[0])
+	writeInt(motion.abcd[1])
+	writeInt(motion.abcd[2])
+	writeInt(motion.abcd[3])
+	writeInt(motion.rotated.size)
+	for (atomi in motion.rotated) {
+		writeInt(atomi)
+	}
+}
+
+private fun DataOutput.write(motion: CompiledConfSpace.MotionInfo.TranslationRotation) {
+	writeUTF("translationRotation")
+	writeDouble(motion.maxTranslationDistance)
+	writeDouble(motion.maxRotationRadians)
+	write(motion.centroid)
 }

@@ -4,6 +4,7 @@ import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.toIdentitySet
 import edu.duke.cs.molscope.tools.*
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
@@ -12,6 +13,7 @@ import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.tools.UnsupportedClassException
 import edu.duke.cs.ospreygui.tools.pairs
 import org.joml.Vector3d
+import java.util.*
 import kotlin.collections.ArrayList
 
 
@@ -221,37 +223,48 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			fixedAtoms.updateStatic()
 			fixedAtomsTask.increment()
 
-			// compile molecule motions
-			val molInfos = confSpaceIndex.mols.map { mol ->
-				CompiledConfSpace.MolInfo(
-					mol.name,
-					mol.type,
-					confSpace.molMotions[mol]?.map { it.compile(mol) } ?: emptyList()
-				)
-			}
-
-			// prep for atom compilation
-			val infoIndexer = InfoIndexer(confSpaceIndex.mols.zip(molInfos))
+			// index the molecules and residues
+			val infoIndexer = InfoIndexer(confSpaceIndex.mols)
 
 			// compile the static atoms
 			val staticAtoms = fixedAtoms.statics
 				.map { it.atom.compile(infoIndexer, it.mol) }
 			fixedAtomsTask.increment()
 
-			// calculate the internal energies for the static atoms
+			// compile the molecule motions
+			for ((moli, mol) in confSpaceIndex.mols.withIndex()) {
+				val motions = infoIndexer.molInfos[moli].motions
+				for (description in confSpace.molMotions.getOrDefault(mol, mutableListOf())) {
+					motions.add(description.compile(mol, fixedAtoms))
+				}
+			}
+
+			// collect the atoms affected by molecule motions
+			val staticAffectedAtomsByMol = confSpaceIndex.mols
+				.associateIdentity { mol ->
+					val atoms = confSpace.molMotions[mol]
+						?.flatMap { desc -> desc.getAffectedAtoms() }
+						?: emptyList()
+					mol to atoms.toIdentitySet()
+				}
+
+			// calculate the internal energies for the static atoms that aren't affected by molecule motions
+			val staticUnaffectedAtomsByMol = fixedAtoms.staticAtomsByMol
+				.mapValuesIdentity { (mol, atoms) ->
+					atoms.filter { it !in staticAffectedAtomsByMol.getOrDefault(mol, mutableSetOf()) }
+				}
 			val staticEnergies = forcefields
 				.map { ff ->
 
 					val paramsByMol = params.getWildTypeByMol(ff)
-					val staticAtomsByMol = fixedAtoms.staticAtomsByMol
 
 					// map atoms onto the params mols
-					val molToParams = staticAtomsByMol
+					val molToParams = staticUnaffectedAtomsByMol
 						.mapValuesIdentity { (mol, _) ->
 							mol.mapAtomsByNameTo(paramsByMol.getValue(mol).mol)
 						}
 
-					ff.calcEnergy(staticAtomsByMol, paramsByMol, molToParams)
+					ff.calcEnergy(staticUnaffectedAtomsByMol, paramsByMol, molToParams)
 						.also { staticEnergiesTask.increment() }
 				}
 
@@ -282,22 +295,23 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			// compile all the atom pairs for the forcefields
 			val atomPairs = forcefields
 				.map { AtomPairs(confSpaceIndex) }
+			atomPairs.compileStatic(staticAffectedAtomsByMol, staticUnaffectedAtomsByMol, fixedAtoms, params)
 			for (posInfo1 in confSpaceIndex.positions) {
 				posInfo1.forEachFrag(molLocker) { fragInfo1, confInfo1 ->
 
 					// compile the pos atom pairs
-					atomPairs.compile(confInfo1, fixedAtoms, params)
+					atomPairs.compilePos(confInfo1, fixedAtoms, params)
 					atomPairsTask.increment()
 
 					// compile the pos-static atom pairs
-					atomPairs.compileStatic(confInfo1, fixedAtoms, params)
+					atomPairs.compilePosStatic(confInfo1, fixedAtoms, params)
 					atomPairsTask.increment()
 
 					for (posInfo2 in confSpaceIndex.positions.subList(0, posInfo1.index)) {
 						posInfo2.forEachFrag(molLocker) { fragInfo2, confInfo2 ->
 
 							// compile the pos-pos atom pairs
-							atomPairs.compile(confInfo1, confInfo2, fixedAtoms, params)
+							atomPairs.compilePosPos(confInfo1, confInfo2, fixedAtoms, params)
 							atomPairsTask.increment()
 						}
 					}
@@ -311,7 +325,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				CompiledConfSpace(
 					confSpace.name,
 					forcefieldInfos,
-					molInfos,
+					infoIndexer.molInfos,
 					infoIndexer.resInfos,
 					staticAtoms,
 					staticEnergies,
@@ -334,39 +348,64 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		}
 	}
 
-	private class InfoIndexer(val molInfos: List<Pair<Molecule,CompiledConfSpace.MolInfo>>) {
+	private class InfoIndexer(val mols: List<Molecule>) {
 
-		val resInfos = ArrayList<CompiledConfSpace.ResInfo>()
+		// index all the molecules
+		val molInfos: List<CompiledConfSpace.MolInfo>
+		val molIndices: Map<Molecule,Int>
+		init {
+			val molInfos = ArrayList<CompiledConfSpace.MolInfo>()
+			molIndices = IdentityHashMap()
+			for (mol in mols) {
+				molIndices[mol] = molInfos.size
+				molInfos.add(CompiledConfSpace.MolInfo(mol.name, mol.type))
+			}
+			this.molInfos = molInfos
+		}
+
+		// index all the residues
+		val resInfos: List<CompiledConfSpace.ResInfo>
+		val resIndices: Map<Polymer.Residue,Int>
+		init {
+			val resInfos = ArrayList<CompiledConfSpace.ResInfo>()
+			resIndices = IdentityHashMap()
+			for (mol in mols.filterIsInstance<Polymer>()) {
+				for (chain in mol.chains) {
+					for ((resi, res) in chain.residues.withIndex()) {
+						resIndices[res] = resInfos.size
+						resInfos.add(CompiledConfSpace.ResInfo(chain.id, res.id, res.type, resi))
+					}
+				}
+			}
+			this.resInfos = resInfos
+		}
 
 		fun indexOfMol(mol: Molecule): Int =
-			molInfos
-				.indexOfFirst { (m, _) -> m === mol }
-				.takeIf { it >= 0 }
-				?: throw IllegalArgumentException("molecule has no molecule info: $mol")
+			molIndices[mol]
+				?: throw IllegalArgumentException("molecule has no index: $mol")
 
-		fun indexOfRes(chain: Polymer.Chain, res: Polymer.Residue): Int {
-
-			val indexInChain = chain.residues
-				.indexOf(res)
-				.takeIf { it >= 0 }
-				?: throw IllegalArgumentException("residue $res is not in chain $chain")
-
-			val info = CompiledConfSpace.ResInfo(chain.id, res.id, res.type, indexInChain)
-
-			var index = resInfos.indexOf(info)
-			if (index < 0) {
-				index = resInfos.size
-				resInfos.add(info)
+		fun indexOfRes(res: Polymer.Residue?): Int =
+			if (res != null) {
+				resIndices[res] ?: throw IllegalArgumentException("residue has no index: $res")
+			} else {
+				-1
 			}
-
-			return index
-		}
 	}
 
 	/**
 	 * Compiles the motions for this molecule
 	 */
-	private fun MolMotion.Description.compile(mol: Molecule): CompiledConfSpace.MotionInfo = when (this) {
+	private fun MolMotion.Description.compile(
+		mol: Molecule,
+		fixedAtoms: FixedAtoms
+	): CompiledConfSpace.MotionInfo = when (this) {
+
+		is DihedralAngle.MolDescription -> CompiledConfSpace.MotionInfo.DihedralAngle(
+			minDegrees,
+			maxDegrees,
+			abcd = listOf(a, b, c, d).map { fixedAtoms.getStatic(it).index },
+			rotated = rotatedAtoms.map { fixedAtoms.getStatic(it).index }
+		)
 
 		is TranslationRotation.MolDescription -> CompiledConfSpace.MotionInfo.TranslationRotation(
 			maxTranslationDist,
@@ -457,10 +496,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			name,
 			Vector3d(pos.checkForErrors(name)),
 			infoIndexer.indexOfMol(mol),
-			(mol as? Polymer)
-				?.findChainAndResidue(this)
-				?.let { (chain, res) -> infoIndexer.indexOfRes(chain, res) }
-				?: -1
+			infoIndexer.indexOfRes((mol as? Polymer)?.findResidue(this))
 		)
 
 	class MolInfo(
@@ -473,7 +509,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compile atom pairs for pos interactions.
 	 */
-	private fun List<AtomPairs>.compile(
+	private fun List<AtomPairs>.compilePos(
 		confInfo: ConfSpaceIndex.ConfInfo,
 		fixedAtoms: FixedAtoms,
 		params: MolsParams
@@ -494,7 +530,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				val patom2 = molInfo.molToFrag.getBOrThrow(atom2)
 
 				ff.pairParams(molInfo.params, patom1, molInfo.params, patom2, dist)?.let { params ->
-					this[ffi].singles.add(
+					this[ffi].pos.add(
 						confInfo.posInfo.index,
 						confInfo.fragInfo.index,
 						confAtoms.getOrThrow(atom1),
@@ -509,7 +545,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compile atom pairs for pos-pos interactions.
 	 */
-	private fun List<AtomPairs>.compile(
+	private fun List<AtomPairs>.compilePosPos(
 		confInfo1: ConfSpaceIndex.ConfInfo,
 		confInfo2: ConfSpaceIndex.ConfInfo,
 		fixedAtoms: FixedAtoms,
@@ -538,7 +574,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				val patom2 = mol2Info.molToFrag.getBOrThrow(atom2)
 
 				ff.pairParams(mol1Info.params, patom1, mol2Info.params, patom2, dist)?.let { params ->
-					this[ffi].pairs.add(
+					this[ffi].posPos.add(
 						confInfo1.posInfo.index,
 						confInfo1.fragInfo.index,
 						confInfo2.posInfo.index,
@@ -555,7 +591,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compile atom pairs for pos-static interactions
 	 */
-	private fun List<AtomPairs>.compileStatic(
+	private fun List<AtomPairs>.compilePosStatic(
 		confInfo: ConfSpaceIndex.ConfInfo,
 		fixedAtoms: FixedAtoms,
 		params: MolsParams
@@ -585,11 +621,80 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				val patom2 = staticMolInfo.molToFrag.getBOrThrow(satom)
 
 				ff.pairParams(confMolInfo.params, patom1, staticMolInfo.params, patom2, dist)?.let { params ->
-					this[ffi].statics.add(
+					this[ffi].posStatic.add(
 						confInfo.posInfo.index,
 						confInfo.fragInfo.index,
 						confAtoms.getOrThrow(catom),
 						fixedAtoms.getStatic(satom).index,
+						params.list
+					)
+				}
+			}
+		}
+	}
+
+	/**
+	 * Compile atom pairs for static interactions
+	 */
+	private fun List<AtomPairs>.compileStatic(
+		staticAffectedAtomsByMol: Map<Molecule,Set<Atom>>,
+		staticUnaffectedAtomsByMol: Map<Molecule,List<Atom>>,
+		fixedAtoms: FixedAtoms,
+		params: MolsParams
+	) {
+		// first, do affected internal interactions
+		val affectedAtomsByMol = staticAffectedAtomsByMol
+			.mapValuesIdentity { (_, atoms) -> atoms.toList().sortedBy { it.name } }
+		val affectedMols = affectedAtomsByMol.keys.toList()
+		val affectedMolInfos = forcefields.map { ff ->
+			affectedMols.associateIdentity { mol ->
+				mol to MolInfo(mol, params[ff, mol])
+			}
+		}
+
+		ForcefieldParams.forEachPair(affectedAtomsByMol, affectedAtomsByMol) { mol1, atom1, mol2, atom2, dist ->
+
+			for ((ffi, ff) in forcefields.withIndex()) {
+
+				// map atoms onto the params mols
+				val mol1Info = affectedMolInfos[ffi].getValue(mol1)
+				val patom1 = mol1Info.molToFrag.getBOrThrow(atom1)
+				val mol2Info = affectedMolInfos[ffi].getValue(mol2)
+				val patom2 = mol2Info.molToFrag.getBOrThrow(atom2)
+
+				ff.pairParams(mol1Info.params, patom1, mol2Info.params, patom2, dist)?.let { params ->
+					this[ffi].static.add(
+						fixedAtoms.getStatic(atom1).index,
+						fixedAtoms.getStatic(atom2).index,
+						params.list
+					)
+				}
+			}
+		}
+
+		// then, add affected-unaffected interactions
+		val unaffectedAtomsByMol = staticUnaffectedAtomsByMol
+		val unaffectedMols = unaffectedAtomsByMol.keys.toList()
+		val unaffectedMolInfos = forcefields.map { ff ->
+			unaffectedMols.associateIdentity { mol ->
+				mol to MolInfo(mol, params[ff, mol])
+			}
+		}
+
+		ForcefieldParams.forEachPair(affectedAtomsByMol, unaffectedAtomsByMol) { amol, aatom, umol, uatom, dist ->
+
+			for ((ffi, ff) in forcefields.withIndex()) {
+
+				// map atoms onto the params mols
+				val amolInfo = affectedMolInfos[ffi].getValue(amol)
+				val patom1 = amolInfo.molToFrag.getBOrThrow(aatom)
+				val umolInfo = affectedMolInfos[ffi].getValue(umol)
+				val patom2 = umolInfo.molToFrag.getBOrThrow(uatom)
+
+				ff.pairParams(amolInfo.params, patom1, umolInfo.params, patom2, dist)?.let { params ->
+					this[ffi].static.add(
+						fixedAtoms.getStatic(aatom).index,
+						fixedAtoms.getStatic(uatom).index,
 						params.list
 					)
 				}
