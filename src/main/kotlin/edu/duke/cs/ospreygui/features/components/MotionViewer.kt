@@ -1,0 +1,14 @@
+package edu.duke.cs.ospreygui.features.components
+
+import cuchaz.kludge.imgui.Commands
+import edu.duke.cs.molscope.view.MoleculeRenderView
+import kotlin.random.Random
+
+
+interface MotionViewer {
+
+	val label: String
+	fun gui(imgui: Commands, view: MoleculeRenderView)
+	fun jiggle(rand: Random, view: MoleculeRenderView)
+	fun reset(view: MoleculeRenderView)
+}

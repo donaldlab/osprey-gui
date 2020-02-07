@@ -9,8 +9,8 @@ class TranslationRotation(val mol: Molecule): MolMotion {
 
 	class MolDescription(
 		val mol: Molecule,
-		var maxTranslationDist: Double,
-		var maxRotationDegrees: Double
+		val maxTranslationDist: Double,
+		val maxRotationDegrees: Double
 	) : MolMotion.Description {
 
 		override fun copyTo(mol: Molecule) =
