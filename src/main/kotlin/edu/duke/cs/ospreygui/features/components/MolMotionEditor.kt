@@ -58,11 +58,13 @@ class MolMotionEditor(
 
 				// init the motion info
 				when (desc) {
-					is DihedralAngle.MolDescription -> resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor, view))
-					is TranslationRotation.MolDescription -> resetInfo(view, MotionInfo.TranslationRotationInfo(this@MolMotionEditor, view))
 
-					// start with a translation/rotation motion by default
-					null -> resetInfo(view, MotionInfo.TranslationRotationInfo(this@MolMotionEditor, view)).initDefault(view)
+					// make info for an existing motion
+					is DihedralAngle.MolDescription -> resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor, slidewin, view))
+					is TranslationRotation.MolDescription -> resetInfo(view, MotionInfo.TranslationRotationInfo(this@MolMotionEditor))
+
+					// by default, make a new translation/rotation motion and its info
+					null -> resetInfo(view, MotionInfo.TranslationRotationInfo(this@MolMotionEditor)).initDefault(view)
 				}
 			},
 			whenOpen = {
@@ -80,12 +82,12 @@ class MolMotionEditor(
 					val canDihedralAngle = molInfo.mol.atoms.size >= 4
 					styleEnabledIf(canDihedralAngle) {
 						if (radioButton("Dihedral Angle", desc is DihedralAngle.MolDescription) && canDihedralAngle) {
-							resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor, view)).initDefault(view)
+							resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor, slidewin, view)).initDefault(view)
 						}
 					}
 
 					if (radioButton("Translation & Rotation", desc is TranslationRotation.MolDescription)) {
-						resetInfo(view, MotionInfo.TranslationRotationInfo(this@MolMotionEditor, view)).initDefault(view)
+						resetInfo(view, MotionInfo.TranslationRotationInfo(this@MolMotionEditor)).initDefault(view)
 					}
 
 					unindent(20f)
@@ -121,7 +123,7 @@ class MolMotionEditor(
 				val view = slide.findView()
 				viewer?.reset(view)
 				viewer = null
-				info?.cleanup(view)
+				info?.close()
 				info = null
 
 				onClose()
@@ -132,7 +134,7 @@ class MolMotionEditor(
 	private fun resetInfo(view: MoleculeRenderView, info: MotionInfo): MotionInfo {
 
 		// cleanup the old info, if any
-		this.info?.cleanup(view)
+		this.info?.close()
 
 		// set the new info
 		this.info = info
@@ -173,20 +175,46 @@ class MolMotionEditor(
 		}
 	}
 
-	private sealed class MotionInfo {
+	private sealed class MotionInfo : AutoCloseable {
 
 		abstract fun initDefault(view: MoleculeRenderView)
 		abstract fun gui(imgui: Commands, slidewin: SlideCommands, view: MoleculeRenderView)
-		open fun cleanup(view: MoleculeRenderView) {}
 
+		override fun close() {
+			// nothing to cleanup by default
+		}
 
-		class DihedralAngleInfo(val editor: MolMotionEditor, view: MoleculeRenderView) : MotionInfo() {
+		class DihedralAngleInfo(val editor: MolMotionEditor, slidewin: SlideCommands, view: MoleculeRenderView) : MotionInfo() {
 
 			companion object {
 				const val defaultRadiusDegrees = 9.0
 			}
 
 			private val desc get() = editor.desc as? DihedralAngle.MolDescription
+
+			// init effects
+			private val hoverEffects = slidewin.hoverEffects.writer()
+			private val renderEffects = view.renderEffects.writer()
+
+			init {
+				resetEffects()
+			}
+
+			private fun resetEffects() {
+				renderEffects.clear()
+				desc?.let { desc ->
+					renderEffects[desc.a] = selectedEffect
+					renderEffects[desc.b] = selectedEffect
+					renderEffects[desc.c] = selectedEffect
+					renderEffects[desc.d] = selectedEffect
+				}
+			}
+
+			// cleanup effects
+			override fun close() {
+				hoverEffects.close()
+				renderEffects.close()
+			}
 
 			override fun initDefault(view: MoleculeRenderView) {
 
@@ -204,10 +232,20 @@ class MolMotionEditor(
 					initialDegrees - defaultRadiusDegrees,
 					initialDegrees + defaultRadiusDegrees
 				))
+
+				resetEffects()
+			}
+
+			private enum class AtomSel {
+
+				A, B, C, D;
+
+				fun next() =
+					values()[(ordinal + 1) % 4]
 			}
 
 			private val pRadiusDegrees = Ref.of((desc?.radiusDegrees ?: defaultRadiusDegrees).toFloat())
-			private var currentAtomIndex = 0
+			private var currentAtom = AtomSel.A
 			private val clickTracker = ClickTracker()
 
 			override fun gui(imgui: Commands, slidewin: SlideCommands, view: MoleculeRenderView) = imgui.run {
@@ -228,17 +266,17 @@ class MolMotionEditor(
 				infoTip("Ctrl-click to type a precise value")
 
 				// atom pickers
-				if (radioButton("Atom A: ${desc.a.name}###atoma", currentAtomIndex == 0)) {
-					currentAtomIndex = 0
+				if (radioButton("Atom A: ${desc.a.name}###atoma", currentAtom == AtomSel.A)) {
+					currentAtom = AtomSel.A
 				}
-				if (radioButton("Atom B: ${desc.b.name}###atomb", currentAtomIndex == 1)) {
-					currentAtomIndex = 1
+				if (radioButton("Atom B: ${desc.b.name}###atomb", currentAtom == AtomSel.B)) {
+					currentAtom = AtomSel.B
 				}
-				if (radioButton("Atom C: ${desc.c.name}###atomc", currentAtomIndex == 2)) {
-					currentAtomIndex = 2
+				if (radioButton("Atom C: ${desc.c.name}###atomc", currentAtom == AtomSel.C)) {
+					currentAtom = AtomSel.C
 				}
-				if (radioButton("Atom D: ${desc.d.name}###atomd", currentAtomIndex == 3)) {
-					currentAtomIndex = 3
+				if (radioButton("Atom D: ${desc.d.name}###atomd", currentAtom == AtomSel.D)) {
+					currentAtom = AtomSel.D
 				}
 
 				// are we hovering over an atom?
@@ -247,42 +285,30 @@ class MolMotionEditor(
 						?.takeIf { it.view === view }
 						?.target as? Atom
 
-				// update atom render effects
-				view.renderEffects.clear()
-				if (hoverAtom != null) {
-					view.renderEffects[hoverAtom] = hoverEffect
-				}
-				view.renderEffects[desc.a] = selectedEffect
-				view.renderEffects[desc.b] = selectedEffect
-				view.renderEffects[desc.c] = selectedEffect
-				view.renderEffects[desc.d] = selectedEffect
-
 				// if we clicked an atom, update the motion
 				if (hoverAtom != null && clickTracker.clicked(slidewin)) {
-					when (currentAtomIndex) {
-						0 -> editor.resetMotion(view, DihedralAngle.MolDescription(
+					val newdesc = when (currentAtom) {
+						AtomSel.A -> DihedralAngle.MolDescription(
 							desc.mol, hoverAtom, desc.b, desc.c, desc.d, radiusDegrees = pRadiusDegrees.value.toDouble()
-						))
-						1 -> editor.resetMotion(view, DihedralAngle.MolDescription(
+						)
+						AtomSel.B -> DihedralAngle.MolDescription(
 							desc.mol, desc.a, hoverAtom, desc.c, desc.d, radiusDegrees = pRadiusDegrees.value.toDouble()
-						))
-						2 -> editor.resetMotion(view, DihedralAngle.MolDescription(
+						)
+						AtomSel.C -> DihedralAngle.MolDescription(
 							desc.mol, desc.a, desc.b, hoverAtom, desc.d, radiusDegrees = pRadiusDegrees.value.toDouble()
-						))
-						3 -> editor.resetMotion(view, DihedralAngle.MolDescription(
+						)
+						AtomSel.D -> DihedralAngle.MolDescription(
 							desc.mol, desc.a, desc.b, desc.c, hoverAtom, radiusDegrees = pRadiusDegrees.value.toDouble()
-						))
+						)
 					}
-					currentAtomIndex = (currentAtomIndex + 1) % 4
+					editor.resetMotion(view, newdesc)
+					currentAtom = currentAtom.next()
+					resetEffects()
 				}
-			}
-
-			override fun cleanup(view: MoleculeRenderView) {
-				view.renderEffects.clear()
 			}
 		}
 
-		class TranslationRotationInfo(val editor: MolMotionEditor, view: MoleculeRenderView) : MotionInfo() {
+		class TranslationRotationInfo(val editor: MolMotionEditor) : MotionInfo() {
 
 			companion object {
 				const val defaultDist = 1.2 // angstroms

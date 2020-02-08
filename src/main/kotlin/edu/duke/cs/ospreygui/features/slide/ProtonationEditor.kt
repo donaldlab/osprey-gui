@@ -12,12 +12,15 @@ import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.render.HoverEffects
+import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.osprey.dof.DihedralRotation
 import edu.duke.cs.osprey.tools.Protractor
 import edu.duke.cs.ospreygui.forcefield.amber.*
 import org.joml.Vector3d
+import java.util.*
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -29,10 +32,10 @@ class ProtonationEditor : SlideFeature {
 	private val winState = WindowState()
 	private val clickTracker = ClickTracker()
 	private var selection: Selection? = null
+	private var hoverEffects = null as HoverEffects.Writer?
+	private val renderEffects = IdentityHashMap<MoleculeRenderView,MoleculeRenderEffects.Writer>()
 
-	private fun Slide.Locked.molViews() = views.mapNotNull { it as? MoleculeRenderView }
-
-	private fun List<MoleculeRenderView>.clearSelections() = forEach { it.renderEffects.clear() }
+	private fun Slide.Locked.molViews() = views.filterIsInstance<MoleculeRenderView>()
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Protonation")) {
@@ -42,12 +45,20 @@ class ProtonationEditor : SlideFeature {
 
 	override fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
-		val molViews = slide.molViews()
+		val views = slide.molViews()
 
 		winState.render(
 			onOpen = {
+
 				// add the hover effect
-				slidewin.hoverEffects[id] = hoverEffect
+				hoverEffects = slidewin.hoverEffects.writer().apply {
+					effect = hoverEffect
+				}
+
+				// init the render effects
+				for (view in views) {
+					renderEffects[view] = view.renderEffects.writer()
+				}
 			},
 			whenOpen = {
 
@@ -55,7 +66,7 @@ class ProtonationEditor : SlideFeature {
 				if (clickTracker.clicked(slidewin)) {
 
 					// clear any previous selection
-					molViews.clearSelections()
+					renderEffects.values.forEach { it.clear() }
 					selection = null
 
 					// select the heavy atom from the click, if any
@@ -77,14 +88,14 @@ class ProtonationEditor : SlideFeature {
 					indent(10f)
 
 					if (button("Clear all Hydrogens")) {
-						clearAll(molViews)
+						clearAll(views)
 					}
 
 					// TODO: Reduce
 
 					if (button("Add Hydrogens automatically")) {
 						slidewin.showExceptions {
-							autoProtonate(molViews)
+							autoProtonate(views)
 						}
 					}
 					sameLine()
@@ -163,10 +174,12 @@ class ProtonationEditor : SlideFeature {
 			onClose = {
 
 				// remove the hover effect
-				slidewin.hoverEffects.remove(id)
+				hoverEffects?.close()
+				hoverEffects = null
 
 				// clear any leftover selections when the window closes
-				molViews.clearSelections()
+				renderEffects.values.forEach { it.close() }
+				renderEffects.clear()
 				selection = null
 			}
 		)
@@ -334,23 +347,23 @@ class ProtonationEditor : SlideFeature {
 			}
 			view.moleculeChanged()
 
-			if (rotator != null) {
-				rotator.update()
-			}
+			rotator?.update()
 
 			updateSelectionEffects()
 		}
 
 		private fun updateSelectionEffects() {
 
-			view.renderEffects.clear()
+			val effects = renderEffects[view] ?: return
+
+			effects.clear()
 
 			// add the selection effect
-			view.renderEffects[atom] = selectedEffect
+			effects[atom] = selectedEffect
 
 			// highlight the dihedral atoms if needed
 			rotator?.rotationH?.let { rotationH ->
-				view.renderEffects[listOf(
+				effects[listOf(
 					rotator.rotationHeavy,
 					rotator.bondedHeavy,
 					atom,

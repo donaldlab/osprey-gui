@@ -11,6 +11,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.MoleculeSelectors
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.render.Camera
+import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
@@ -48,6 +49,7 @@ class MoleculeNavigator : SlideFeature {
 			|| atom != null
 	}
 
+	private val renderEffects = IdentityHashMap<MoleculeRenderView,MoleculeRenderEffects.Writer>()
 	private val slideHovers = Selection()
 	private val guiHovers = Selection()
 	private val highlights = Selection()
@@ -65,6 +67,11 @@ class MoleculeNavigator : SlideFeature {
 			onOpen = {
 
 				// init state
+				slide.views
+					.filterIsInstance<MoleculeRenderView>()
+					.forEach { view ->
+						renderEffects[view] = view.renderEffects.writer()
+					}
 				highlights.clear()
 			},
 			whenOpen = {
@@ -172,10 +179,10 @@ class MoleculeNavigator : SlideFeature {
 						highlights.clear()
 						highlights.atom = atom
 
-						views.forEach { it.renderEffects.clear() }
-						views
+						renderEffects.values.forEach { it.clear() }
+						renderEffects.values
 							.find { it.mol === slideHovers.molecule }
-							?.let { it.renderEffects[atom] = hoverEffect }
+							?.let { it[atom] = hoverEffect }
 					}
 				}
 				?: guiHovers.atom?.let { atom ->
@@ -185,10 +192,10 @@ class MoleculeNavigator : SlideFeature {
 						highlights.clear()
 						highlights.atom = atom
 
-						views.forEach { it.renderEffects.clear() }
-						views
+						renderEffects.values.forEach { it.clear() }
+						renderEffects.values
 							.find { it.mol === guiHovers.molecule }
-							?.let { it.renderEffects[atom] = hoverEffect }
+							?.let { it[atom] = hoverEffect }
 					}
 				}
 				?: guiHovers.residue?.let { res ->
@@ -198,10 +205,10 @@ class MoleculeNavigator : SlideFeature {
 						highlights.clear()
 						highlights.residue = res
 
-						views.forEach { it.renderEffects.clear() }
-						views
+						renderEffects.values.forEach { it.clear() }
+						renderEffects.values
 							.find { it.mol === guiHovers.molecule }
-							?.let { view -> view.renderEffects[res.atoms] = hoverEffect }
+							?.let { it[res.atoms] = hoverEffect }
 					}
 				}
 				?: guiHovers.chain?.let { chain ->
@@ -211,10 +218,10 @@ class MoleculeNavigator : SlideFeature {
 						highlights.clear()
 						highlights.chain = chain
 
-						views.forEach { it.renderEffects.clear() }
-						views
+						renderEffects.values.forEach { it.clear() }
+						renderEffects.values
 							.find { it.mol === guiHovers.molecule }
-							?.let { view -> view.renderEffects[chain.residues.flatMap { it.atoms }] = hoverEffect }
+							?.let { it[chain.residues.flatMap { it.atoms }] = hoverEffect }
 					}
 				}
 				?: guiHovers.molecule?.let { mol ->
@@ -224,10 +231,10 @@ class MoleculeNavigator : SlideFeature {
 						highlights.clear()
 						highlights.molecule = mol
 
-						views.forEach { it.renderEffects.clear() }
-						views
+						renderEffects.values.forEach { it.clear() }
+						renderEffects.values
 							.find { it.mol === mol }
-							?.let { view -> view.renderEffects[MoleculeSelectors.all] = hoverEffect }
+							?.let { it[MoleculeSelectors.all] = hoverEffect }
 					}
 				}
 				?: run {
@@ -235,15 +242,15 @@ class MoleculeNavigator : SlideFeature {
 
 						// clear any highlights
 						highlights.clear()
-						views.forEach { it.renderEffects.clear() }
+						renderEffects.values.forEach { it.clear() }
 					}
 				}
 			},
 			onClose = {
+
 				// clear highlights
-				slide.views
-					.filterIsInstance<MoleculeRenderView>()
-					.forEach { it.renderEffects.clear() }
+				renderEffects.values.forEach { it.close() }
+				renderEffects.clear()
 			}
 		)
 	}

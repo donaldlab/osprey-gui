@@ -9,6 +9,7 @@ import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.*
+import edu.duke.cs.molscope.render.HoverEffects
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.components.ConfLibPicker
@@ -40,6 +41,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		val posEditor = DesignPositionEditor(prep, pos)
 		val mutationsTabState = Commands.TabState()
 		var resetTabSelection = true
+		var hoverEffects = null as HoverEffects.Writer?
 
 		fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
@@ -52,10 +54,12 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				onOpen = {
 
 					// add the hover effect
-					slidewin.hoverEffects[id] = hoverEffect
+					hoverEffects = slidewin.hoverEffects.writer().apply {
+						effect = hoverEffect
+					}
 
 					// init the pos editor
-					posEditor.refresh(view)
+					posEditor.init(view)
 
 					updateSequenceCounts()
 				},
@@ -101,7 +105,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 				onClose = {
 
 					// cleanup effects
-					slidewin.hoverEffects.remove(id)
+					hoverEffects?.close()
+					hoverEffects = null
 
 					// deactivate the mutations tab if it's open
 					if (mutationsTabState.wasActive) {
@@ -243,8 +248,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 			pos.setConf(frag, conf)
 
-			// update the view
-			posEditor.refresh(view)
+			posEditor.resetInfos()
 			view.moleculeChanged()
 		}
 	}

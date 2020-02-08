@@ -10,11 +10,13 @@ import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.*
+import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.prep.MoleculePrep
 import org.joml.Vector3d
+import java.util.*
 
 
 class FilterTool(val prep: MoleculePrep) : SlideFeature {
@@ -25,6 +27,7 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 
 	private var highlightedAtom: Atom? = null
 	private var highlightedMol: Molecule? = null
+	private val renderEffects = IdentityHashMap<MoleculeRenderView,MoleculeRenderEffects.Writer>()
 
 	private val inclusionChecks = prep.partition
 		.map { (_, mol) -> mol }
@@ -40,6 +43,15 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 
 		// render the main window
 		winState.render(
+			onOpen = {
+
+				// init the render effects
+				slide.views
+					.filterIsInstance<MoleculeRenderView>()
+					.forEach { view ->
+						renderEffects[view] = view.renderEffects.writer()
+					}
+			},
 			whenOpen = {
 
 				var hoveredMol: Molecule? = null
@@ -121,10 +133,10 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 				updateHighlight(slide, slidewin.mouseTarget, hoveredMol)
 			},
 			onClose = {
+
 				// clear highlights
-				slide.views
-					.filterIsInstance<MoleculeRenderView>()
-					.forEach { it.renderEffects.clear() }
+				renderEffects.values.forEach { it.close() }
+				renderEffects.clear()
 			}
 		)
 	}
@@ -167,13 +179,12 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 		highlightedAtom = atom
 
 		// clear any previous highlights
-		val views = slide.views.filterIsInstance<MoleculeRenderView>()
-		views.forEach { it.renderEffects.clear() }
+		renderEffects.values.forEach { it.clear() }
 
 		// update the highlight for the mol, if any
-		views
-			.find { it.mol == mol }
-			?.let { view -> view.renderEffects[MoleculeSelectors.all] = hoverEffect }
+		renderEffects.values
+			.find { it.mol === mol }
+			?.let { it[MoleculeSelectors.all] = hoverEffect }
 	}
 }
 

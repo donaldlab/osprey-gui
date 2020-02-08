@@ -8,12 +8,15 @@ import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.render.HoverEffects
+import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.inferBondsAmber
 import edu.duke.cs.ospreygui.prep.BondGuesser
 import edu.duke.cs.ospreygui.prep.covalentRange
 import edu.duke.cs.ospreygui.prep.toTree
+import java.util.*
 
 
 class BondEditor : SlideFeature {
@@ -22,6 +25,8 @@ class BondEditor : SlideFeature {
 
 	private val winState = WindowState()
 	private val clickTracker = ClickTracker()
+	private var hoverEffects = null as HoverEffects.Writer?
+	private val renderEffects = IdentityHashMap<MoleculeRenderView,MoleculeRenderEffects.Writer>()
 
 	private val pMaxDist = Ref.of(3f)
 
@@ -36,16 +41,22 @@ class BondEditor : SlideFeature {
 
 	private fun Slide.Locked.molViews() = views.mapNotNull { it as? MoleculeRenderView }
 
-	private fun List<MoleculeRenderView>.clearSelections() = forEach { it.renderEffects.clear() }
-
 	override fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
-		val molViews = slide.molViews()
+		val views = slide.molViews()
 
 		winState.render(
 			onOpen = {
+
 				// add the hover effect
-				slidewin.hoverEffects[id] = hoverEffect
+				hoverEffects = slidewin.hoverEffects.writer().apply {
+					effect = hoverEffect
+				}
+
+				// init the render effects for each molecule
+				for (view in views) {
+					renderEffects[view] = view.renderEffects.writer()
+				}
 			},
 			whenOpen = {
 
@@ -53,7 +64,7 @@ class BondEditor : SlideFeature {
 				if (clickTracker.clicked(slidewin)) {
 
 					selection = null
-					molViews.clearSelections()
+					renderEffects.values.forEach { it.clear() }
 
 					// select the atom from the click, if any
 					slidewin.mouseTarget?.let { target ->
@@ -72,12 +83,12 @@ class BondEditor : SlideFeature {
 					indent(10f)
 
 					if (button("Clear all bonds")) {
-						clearBonds(molViews)
+						clearBonds(views)
 					}
 
 					if (button("Add bonds automatically")) {
 						slidewin.showExceptions {
-							guessBonds(molViews)
+							guessBonds(views)
 						}
 					}
 					sameLine()
@@ -117,7 +128,7 @@ class BondEditor : SlideFeature {
 								nextColumn()
 
 								// update atom selections
-								selection.view.renderEffects[info.atom] = if (isCheckHovered) {
+								renderEffects[selection.view]?.set(info.atom, if (isCheckHovered) {
 									// highlight the atom when we mouseover the checkbox
 									hoverEffect
 								} else {
@@ -127,7 +138,7 @@ class BondEditor : SlideFeature {
 									} else {
 										outOfRangeEffect
 									}
-								}
+								})
 							}
 							columns(1)
 						}
@@ -137,10 +148,12 @@ class BondEditor : SlideFeature {
 			onClose = {
 
 				// remove the hover effect
-				slidewin.hoverEffects.remove(id)
+				hoverEffects?.close()
+				hoverEffects = null
 
 				// clear any leftover selections when the window closes
-				molViews.clearSelections()
+				renderEffects.values.forEach { it.close() }
+				renderEffects.clear()
 			}
 		)
 	}
@@ -160,7 +173,7 @@ class BondEditor : SlideFeature {
 			// show a button to select the atom
 			if (button("Select Atom")) {
 				closeCurrentPopup()
-				slide.molViews().clearSelections()
+				renderEffects.values.forEach { it.clear() }
 				selectAtom(view, atom)
 			}
 
@@ -227,7 +240,7 @@ class BondEditor : SlideFeature {
 		).apply {
 
 			// highlight the selected atom
-			view.renderEffects[atom] = selectedEffect
+			renderEffects[view]?.set(atom, selectedEffect)
 		}
 	}
 

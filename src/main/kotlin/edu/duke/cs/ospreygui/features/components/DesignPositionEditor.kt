@@ -7,6 +7,7 @@ import cuchaz.kludge.tools.Ref
 import cuchaz.kludge.tools.divideUp
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.molecule.*
+import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.ConfLib
@@ -34,17 +35,9 @@ class DesignPositionEditor(
 	private var autoSelectHydrogens = Ref.of(true)
 	private val nameBuf = Commands.TextBuffer(1024)
 
-	private inner class CurrentAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
+	private inner class CurrentAtom(val atom: Atom, val label: String) {
 
 		val pSelected = Ref.of(false)
-
-		fun addEffect() {
-			view.renderEffects[atom] = selectedEffect
-		}
-
-		fun removeEffect() {
-			view.renderEffects.remove(atom)
-		}
 	}
 
 	private fun toggleCurrentAtom(atom: Atom, view: MoleculeRenderView) {
@@ -78,7 +71,6 @@ class DesignPositionEditor(
 		}
 
 		resetPosConfSpace()
-		refresh(view)
 	}
 
 	private fun removeCurrentAtoms(atoms: Set<Atom>, view: MoleculeRenderView) {
@@ -86,18 +78,9 @@ class DesignPositionEditor(
 		pos.currentAtoms.removeIf { it in atoms }
 
 		resetPosConfSpace()
-		refresh(view)
 	}
 
-	private inner class AnchorAtom(val atom: Atom, val label: String, val view: MoleculeRenderView) {
-
-		fun addEffect() {
-			view.renderEffects[atom] = anchorEffect
-		}
-
-		fun removeEffect() {
-			view.renderEffects.remove(atom)
-		}
+	private inner class AnchorAtom(val atom: Atom, val label: String) {
 
 		var atomClickHandler: ((MoleculeRenderView, Atom) -> Unit)? = null
 	}
@@ -110,10 +93,6 @@ class DesignPositionEditor(
 
 		fun findAtomInfo(atom: Atom) =
 			anchorAtoms.find { it.atom === atom }
-
-		fun removeEffects() {
-			anchorAtoms.forEach { it.removeEffect() }
-		}
 	}
 
 	private inner class AnchorGroupInfo(
@@ -122,10 +101,6 @@ class DesignPositionEditor(
 
 		val anchorInfos = ArrayList<AnchorInfo>()
 
-		fun removeEffects() {
-			anchorInfos.forEach { it.removeEffects() }
-		}
-
 		fun replaceAnchor(old: DesignPosition.Anchor, new: DesignPosition.Anchor) {
 			anchors[anchors.indexOf(old)] = new
 		}
@@ -133,6 +108,22 @@ class DesignPositionEditor(
 
 	private val currentAtoms = ArrayList<CurrentAtom>()
 	private val anchorGroupInfos = ArrayList<AnchorGroupInfo>()
+	private var renderEffects = null as MoleculeRenderEffects.Writer?
+
+	fun init(view: MoleculeRenderView) {
+
+		renderEffects = view.renderEffects.writer()
+
+		resetInfos()
+	}
+
+	fun closed() {
+
+		renderEffects?.close()
+
+		anchorGroupInfos.clear()
+		currentAtoms.clear()
+	}
 
 	fun Atom.label(): String {
 
@@ -208,35 +199,36 @@ class DesignPositionEditor(
 				}
 			}
 		}
+
+		resetInfos()
 	}
 
-	fun refresh(view: MoleculeRenderView) {
+	fun resetInfos() {
 
-		anchorGroupInfos.forEach { it.removeEffects() }
+		renderEffects?.clear()
 		anchorGroupInfos.clear()
-		currentAtoms.forEach { it.removeEffect() }
 		currentAtoms.clear()
 
-		// add the anchor effects
+		// make infos for the anchor atoms
 		for (anchorGroup in pos.anchorGroups) {
 			anchorGroupInfos.add(AnchorGroupInfo(anchorGroup).apply {
 				for (anchor in anchorGroup) {
 					anchorInfos.add(AnchorInfo(anchor).apply {
 						for (atom in anchor.anchorAtoms) {
-							val info = AnchorAtom(atom, atom.label(), view)
+							val info = AnchorAtom(atom, atom.label())
 							anchorAtoms.add(info)
-							info.addEffect()
+							renderEffects?.set(atom, anchorEffect)
 						}
 					})
 				}
 			})
 		}
 
-		// add the current atoms effects
+		// make infos for the current atoms
 		for (atom in pos.currentAtoms) {
-			val info = CurrentAtom(atom, atom.label(), view)
+			val info = CurrentAtom(atom, atom.label())
 			currentAtoms.add(info)
-			info.addEffect()
+			renderEffects?.set(atom, selectedEffect)
 		}
 	}
 
@@ -338,7 +330,6 @@ class DesignPositionEditor(
 		// update the design position
 		Proteins.setDesignPosition(pos, res)
 		resetPosConfSpace()
-		refresh(view)
 	}
 
 	private var atomClickHandler: ((MoleculeRenderView, Atom) -> Unit)? = null
@@ -464,7 +455,6 @@ class DesignPositionEditor(
 											anchorInfo.anchor,
 											anchorUpdater(clickedAtom)
 										)
-										resetPosConfSpace()
 										/* NOTE:
 											Could set posChanged = true here, but it won't work the way you'd think.
 											By the time atomClickHandler gets called, we'll be on a different stack frame,
@@ -472,7 +462,7 @@ class DesignPositionEditor(
 											So just call resetInfos() directly. Which is ok here, since
 											atomClickHandler gets called outside of the info render loops.
 										 */
-										refresh(view)
+										resetPosConfSpace()
 										atomClickHandler = null
 									}
 									atomClickHandler = atomInfo.atomClickHandler
@@ -577,16 +567,7 @@ class DesignPositionEditor(
 		// finally, handle any pending updates after we changed the position
 		if (posChanged) {
 			resetPosConfSpace()
-			refresh(view)
 		}
-	}
-
-	fun closed() {
-
-		anchorGroupInfos.forEach { it.removeEffects() }
-		anchorGroupInfos.clear()
-		currentAtoms.forEach { it.removeEffect() }
-		currentAtoms.clear()
 	}
 }
 

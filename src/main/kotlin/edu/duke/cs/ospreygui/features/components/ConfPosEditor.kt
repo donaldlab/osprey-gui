@@ -122,7 +122,7 @@ class ConfPosEditor(val prep: ConfSpacePrep, val molInfo: MolInfo, val posInfo: 
 			onOpen = {
 
 				// init the pos editor
-				posEditor.refresh(view)
+				posEditor.init(view)
 			},
 			whenOpen = {
 
@@ -307,8 +307,7 @@ class ConfPosEditor(val prep: ConfSpacePrep, val molInfo: MolInfo, val posInfo: 
 
 		posInfo.pos.setConf(frag, conf)
 
-		// update the view
-		posEditor.refresh(view)
+		posEditor.resetInfos()
 		view.moleculeChanged()
 	}
 
