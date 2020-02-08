@@ -594,7 +594,7 @@ class ConfPosEditor(val prep: ConfSpacePrep, val molInfo: MolInfo, val posInfo: 
 					if (isChecked) {
 
 						// add the motion
-						val desc = DihedralAngle.ConfDescription.make(
+						val desc = DihedralAngle.ConfDescription(
 							posInfo.pos,
 							motion,
 							confConfSpace.conf,

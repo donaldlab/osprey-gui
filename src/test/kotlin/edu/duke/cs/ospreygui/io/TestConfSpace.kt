@@ -191,6 +191,20 @@ fun makeTestConfSpace(): ConfSpace {
 
 			// no motion settings, ie no continuous flexibility
 		}
+
+		// add a dihedral angle to the small molecule
+		molMotions
+			.getOrPut(smallmol) { ArrayList() }
+			.add(DihedralAngle.MolDescription(
+				smallmol,
+				smallmol.atoms.findOrThrow("C6"),
+				smallmol.atoms.findOrThrow("C1"),
+				smallmol.atoms.findOrThrow("C"),
+				smallmol.atoms.findOrThrow("N1"),
+				0.0,
+				60.0
+			)
+		)
 	}
 }
 

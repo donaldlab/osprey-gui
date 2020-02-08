@@ -199,7 +199,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 								withId("flexible") {
 
 									text("Flexible Positions:")
-									child("flexpos", 300f, 200f, true) {
+									child("flexpos", 360f, 200f, true) {
 										columns(2)
 										for (posInfo in molInfo.posInfos.filter { it.isFlexible }) {
 
@@ -281,7 +281,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 								withId("molMotions") {
 
 									text("Molecule Motions:")
-									child("motions", 300f, 200f, true) {
+									child("motions", 360f, 200f, true) {
 										for (motionInfo in molInfo.motionInfos) {
 
 											if (selectable(motionInfo.label, selectedMotionInfo === motionInfo)) {

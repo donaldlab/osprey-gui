@@ -137,6 +137,15 @@ fun ConfSpace.toToml(): String {
 			write("[confspace.molMotions.$moli.$motioni]\n")
 			when (motion) {
 
+				is DihedralAngle.MolDescription -> {
+					write("type = %s\n", "dihedralAngle".quote())
+					write("atoms = [ %s ]\n",
+						listOf(motion.a, motion.b, motion.c, motion.d)
+							.joinToString(", ") { it.index().toString() }
+					)
+					write("degrees = [ %12.6f, %12.6f ]\n", motion.minDegrees, motion.maxDegrees)
+				}
+
 				is TranslationRotation.MolDescription -> {
 					write("type = %s\n", "translationRotation".quote())
 					write("maxTranslationDist = %12.6f\n", motion.maxTranslationDist)
@@ -338,11 +347,30 @@ fun ConfSpace.Companion.fromTomlWithConfLib(toml: String): Pair<ConfSpace,ConfLi
 
 					for (motionkey in motionsTable.keySet()) {
 						val motionTable = motionsTable.getTableOrThrow(motionkey)
+						val motionPos = motionsTable.inputPositionOf(motionkey)
+
+						val motions = molMotions.getOrPut(mol) { ArrayList() }
 
 						when (motionTable.getString("type")) {
 
+							"dihedralAngle" -> {
+
+								val atomsArray = motionTable.getArrayOrThrow("atoms", motionPos)
+								val degreesArray = motionTable.getArrayOrThrow("degrees", motionPos)
+
+								motions.add(DihedralAngle.MolDescription(
+									mol,
+									getAtom(atomsArray.getInt(0), motionPos),
+									getAtom(atomsArray.getInt(1), motionPos),
+									getAtom(atomsArray.getInt(2), motionPos),
+									getAtom(atomsArray.getInt(3), motionPos),
+									degreesArray.getDouble(0),
+									degreesArray.getDouble(1)
+								))
+							}
+
 							"translationRotation" -> {
-								molMotions.getOrPut(mol) { ArrayList() }.add(TranslationRotation.MolDescription(
+								motions.add(TranslationRotation.MolDescription(
 									mol,
 									motionTable.getDoubleOrThrow("maxTranslationDist"),
 									motionTable.getDoubleOrThrow("maxRotationDegrees")

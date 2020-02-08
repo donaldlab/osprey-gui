@@ -7,7 +7,7 @@ import org.joml.Vector3d
 
 class TranslationRotation(val mol: Molecule): MolMotion {
 
-	class MolDescription(
+	data class MolDescription(
 		val mol: Molecule,
 		val maxTranslationDist: Double,
 		val maxRotationDegrees: Double

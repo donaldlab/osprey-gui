@@ -37,6 +37,21 @@ class DihedralAngle(
 		val maxDegrees: Double
 	) : ConfMotion.Description {
 
+		constructor(pos: DesignPosition, motion: ConfLib.ContinuousMotion.DihedralAngle, degrees: ClosedFloatingPointRange<Double>) :
+			this(pos, motion, degrees.start, degrees.endInclusive)
+
+		constructor(pos: DesignPosition, motion: ConfLib.ContinuousMotion.DihedralAngle, conf: ConfLib.Conf, radiusDegrees: Double) :
+			this(
+				pos,
+				motion,
+				measureDegrees(
+					motion.a.resolveCoordsOrThrow(conf),
+					motion.b.resolveCoordsOrThrow(conf),
+					motion.c.resolveCoordsOrThrow(conf),
+					motion.d.resolveCoordsOrThrow(conf)
+				).let { it - radiusDegrees .. it + radiusDegrees }
+			)
+
 		override fun copyTo(pos: DesignPosition) =
 			ConfDescription(
 				pos,
@@ -55,23 +70,6 @@ class DihedralAngle(
 			)
 
 		companion object {
-
-			fun make(pos: DesignPosition, motion: ConfLib.ContinuousMotion.DihedralAngle, conf: ConfLib.Conf, radiusDegrees: Double): ConfDescription {
-
-				val initialDegrees = measureDegrees(
-					motion.a.resolveCoordsOrThrow(conf),
-					motion.b.resolveCoordsOrThrow(conf),
-					motion.c.resolveCoordsOrThrow(conf),
-					motion.d.resolveCoordsOrThrow(conf)
-				)
-
-				return ConfDescription(
-					pos,
-					motion,
-					minDegrees = initialDegrees - radiusDegrees,
-					maxDegrees = initialDegrees + radiusDegrees
-				)
-			}
 
 			fun makeFromLibrary(pos: DesignPosition, frag: ConfLib.Fragment, conf: ConfLib.Conf, settings: LibrarySettings) =
 				frag.motions
@@ -94,7 +92,7 @@ class DihedralAngle(
 							return@desc null
 						}
 
-						return@desc make(pos, motion, conf, settings.radiusDegrees)
+						return@desc ConfDescription(pos, motion, conf, settings.radiusDegrees)
 					}
 		}
 	}
@@ -109,7 +107,15 @@ class DihedralAngle(
 		val maxDegrees: Double
 	) : MolMotion.Description {
 
+		constructor(mol: Molecule, a: Atom, b: Atom, c: Atom, d: Atom, degrees: ClosedFloatingPointRange<Double>) :
+			this(mol, a, b, c, d, degrees.start, degrees.endInclusive)
+
+		constructor(mol: Molecule, a: Atom, b: Atom, c: Atom, d: Atom, radiusDegrees: Double) :
+			this(mol, a, b, c, d, measureDegrees(a.pos, b.pos, c.pos, d.pos).let { it - radiusDegrees .. it + radiusDegrees })
+
 		val rotatedAtoms = findRotatedAtoms(mol, b, c)
+
+		val radiusDegrees get() = (maxDegrees - minDegrees)/2.0
 
 		override fun copyTo(mol: Molecule): MolDescription {
 			val map = this.mol.mapAtomsByValueTo(mol)

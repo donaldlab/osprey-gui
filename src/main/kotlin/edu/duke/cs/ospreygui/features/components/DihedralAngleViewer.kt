@@ -42,9 +42,13 @@ class DihedralAngleViewer(
 		// show a slider to manipulate the dihedral angle
 		text("Radius: %.1f degrees".format(radius))
 		text("Range: %.1f to %.1f degrees".format(minDegrees, maxDegrees))
-		if (sliderFloat("Angle", pValue, minDegrees, maxDegrees, format = "%.1f")) {
-			dihedral.setDegrees(pValue.value.toDouble())
-			view.moleculeChanged()
+		if (minDegrees.isFinite() && maxDegrees.isFinite() && pValue.value.isFinite()) {
+			if (sliderFloat("Angle", pValue, minDegrees, maxDegrees, format = "%.1f")) {
+				dihedral.setDegrees(pValue.value.toDouble())
+				view.moleculeChanged()
+			}
+		} else {
+			text("(invalid angle)")
 		}
 	}
 
