@@ -252,7 +252,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 	private inner class PosInfo(val pos: DesignPosition, val moltype: MoleculeType) {
 
-		val pSelected = Ref.of(false)
+		val label = pos.name
 	}
 
 	private val DesignPosition.confSpace get() = prep.confSpace.positionConfSpaces.getOrMake(this)
@@ -302,6 +302,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		}
 	}
 	private val molInfos = ArrayList<MolInfo>()
+
+	private var selectedPosInfo = null as PosInfo?
 
 	private val sequenceFormatter = NumberFormat.getIntegerInstance()
 		.apply {
@@ -356,7 +358,9 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 								text("${molInfo.posInfos.size} positions(s)")
 								child("positions", 300f, 200f, true) {
 									for (posInfo in molInfo.posInfos) {
-										selectable(posInfo.pos.name, posInfo.pSelected)
+										if (selectable(posInfo.label, selectedPosInfo === posInfo)) {
+											selectedPosInfo = posInfo
+										}
 									}
 								}
 
@@ -368,28 +372,34 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 								sameLine()
 
-								val canEdit = molInfo.posInfos.count { it.pSelected.value } == 1
+								val selectedPosInfo = selectedPosInfo
+
+								val canEdit = selectedPosInfo != null
 								styleEnabledIf(canEdit) {
 									if (button("Edit") && canEdit) {
 
+										// sadly the compiler isn't quite smart enough to figure out this can't be null
+										// so put in a runtime check to make flow typing work correctly
+										selectedPosInfo!!
+
 										// start the position editor
-										molInfo.posInfos
-											.find { it.pSelected.value }
-											?.let { mutEditor = MutEditor(it) }
+										mutEditor = MutEditor(selectedPosInfo)
 									}
 								}
 
 								sameLine()
 
-								styleEnabledIf(molInfo.posInfos.any { it.pSelected.value }) {
-									if (button("Remove")) {
-										molInfo.posInfos
-											.filter { it.pSelected.value }
-											.forEach {
-												molInfo.posInfos.remove(it)
-												prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(it.pos)
-												prep.confSpace.positionConfSpaces.remove(it.pos)
-											}
+								val canRemove = selectedPosInfo != null
+								styleEnabledIf(canRemove) {
+									if (button("Remove") && canRemove) {
+
+										// sadly the compiler isn't quite smart enough to figure out this can't be null
+										// so put in a runtime check to make flow typing work correctly
+										selectedPosInfo!!
+
+										molInfo.posInfos.remove(selectedPosInfo)
+										prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(selectedPosInfo.pos)
+										prep.confSpace.positionConfSpaces.remove(selectedPosInfo.pos)
 										updateSequenceCounts()
 									}
 								}
