@@ -596,7 +596,7 @@ class TestMutation : SharedSpec({
 
 			// build the dihedral angle
 			val chi1 = frag.motions[0] as ConfLib.ContinuousMotion.DihedralAngle
-			DihedralAngle.ConfDescription.make(pos, chi1, conf, radiusDegrees = 9.0).run {
+			DihedralAngle.ConfDescription(pos, chi1, conf, radiusDegrees = 9.0).run {
 				make().run {
 					mol shouldBeSameInstanceAs pos.mol
 					a.name shouldBe "N"
