@@ -6,13 +6,12 @@ import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.MoleculeSelectors
-import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.Camera
 import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
+import edu.duke.cs.molscope.tools.identityHashSet
+import edu.duke.cs.molscope.tools.toIdentitySet
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.forcefield.amber.findTypeOrThrow
@@ -50,9 +49,13 @@ class MoleculeNavigator : SlideFeature {
 	}
 
 	private val renderEffects = IdentityHashMap<MoleculeRenderView,MoleculeRenderEffects.Writer>()
+	private val viewSelectors = IdentityHashMap<MoleculeRenderView,MoleculeSelector>()
 	private val slideHovers = Selection()
 	private val guiHovers = Selection()
 	private val highlights = Selection()
+
+	private val focusedResidues = IdentityHashMap<Molecule,MutableSet<Polymer.Residue>>()
+	private val pShowDist = Ref.of(3.0)
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Molecules")) {
@@ -62,22 +65,25 @@ class MoleculeNavigator : SlideFeature {
 
 	override fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
+		val views = slide.views
+			.filterIsInstance<MoleculeRenderView>()
+
 		// render the main window
 		winState.render(
 			onOpen = {
 
-				// init state
-				slide.views
-					.filterIsInstance<MoleculeRenderView>()
-					.forEach { view ->
-						renderEffects[view] = view.renderEffects.writer()
-					}
+				// init render effects
+				for (view in views) {
+					renderEffects[view] = view.renderEffects.writer()
+				}
 				highlights.clear()
+
+				// backup current selectors
+				for (view in views) {
+					viewSelectors[view] = view.selector
+				}
 			},
 			whenOpen = {
-
-				val views = slide.views
-					.filterIsInstance<MoleculeRenderView>()
 
 				// look for hovers from the slide
 				slideHovers.clear()
@@ -137,7 +143,7 @@ class MoleculeNavigator : SlideFeature {
 							""".trimMargin())
 
 							when (type) {
-								MoleculeType.Protein -> guiProtein(imgui, slidewin, mol as Polymer)
+								MoleculeType.Protein -> guiProtein(imgui, slidewin, views, mol as Polymer)
 								MoleculeType.SmallMolecule -> guiSmallMolecule(imgui, slidewin, mol)
 								else -> Unit
 							}
@@ -251,6 +257,15 @@ class MoleculeNavigator : SlideFeature {
 				// clear highlights
 				renderEffects.values.forEach { it.close() }
 				renderEffects.clear()
+
+				// restore the molecule selectors
+				for (view in views) {
+					view.selector = viewSelectors[view] ?: MoleculeSelectors.all
+				}
+				viewSelectors.clear()
+
+				// other cleanup
+				focusedResidues.clear()
 			}
 		)
 	}
@@ -267,7 +282,25 @@ class MoleculeNavigator : SlideFeature {
 			div(size.toDouble())
 		}
 
-	private fun guiProtein(imgui: Commands, slidewin: SlideCommands, mol: Polymer) = imgui.run {
+	private fun guiProtein(imgui: Commands, slidewin: SlideCommands, views: List<MoleculeRenderView>, mol: Polymer) = imgui.run {
+
+		fun Polymer.Residue.addToFocus() {
+			focusedResidues[mol]?.add(this)
+		}
+
+		fun clearFocus() {
+			focusedResidues[mol] = identityHashSet()
+		}
+
+		fun Polymer.Residue.removeFromFocus() {
+			focusedResidues
+				.getOrPut(mol) {
+					mol.chains
+						.flatMap { it.residues }
+						.toIdentitySet()
+				}
+				.remove(this)
+		}
 
 		// show all the chains as buttons
 		for (chain in mol.chains) {
@@ -276,8 +309,8 @@ class MoleculeNavigator : SlideFeature {
 				// show all the residues in columns
 				val residuesPerCol = 10
 				val numCols = chain.residues.size.divideUp(residuesPerCol)
-				setNextWindowContentSize(numCols*100f, 0f)
-				child("residues", 500f, 200f, true, flags = IntFlags.of(Commands.BeginFlags.HorizontalScrollBar)) {
+				setNextWindowContentSize(numCols*110f, 0f)
+				child("residues", 500f, 260f, true, flags = IntFlags.of(Commands.BeginFlags.HorizontalScrollBar)) {
 
 					columns(numCols, border = true) {
 						for (c in 0 until numCols) {
@@ -288,18 +321,61 @@ class MoleculeNavigator : SlideFeature {
 
 									withId(res.id) {
 
-										// show a label for the residue that we can hover over
-										selectable("${res.id} ${res.type}", slideHovers.residue === res || guiHovers.residue === res)
+										val label = "${res.id} ${res.type}"
+
+										group {
+
+											// add a checkbox to show/hide the residue
+											val isFocused = focusedResidues[mol]?.let { res in it } ?: true
+											checkbox("###$label", isFocused)?.let { isChecked ->
+												if (isChecked) {
+													res.addToFocus()
+												} else {
+													res.removeFromFocus()
+												}
+												updateFocusAtoms(views)
+											}
+
+											sameLine()
+
+											// show a label for the residue that we can hover over
+											selectable(label, slideHovers.residue === res || guiHovers.residue === res)
+										}
 										if (isItemHovered()) {
 											guiHovers.residue = res
 											guiHovers.molecule = mol
 										}
 
-										// show a context menu to center the camera on the molecule
-										popupContextItem("centerCamera") {
+										// show a context menu for residue-specific ations
+										popupContextItem("resPopup") {
+
 											if (button("Center Camera")) {
 												slidewin.camera.lookAt(res.atoms)
 												closeCurrentPopup()
+											}
+
+											// breathe a little ...
+											spacing()
+											separator()
+											spacing()
+
+											if (button("Show only $label")) {
+												clearFocus()
+												res.addToFocus()
+												updateFocusAtoms(views)
+												closeCurrentPopup()
+											}
+
+											if (button("Show residues within ${pShowDist.value} Å###showDist")) {
+												res
+													.findWithin(mol, pShowDist.value)
+													.forEach { it.addToFocus() }
+												updateFocusAtoms(views)
+												closeCurrentPopup()
+											}
+											sameLine()
+											itemWidth(40f) {
+												inputDouble("###dist", pShowDist, format = "%.1f")
 											}
 										}
 									}
@@ -307,6 +383,16 @@ class MoleculeNavigator : SlideFeature {
 							}
 						}
 					}
+				}
+
+				if (button("Show all residues")) {
+					focusedResidues.remove(mol)
+					updateFocusAtoms(views)
+				}
+				sameLine()
+				if (button("Hide all residues")) {
+					clearFocus()
+					updateFocusAtoms(views)
 				}
 			}
 		}
@@ -391,9 +477,46 @@ class MoleculeNavigator : SlideFeature {
 			unindent(10f)
 		}
 	}
+
+	private fun updateFocusAtoms(views: List<MoleculeRenderView>) {
+
+		for (view in views) {
+
+			val residues = focusedResidues[view.mol]
+			if (residues == null) {
+
+				// no residue definitions? revert back to default
+				view.selector = viewSelectors[view] ?: MoleculeSelectors.all
+
+			} else {
+
+				// otherwise, translate the focus into a selector
+				val atoms = residues.flatMap { it.atoms }
+				view.selector = { atoms }
+			}
+		}
+	}
+
+	private fun Polymer.Residue.findWithin(mol: Polymer, dist: Double): List<Polymer.Residue> {
+
+		fun dist(a: Polymer.Residue, b: Polymer.Residue) =
+			a.atoms.allPairs(b.atoms)
+				.map { (a, b) -> a.pos.distance(b.pos) }
+				.min()
+				?: Double.POSITIVE_INFINITY
+
+		return mol.chains
+			.flatMap { it.residues }
+			.filter { res -> dist(this, res) <= dist }
+	}
 }
 
 private val hoverEffect = RenderEffect(
 	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Outset),
 	200u, 200u, 200u
+)
+
+private val hideEffect = RenderEffect(
+	ByteFlags.of(RenderEffect.Flags.Alpha),
+	32u, 0u, 0u
 )
