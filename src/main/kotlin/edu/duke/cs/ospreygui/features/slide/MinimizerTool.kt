@@ -73,7 +73,8 @@ class MinimizerTool : SlideFeature {
 										mol.atoms.forEach { add(it.pos) }
 										div(mol.atoms.size.toDouble())
 									}
-									slidewin.camera.lookAt(center.toFloat())
+									slidewin.camera.lookAt(center.toFloat(), slide.views)
+									slidewin.camera.changed()
 
 									closeCurrentPopup()
 								}
@@ -84,14 +85,14 @@ class MinimizerTool : SlideFeature {
 							val minimizedCoords = info.minInfo.minimizedCoords
 							text("Set Coords:")
 							sameLine()
-							styleDisabledIf(unminimizedCoords == null) {
+							disabledIf(unminimizedCoords == null) {
 								if (button("Unminimized") && unminimizedCoords != null) {
 									info.minInfo.setCoords(unminimizedCoords)
 									info.view.moleculeChanged()
 								}
 							}
 							sameLine()
-							styleDisabledIf(minimizedCoords == null) {
+							disabledIf(minimizedCoords == null) {
 								if (button("Minimized") && minimizedCoords != null) {
 									info.minInfo.setCoords(minimizedCoords)
 									info.view.moleculeChanged()

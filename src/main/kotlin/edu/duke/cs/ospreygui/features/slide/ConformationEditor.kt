@@ -231,9 +231,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 									val selectedPosInfo = selectedPosInfo
 
-									val canEdit = selectedPosInfo != null
-									styleEnabledIf(canEdit) {
-										if (button("Edit") && canEdit) {
+									enabledIf(selectedPosInfo != null) {
+										if (button("Edit")) {
 
 											// sadly the compiler isn't quite smart enough to figure out this can't be null
 											// so put in a runtime check to make flow typing work correctly
@@ -255,9 +254,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 									sameLine()
 
 									// allow removing flexible positions only
-									val canRemove = selectedPosInfo != null && selectedPosInfo.isFlexible
-									styleEnabledIf(canRemove) {
-										if (button("Remove") && canRemove) {
+									enabledIf(selectedPosInfo != null && selectedPosInfo.isFlexible) {
+										if (button("Remove")) {
 
 											// sadly the compiler isn't quite smart enough to figure out this can't be null
 											// so put in a runtime check just to make the compiler happy
@@ -310,9 +308,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 									val selectedMotionInfo = selectedMotionInfo
 
 									// edit button
-									val canEdit = selectedMotionInfo != null
-									styleEnabledIf(canEdit) {
-										if (button("Edit") && canEdit) {
+									enabledIf(selectedMotionInfo != null) {
+										if (button("Edit")) {
 
 											// sadly the compiler isn't quite smart enough to figure out this can't be null
 											// so put in a runtime check to make flow typing work correctly
@@ -334,9 +331,8 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 									sameLine()
 
 									// remove button
-									val canRemove = selectedMotionInfo != null
-									styleEnabledIf(canRemove) {
-										if (button("Remove") && canRemove) {
+									enabledIf(selectedMotionInfo != null) {
+										if (button("Remove")) {
 
 											// sadly the compiler isn't quite smart enough to figure out this can't be null
 											// so put in a runtime check to make flow typing work correctly

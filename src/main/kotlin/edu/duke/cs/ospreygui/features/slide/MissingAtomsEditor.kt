@@ -99,7 +99,8 @@ class MissingAtomsEditor : SlideFeature {
 									popupContextItem("addedAtom:$label") {
 
 										if (button("Center Camera")) {
-											slidewin.camera.lookAt(addedAtom.atom.pos.toFloat())
+											slidewin.camera.lookAt(addedAtom.atom.pos.toFloat(), slide.views)
+											slidewin.camera.changed()
 											closeCurrentPopup()
 										}
 									}

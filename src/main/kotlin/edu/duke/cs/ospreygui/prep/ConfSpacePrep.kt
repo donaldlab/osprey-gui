@@ -5,7 +5,7 @@ import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.features.slide.CloseSlide
 import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
-import edu.duke.cs.molscope.gui.features.slide.NavigationTool
+import edu.duke.cs.molscope.gui.features.slide.CameraTool
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.ospreygui.defaultRenderSettings
 import edu.duke.cs.ospreygui.features.slide.*
@@ -71,7 +71,7 @@ class ConfSpacePrep(
 				add(CloseSlide(win))
 			}
 			s.features.menu("View") {
-				add(NavigationTool())
+				add(CameraTool())
 				add(MenuRenderSettings(defaultRenderSettings))
 				add(MoleculeNavigator())
 				add(ClashViewer())

@@ -6,7 +6,7 @@ import cuchaz.kludge.tools.toFloat
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.Window
 import edu.duke.cs.molscope.gui.features.slide.MenuRenderSettings
-import edu.duke.cs.molscope.gui.features.slide.NavigationTool
+import edu.duke.cs.molscope.gui.features.slide.CameraTool
 import edu.duke.cs.molscope.gui.features.win.AboutMolscope
 import edu.duke.cs.molscope.gui.features.win.Exit
 import edu.duke.cs.molscope.gui.features.win.MenuColorsMode
@@ -57,7 +57,7 @@ fun main() = autoCloser {
 val defaultRenderSettings = RenderSettings().apply {
 	// these settings looked nice on a small protein
 	shadingWeight = 1.4f
-	lightWeight = 1.4f
+	lightWeight = 1.6f
 	depthWeight = 1.0f
 }
 
@@ -100,7 +100,7 @@ fun Molecule.show(focusAtom: Atom? = null, wait: Boolean = false) {
 					}
 
 					s.features.menu("View") {
-						add(NavigationTool())
+						add(CameraTool())
 						add(MenuRenderSettings(defaultRenderSettings))
 						add(ClashViewer())
 					}

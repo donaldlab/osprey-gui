@@ -10,7 +10,7 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
-import edu.duke.cs.molscope.gui.styleEnabledIf
+import edu.duke.cs.molscope.gui.enabledIf
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.toToml
@@ -103,8 +103,8 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 					} else {
 						"${selectedMols.size} molecules"
 					}
-					styleEnabledIf(selectedMols.isNotEmpty()) {
-						if (button("Save $selmsg###save") && selectedMols.isNotEmpty()) {
+					enabledIf(selectedMols.isNotEmpty()) {
+						if (button("Save $selmsg###save")) {
 							FileDialog.saveFile(filterList, dir)?.let { path ->
 								dir = path.parent
 								save(slidewin, path, selectedMols, nameBuf.text)

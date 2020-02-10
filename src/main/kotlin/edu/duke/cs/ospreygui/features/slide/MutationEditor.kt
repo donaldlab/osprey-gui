@@ -378,9 +378,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 								val selectedPosInfo = selectedPosInfo
 
-								val canEdit = selectedPosInfo != null
-								styleEnabledIf(canEdit) {
-									if (button("Edit") && canEdit) {
+								enabledIf(selectedPosInfo != null) {
+									if (button("Edit")) {
 
 										// sadly the compiler isn't quite smart enough to figure out this can't be null
 										// so put in a runtime check to make flow typing work correctly
@@ -393,9 +392,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 								sameLine()
 
-								val canRemove = selectedPosInfo != null
-								styleEnabledIf(canRemove) {
-									if (button("Remove") && canRemove) {
+								enabledIf(selectedPosInfo != null) {
+									if (button("Remove")) {
 
 										// sadly the compiler isn't quite smart enough to figure out this can't be null
 										// so put in a runtime check to make flow typing work correctly

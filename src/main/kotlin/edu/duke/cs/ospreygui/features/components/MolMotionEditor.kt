@@ -9,7 +9,7 @@ import edu.duke.cs.molscope.gui.ClickTracker
 import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.gui.infoTip
-import edu.duke.cs.molscope.gui.styleEnabledIf
+import edu.duke.cs.molscope.gui.enabledIf
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
@@ -79,9 +79,8 @@ class MolMotionEditor(
 					text("Motion type:")
 					indent(20f)
 
-					val canDihedralAngle = molInfo.mol.atoms.size >= 4
-					styleEnabledIf(canDihedralAngle) {
-						if (radioButton("Dihedral Angle", desc is DihedralAngle.MolDescription) && canDihedralAngle) {
+					enabledIf(molInfo.mol.atoms.size >= 4) {
+						if (radioButton("Dihedral Angle", desc is DihedralAngle.MolDescription)) {
 							resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor, slidewin, view)).initDefault(view)
 						}
 					}

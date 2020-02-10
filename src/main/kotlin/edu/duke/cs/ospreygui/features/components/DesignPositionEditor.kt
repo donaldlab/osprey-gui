@@ -375,7 +375,7 @@ class DesignPositionEditor(
 			}
 		}
 
-		styleEnabledIf(currentAtoms.any { it.pSelected.value }) {
+		enabledIf(currentAtoms.any { it.pSelected.value }) {
 			if (button("Remove")) {
 				val selectedAtoms = currentAtoms
 					.filter { it.pSelected.value }

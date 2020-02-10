@@ -86,7 +86,8 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 									mol.atoms.forEach { add(it.pos) }
 									div(mol.atoms.size.toDouble())
 								}
-								slidewin.camera.lookAt(center.toFloat())
+								slidewin.camera.lookAt(center.toFloat(), slide.views)
+								slidewin.camera.changed()
 
 								closeCurrentPopup()
 							}

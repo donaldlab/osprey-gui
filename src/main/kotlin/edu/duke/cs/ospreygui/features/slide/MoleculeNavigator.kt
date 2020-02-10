@@ -128,7 +128,8 @@ class MoleculeNavigator : SlideFeature {
 							// show a context menu to center the camera on the molecule
 							popupContextItem("centerCamera") {
 								if (button("Center Camera")) {
-									slidewin.camera.lookAt(mol.atoms)
+									slidewin.camera.lookAt(mol.atoms, slide)
+									slidewin.camera.changed()
 									closeCurrentPopup()
 								}
 							}
@@ -143,8 +144,8 @@ class MoleculeNavigator : SlideFeature {
 							""".trimMargin())
 
 							when (type) {
-								MoleculeType.Protein -> guiProtein(imgui, slidewin, views, mol as Polymer)
-								MoleculeType.SmallMolecule -> guiSmallMolecule(imgui, slidewin, mol)
+								MoleculeType.Protein -> guiProtein(imgui, slide, slidewin, views, mol as Polymer)
+								MoleculeType.SmallMolecule -> guiSmallMolecule(imgui, slide, slidewin, mol)
 								else -> Unit
 							}
 						}
@@ -270,11 +271,11 @@ class MoleculeNavigator : SlideFeature {
 		)
 	}
 
-	private fun Camera.lookAt(atoms: Collection<Atom>) =
-		lookAt(atoms.centroid().toFloat())
+	private fun Camera.lookAt(atoms: Collection<Atom>, slide: Slide.Locked) =
+		lookAt(atoms.centroid().toFloat(), slide.views)
 
-	private fun Camera.lookAt(atom: Atom) =
-		lookAt(atom.pos.toFloat())
+	private fun Camera.lookAt(atom: Atom, slide: Slide.Locked) =
+		lookAt(atom.pos.toFloat(), slide.views)
 
 	private fun Collection<Atom>.centroid() =
 		Vector3d().apply {
@@ -282,7 +283,7 @@ class MoleculeNavigator : SlideFeature {
 			div(size.toDouble())
 		}
 
-	private fun guiProtein(imgui: Commands, slidewin: SlideCommands, views: List<MoleculeRenderView>, mol: Polymer) = imgui.run {
+	private fun guiProtein(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands, views: List<MoleculeRenderView>, mol: Polymer) = imgui.run {
 
 		fun Polymer.Residue.addToFocus() {
 			focusedResidues[mol]?.add(this)
@@ -350,7 +351,8 @@ class MoleculeNavigator : SlideFeature {
 										popupContextItem("resPopup") {
 
 											if (button("Center Camera")) {
-												slidewin.camera.lookAt(res.atoms)
+												slidewin.camera.lookAt(res.atoms, slide)
+												slidewin.camera.changed()
 												closeCurrentPopup()
 											}
 
@@ -398,7 +400,7 @@ class MoleculeNavigator : SlideFeature {
 		}
 	}
 
-	private fun guiSmallMolecule(imgui: Commands, slidewin: SlideCommands, mol: Molecule) = imgui.run {
+	private fun guiSmallMolecule(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands, mol: Molecule) = imgui.run {
 
 		treeNode("Atoms") {
 
@@ -427,7 +429,8 @@ class MoleculeNavigator : SlideFeature {
 									// show a context menu to center the camera on the molecule
 									popupContextItem("centerCamera") {
 										if (button("Center Camera")) {
-											slidewin.camera.lookAt(atom)
+											slidewin.camera.lookAt(atom, slide)
+											slidewin.camera.changed()
 											closeCurrentPopup()
 										}
 									}
@@ -471,7 +474,8 @@ class MoleculeNavigator : SlideFeature {
 			// show a button to center the camera on the atom
 			if (button("Center Camera")) {
 				closeCurrentPopup()
-				slidewin.camera.lookAt(atom)
+				slidewin.camera.lookAt(atom, slide)
+				slidewin.camera.changed()
 			}
 
 			unindent(10f)
