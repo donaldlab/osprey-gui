@@ -515,8 +515,3 @@ private val hoverEffect = RenderEffect(
 	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Outset),
 	200u, 200u, 200u
 )
-
-private val hideEffect = RenderEffect(
-	ByteFlags.of(RenderEffect.Flags.Alpha),
-	32u, 0u, 0u
-)
