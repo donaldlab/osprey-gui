@@ -9,6 +9,7 @@ import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.combine
+import edu.duke.cs.molscope.molecule.filter
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.prep.Probe
@@ -93,7 +94,10 @@ class ClashViewer : SlideFeature {
 	private fun loadClashes(views: List<MoleculeRenderView>) {
 
 		// combine all the molecules into one PDB
-		val pdb = views.map { it.mol }
+		val pdb = views.map { view ->
+				// grab just the selected part of the molecule
+				view.selector.filter(view.mol)
+			}
 			.combine("combined").first
 			.toPDB()
 
