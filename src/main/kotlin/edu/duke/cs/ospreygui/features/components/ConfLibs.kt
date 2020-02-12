@@ -7,7 +7,7 @@ import edu.duke.cs.molscope.gui.Alert
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.read
-import edu.duke.cs.ospreygui.prep.ConfSpacePrep
+import edu.duke.cs.ospreygui.prep.ConfSpace
 import java.nio.file.Paths
 
 
@@ -40,7 +40,7 @@ object ConfLibs {
 	}
 }
 
-class ConfLibPicker(val prep: ConfSpacePrep) {
+class ConfLibPicker(val confSpace: ConfSpace) {
 
 	private var libDir = Paths.get("").toAbsolutePath()
 	private val conflibFilter = FilterList(listOf("conflib.toml"))
@@ -70,7 +70,7 @@ class ConfLibPicker(val prep: ConfSpacePrep) {
 		// show available libraries
 		text("Conformation Libraries")
 		child("libs", 300f, 100f, true) {
-			for (conflib in prep.conflibs) {
+			for (conflib in confSpace.conflibs) {
 				text(conflib.name)
 				conflibTooltip(conflib.name, conflib.description, conflib.citation)
 			}
@@ -110,11 +110,15 @@ class ConfLibPicker(val prep: ConfSpacePrep) {
 	}
 
 	private fun addLib(toml: String) {
-		try {
-			val conflib = prep.conflibs.add(toml)
-			onAdd?.invoke(conflib)
-		} catch (ex: ConfSpacePrep.DuplicateConfLibException) {
-			alert.show("Skipped adding duplicate Conformation Library:\n${ex.conflib.name}")
+
+		val conflib = ConfLib.from(toml)
+
+		if (confSpace.conflibs.contains(conflib)) {
+			alert.show("Skipped adding duplicate Conformation Library:\n${conflib.name}")
+			return
 		}
+
+		confSpace.conflibs.add(conflib)
+		onAdd?.invoke(conflib)
 	}
 }

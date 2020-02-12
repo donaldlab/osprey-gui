@@ -13,6 +13,7 @@ import edu.duke.cs.ospreygui.motions.MolMotion
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
+import io.kotlintest.matchers.types.shouldNotBeSameInstanceAs
 import io.kotlintest.shouldBe
 import org.joml.Vector3d
 
@@ -34,6 +35,8 @@ fun makeTestConfSpace(): ConfSpace {
 	)).apply {
 
 		name = "The Awesomest Conformation Space Evarrrr!!!"
+
+		conflibs.add(conflib)
 
 		// add some positions to the protein
 		val leu26 = protein.findChainOrThrow("A").findResidueOrThrow("26")
@@ -184,6 +187,11 @@ fun makeTestConfSpace(): ConfSpace {
 				),
 				motions = emptyList()
 			)
+			conflibs.add(ConfLib(
+				id = "barlib",
+				name = "BAR",
+				fragments = mapOf(bar.id to bar)
+			))
 
 			// add some confs
 			confs.addAll(wtFrag)
@@ -227,6 +235,9 @@ class TestConfSpace : SharedSpec({
 		val obs = this
 
 		obs.name shouldBe exp.name
+
+		// check the conformation libraries
+		obs.conflibs.map { it.id } shouldBe exp.conflibs.map { it.id }
 
 		// check the molecules
 		for ((obsPair, expPair) in obs.mols.zip(exp.mols)) {
@@ -275,6 +286,9 @@ class TestConfSpace : SharedSpec({
 			val expPosConfSpace = exp.positionConfSpaces[expPos]!!
 
 			obsPosConfSpace.wildTypeFragment shouldBeFrag expPosConfSpace.wildTypeFragment
+			if (expPosConfSpace.wildTypeFragment != null && obsPosConfSpace.wildTypeFragment != null) {
+				obsPosConfSpace.wildTypeFragment shouldNotBeSameInstanceAs expPosConfSpace.wildTypeFragment
+			}
 			obsPosConfSpace.mutations shouldBe expPosConfSpace.mutations
 
 			// check the confs
@@ -283,6 +297,11 @@ class TestConfSpace : SharedSpec({
 
 				obsSpace.frag shouldBeFrag expSpace.frag
 				obsSpace.conf shouldBeConf expSpace.conf
+
+				val isWildtype = expSpace.frag === expPosConfSpace.wildTypeFragment
+				if (isWildtype) {
+					obsSpace.frag shouldNotBeSameInstanceAs expSpace.frag
+				}
 
 				// check the motions
 				obsSpace.motions.size shouldBe expSpace.motions.size

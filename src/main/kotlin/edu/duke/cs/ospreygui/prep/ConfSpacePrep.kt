@@ -9,42 +9,12 @@ import edu.duke.cs.molscope.gui.features.slide.CameraTool
 import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.ospreygui.defaultRenderSettings
 import edu.duke.cs.ospreygui.features.slide.*
-import edu.duke.cs.ospreygui.io.ConfLib
-import java.util.*
 
 
 class ConfSpacePrep(
 	win: WindowCommands,
 	val confSpace: ConfSpace
 ) {
-
-	class ConfLibs : Iterable<ConfLib> {
-
-		private val conflibs = ArrayList<ConfLib>()
-
-		override fun iterator() = conflibs.iterator()
-
-		fun add(toml: String): ConfLib {
-
-			val conflib = ConfLib.from(toml)
-
-			// don't load the same library more than once
-			if (conflibs.any { it.name == conflib.name }) {
-				throw DuplicateConfLibException(conflib)
-			}
-
-			add(conflib)
-
-			return conflib
-		}
-
-		fun add(confLib: ConfLib) {
-			conflibs.add(confLib)
-		}
-	}
-	val conflibs = ConfLibs()
-
-	class DuplicateConfLibException(val conflib: ConfLib) : RuntimeException("Conformation library already loaded: ${conflib.name}")
 
 	// make the slide last, since many slide features need to access the prep
 	val slide = Slide(confSpace.name, initialSize = Extent2D(640, 480)).apply {
@@ -77,9 +47,9 @@ class ConfSpacePrep(
 				add(ClashViewer())
 			}
 			s.features.menu("Edit") {
-				add(ConfSpaceNameEditor(this@ConfSpacePrep))
-				add(MutationEditor(this@ConfSpacePrep))
-				add(ConformationEditor(this@ConfSpacePrep))
+				add(ConfSpaceNameEditor(confSpace))
+				add(MutationEditor(confSpace))
+				add(ConformationEditor(confSpace))
 			}
 		}
 		win.addSlide(this)

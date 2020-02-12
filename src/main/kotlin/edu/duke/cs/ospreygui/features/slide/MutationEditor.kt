@@ -16,14 +16,14 @@ import edu.duke.cs.ospreygui.features.components.ConfLibPicker
 import edu.duke.cs.ospreygui.features.components.DesignPositionEditor
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
-import edu.duke.cs.ospreygui.prep.ConfSpacePrep
+import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import java.math.BigInteger
 import java.text.NumberFormat
 import kotlin.collections.ArrayList
 
 
-class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
+class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 
 	override val id = FeatureId("edit.mutations")
 
@@ -38,7 +38,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		val winState = WindowState()
 			.apply { pOpen.value = true }
 
-		val posEditor = DesignPositionEditor(prep, pos)
+		val posEditor = DesignPositionEditor(confSpace, pos)
 		val mutationsTabState = Commands.TabState()
 		var resetTabSelection = true
 		var hoverEffects = null as HoverEffects.Writer?
@@ -121,7 +121,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			)
 		}
 
-		private val conflibPicker = ConfLibPicker(prep).apply {
+		private val conflibPicker = ConfLibPicker(confSpace).apply {
 			onAdd = { activateMutationsTab() }
 		}
 
@@ -174,7 +174,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 			selectedSeqInfo = wildTypeInfo
 
 			// add fragments from the libraries
-			for (conflib in prep.conflibs) {
+			for (conflib in confSpace.conflibs) {
 				conflib.fragments.values
 					.filter { pos.isFragmentCompatible(it) }
 					.groupBy { it.type }
@@ -259,7 +259,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		val label = pos.name
 	}
 
-	private val DesignPosition.confSpace get() = prep.confSpace.positionConfSpaces.getOrMake(this)
+	private val DesignPosition.confSpace get() =
+		this@MutationEditor.confSpace.positionConfSpaces.getOrMake(this)
 
 	private inner class MolInfo(val molType: MoleculeType, val mol: Molecule) {
 
@@ -280,7 +281,7 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		fun makeNewPosition(): PosInfo {
 
-			val positions = prep.confSpace.designPositionsByMol
+			val positions = confSpace.designPositionsByMol
 				.getOrPut(mol) { ArrayList() }
 
 			// choose a default but unique name
@@ -338,10 +339,10 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 				// reset infos
 				molInfos.clear()
-				for ((moltype, mol) in prep.confSpace.mols) {
+				for ((moltype, mol) in confSpace.mols) {
 					MolInfo(moltype, mol).apply {
 						molInfos.add(this)
-						prep.confSpace.designPositionsByMol[mol]?.forEach { pos ->
+						confSpace.designPositionsByMol[mol]?.forEach { pos ->
 							posInfos.add(PosInfo(pos, moltype))
 						}
 					}
@@ -400,8 +401,8 @@ class MutationEditor(val prep: ConfSpacePrep) : SlideFeature {
 										selectedPosInfo!!
 
 										molInfo.posInfos.remove(selectedPosInfo)
-										prep.confSpace.designPositionsByMol[molInfo.mol]?.remove(selectedPosInfo.pos)
-										prep.confSpace.positionConfSpaces.remove(selectedPosInfo.pos)
+										confSpace.designPositionsByMol[molInfo.mol]?.remove(selectedPosInfo.pos)
+										confSpace.positionConfSpaces.remove(selectedPosInfo.pos)
 										updateSequenceCounts()
 									}
 								}

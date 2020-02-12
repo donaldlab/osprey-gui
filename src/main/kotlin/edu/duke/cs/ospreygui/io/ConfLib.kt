@@ -17,6 +17,9 @@ import kotlin.collections.HashMap
  * Conformation Library
  */
 class ConfLib(
+	/** should be a valid TOML key */
+	val id: String,
+	/** any human-readable short name */
 	val name: String,
 	val fragments: Map<String,Fragment>,
 	val description: String? = null,
@@ -195,7 +198,10 @@ class ConfLib(
 		val description: String?,
 		val coords: Map<AtomInfo,Vector3d>,
 		val anchorCoords: Map<Anchor,AnchorCoords>
-	)
+	) {
+
+		fun uniqueId(conflib: ConfLib, frag: Fragment) = "${conflib.id}/${frag.id}/$id"
+	}
 
 	interface AtomPointer {
 
@@ -300,6 +306,8 @@ class ConfLib(
 		val motions: List<ContinuousMotion>
 	) {
 
+		fun uniqueId(conflib: ConfLib) = "${conflib.id}/$id"
+
 		fun bondedAtoms(atom: AtomInfo): List<AtomInfo> =
 			bonds
 				.mapNotNull { (a, b) ->
@@ -386,7 +394,13 @@ class ConfLib(
 				throw TomlParseException("TOML parsing failure:\n${doc.errors().joinToString("\n")}")
 			}
 
+			return from(doc)
+		}
+
+		fun from(doc: TomlTable): ConfLib {
+
 			// read the header
+			val libId = doc.getStringOrThrow("id")
 			val libName = doc.getStringOrThrow("name")
 			val libDesc = doc.getString("description")
 			val citation = doc.getString("citation")
@@ -394,7 +408,7 @@ class ConfLib(
 			// read the fragments
 			val frags = fragmentsFrom(doc)
 
-			return ConfLib(libName, frags, libDesc, citation)
+			return ConfLib(libId, libName, frags, libDesc, citation)
 		}
 
 		fun fragmentsFrom(toml: String): Map<String,Fragment> {
@@ -408,7 +422,7 @@ class ConfLib(
 			return fragmentsFrom(doc)
 		}
 
-		fun fragmentsFrom(doc: TomlParseResult): Map<String,Fragment> {
+		fun fragmentsFrom(doc: TomlTable): Map<String,Fragment> {
 
 			val frags = HashMap<String,Fragment>()
 
@@ -600,20 +614,35 @@ class ConfLib(
 	}
 }
 
-val ConfLib?.runtimeId get() = "__dynamic__"
+fun ConfLib.toToml(table: String? = null): String {
 
-fun ConfLib?.fragRuntimeId(frag: ConfLib.Fragment) =
-	"$runtimeId.${frag.id}"
+	val buf = StringBuilder()
+	fun write(str: String, vararg args: Any) = buf.append(String.format(str, *args))
 
-fun ConfLib?.confRuntimeId(frag: ConfLib.Fragment, conf: ConfLib.Conf) =
-	"$runtimeId.${frag.id}.${conf.id}"
+	// write the header
+	if (table != null) {
+		write("[$table]\n")
+	}
+	write("id = %s\n", id.quote())
+	write("name = %s\n", name.quote())
+	description?.let {
+		write("description = %s\n", it.multilineQuote())
+	}
+	citation?.let {
+		write("citation = %s\n", it.multilineQuote())
+	}
+
+	// write the fragments
+	write(fragments.values.sortedBy { it.id }.toToml(table = table).toml)
+
+	return buf.toString()
+}
 
 
 data class FragmentsTOML(
 	val toml: String,
 	val idsByFrag: Map<ConfLib.Fragment,String>
 )
-
 
 /**
  * Writes out a list of fragments to TOML
@@ -623,7 +652,11 @@ fun List<ConfLib.Fragment>.toToml(
 	 * If true, appends sequence numbers to fragment ids to avoid collisions.
 	 * If false, throws an exception when an id collision is found.
 	 */
-	resolveIdCollisions: Boolean = false
+	resolveIdCollisions: Boolean = false,
+	/**
+	 * If given, add fragments to the table, instead of the root document.
+	 */
+	table: String? = null
 ): FragmentsTOML {
 
 	val buf = StringBuilder()
@@ -655,8 +688,14 @@ fun List<ConfLib.Fragment>.toToml(
 		fragIds.add(id)
 		idsByFrag[frag] = id
 
+		val tablePrefix = if (table != null) {
+			"$table."
+		} else {
+			""
+		}
+
 		write("\n")
-		write("[frag.$id]\n")
+		write("[${tablePrefix}frag.$id]\n")
 		write("name = %s\n", frag.name.quote())
 		write("type = %s\n", frag.type.quote())
 
@@ -741,7 +780,7 @@ fun List<ConfLib.Fragment>.toToml(
 		// write the confs
 		for ((confId, conf) in frag.confs) {
 
-			write("[frag.$id.conf.$confId]\n")
+			write("[${tablePrefix}frag.$id.conf.$confId]\n")
 			write("name = %s\n", conf.name.quote())
 			conf.description?.let { write("description = %s\n", it.quote()) }
 
@@ -786,6 +825,8 @@ fun List<ConfLib.Fragment>.toToml(
 }
 
 private fun String.quote() = "'$this'"
+
+private fun String.multilineQuote() = "'''\n$this'''"
 
 private fun Vector3dc.toToml() =
 	"[ %12.6f, %12.6f, %12.6f ]".format(x, y, z)

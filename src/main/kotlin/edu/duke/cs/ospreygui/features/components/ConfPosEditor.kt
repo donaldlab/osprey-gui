@@ -13,23 +13,20 @@ import edu.duke.cs.ospreygui.features.slide.ConformationEditor.MolInfo
 import edu.duke.cs.ospreygui.features.slide.ConformationEditor.PosInfo
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
-import edu.duke.cs.ospreygui.io.confRuntimeId
-import edu.duke.cs.ospreygui.io.fragRuntimeId
 import edu.duke.cs.ospreygui.motions.DihedralAngle
 import edu.duke.cs.ospreygui.prep.ConfSpace
-import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import kotlin.random.asKotlinRandom
 
 
-class ConfPosEditor(val prep: ConfSpacePrep, val molInfo: MolInfo, val posInfo: PosInfo, val onClose: () -> Unit) {
+class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo: PosInfo, val onClose: () -> Unit) {
 
 	private val winState = WindowState()
 		.apply { pOpen.value = true }
-	private val posEditor = DesignPositionEditor(prep, posInfo.pos)
+	private val posEditor = DesignPositionEditor(confSpace, posInfo.pos)
 	private var resetTabSelection = true
 	private val discreteTabState = Commands.TabState()
 	private val continuousTabState = Commands.TabState()
-	private val conflibPicker = ConfLibPicker(prep).apply {
+	private val conflibPicker = ConfLibPicker(confSpace).apply {
 		onAdd = { resetInfos() }
 	}
 
@@ -44,13 +41,23 @@ class ConfPosEditor(val prep: ConfSpacePrep, val molInfo: MolInfo, val posInfo: 
 
 		inner class FragInfo(val conflib: ConfLib?, val frag: ConfLib.Fragment) {
 
-			val id = conflib.fragRuntimeId(frag)
+			val id =
+				if (conflib != null) {
+					frag.uniqueId(conflib)
+				} else {
+					"wildtype/${frag.id}"
+				}
 
 			inner class ConfInfo(val conf: ConfLib.Conf) {
 
 				val fragInfo get() = this@FragInfo
 
-				val id = conflib.confRuntimeId(frag, conf)
+				val id =
+					if (conflib != null) {
+						conf.uniqueId(conflib, frag)
+					} else {
+						"wildtype/${frag.id}/${conf.id}"
+					}
 				val label = "${conf.name}##$id"
 
 				val isSelected = posInfo.posConfSpace.confs.contains(frag, conf)
@@ -81,7 +88,7 @@ class ConfPosEditor(val prep: ConfSpacePrep, val molInfo: MolInfo, val posInfo: 
 		}
 
 		// collect the fragments from the conf libs
-		val fragInfos = prep.conflibs
+		val fragInfos = confSpace.conflibs
 			.flatMap { conflib -> conflib.fragments.values.map { conflib to it } }
 			.toMutableList()
 			.let { frags ->

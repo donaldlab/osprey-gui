@@ -13,13 +13,13 @@ import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.toTomlKey
 import edu.duke.cs.ospreygui.motions.DihedralAngle
-import edu.duke.cs.ospreygui.prep.ConfSpacePrep
+import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
 
 
 class DesignPositionEditor(
-	val prep: ConfSpacePrep,
+	val confSpace: ConfSpace,
 	val pos: DesignPosition
 ) {
 
@@ -141,20 +141,21 @@ class DesignPositionEditor(
 		return label
 	}
 
-	private val DesignPosition.confSpace get() = prep.confSpace.positionConfSpaces.getOrMake(this)
+	private val DesignPosition.confSpace get() =
+		this@DesignPositionEditor.confSpace.positionConfSpaces.getOrMake(this)
 
 	private fun resetPosConfSpace() {
 
 		val posType = pos.type
 
 		// delete the old conf space
-		prep.confSpace.positionConfSpaces.remove(pos)
+		confSpace.positionConfSpaces.remove(pos)
 
 		// make a new conf space
 		pos.confSpace.apply {
 
 			// find motions for the wildtype fragment, by finding a similar fragment from the library
-			val wtMotions = prep.conflibs
+			val wtMotions = confSpace.conflibs
 				.flatMap { it.fragments.values }
 				.firstOrNull {
 					// grab the first compatible fragment with the same seqeuence type
@@ -182,7 +183,7 @@ class DesignPositionEditor(
 			val frags = ArrayList<ConfLib.Fragment>().apply {
 				wildTypeFragment
 					?.let { add(it) }
-				prep.conflibs
+				confSpace.conflibs
 					.flatMap { pos.compatibleFragments(it) }
 					.filter { it.type == posType }
 					.forEach { add(it) }

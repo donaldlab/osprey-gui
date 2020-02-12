@@ -10,7 +10,13 @@ import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.tools.UnsupportedClassException
 import org.tomlj.Toml
 import org.tomlj.TomlPosition
+import java.util.*
+import kotlin.NoSuchElementException
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
+
+private const val wtConflibId = "__wildtype__"
 
 fun ConfSpace.toToml(): String {
 
@@ -28,15 +34,33 @@ fun ConfSpace.toToml(): String {
 		indicesByAtom[this]
 			?: throw NoSuchElementException("no index for atom $this")
 
-	// write down all the fragments
-	val wtFrags = wildTypeFragments()
-	write("\n")
-	val frags = libraryFragments() + wtFrags
-	val (fragsToml, idsByFrag) = frags.toToml(resolveIdCollisions = true)
-	write(fragsToml)
+	val fragConflibIds = IdentityHashMap<ConfLib.Fragment,String>()
 
-	fun ConfLib.Fragment.resolvedId() =
-		idsByFrag.getValue(this)
+	// make a conflib for the wild-type conformations
+	val wtConflib = ConfLib(
+		id = wtConflibId,
+		name = "Wild-Type",
+		fragments = wildTypeFragments().associateBy { it.id }
+	)
+	for (frag in wtConflib.fragments.values) {
+		fragConflibIds[frag] = wtConflib.id
+	}
+
+	// write down all the conf libs
+	for (conflib in conflibs + listOf(wtConflib)) {
+
+		for (frag in conflib.fragments.values) {
+			fragConflibIds[frag] = conflib.id
+		}
+
+		write("\n")
+		write(conflib.toToml(table = "conflibs.${conflib.id}"))
+	}
+
+	fun ConfLib.Fragment.conflibId() =
+		fragConflibIds[this]
+			?: throw Error("no conformation library id for fragment: $id\n" +
+				"maybe the conformation library was not added to the conformation space")
 
 	// write the conf space
 	write("\n")
@@ -92,7 +116,7 @@ fun ConfSpace.toToml(): String {
 			write("\n")
 			write("[confspace.positions.$posi.confspace]\n")
 			posConfSpace.wildTypeFragment?.let {
-				write("wtfrag = %s\n", it.resolvedId().quote())
+				write("wtfrag = %s\n", it.id.quote())
 			}
 			write("mutations = [ %s ]\n",
 				posConfSpace.mutations.joinToString(", ") { it.quote() }
@@ -102,6 +126,7 @@ fun ConfSpace.toToml(): String {
 			for ((confi, space) in posConfSpace.confs.withIndex()) {
 
 				write("[confspace.positions.$posi.confspace.confs.$confi]\n")
+				write("conflib = %s\n", space.frag.conflibId().quote())
 				write("frag = %s\n", space.frag.id.quote())
 				write("conf = %s\n", space.conf.id.quote())
 
@@ -162,13 +187,7 @@ fun ConfSpace.toToml(): String {
 
 private fun String.quote() = "'$this'"
 
-fun ConfSpace.Companion.fromToml(toml: String): ConfSpace =
-	fromTomlWithConfLib(toml).first
-
-/**
- * Returns the conformation space, and the library conformations (ie non-wild-type fragments) as a ConfLib
- */
-fun ConfSpace.Companion.fromTomlWithConfLib(toml: String): Pair<ConfSpace,ConfLib> {
+fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 
 	// parse the TOML
 	val doc = Toml.parse(toml)
@@ -200,22 +219,30 @@ fun ConfSpace.Companion.fromTomlWithConfLib(toml: String): Pair<ConfSpace,ConfLi
 		atomIndices[i]
 			?: throw TomlParseException("no atom with index $i", pos)
 
-	// read the fragments, if any
-	val frags =
-		if (doc.contains("frag")) {
-			ConfLib.fragmentsFrom(doc)
-		} else {
-			HashMap()
-		}
-	fun getFrag(id: String, pos: TomlPosition?) =
-		frags[id] ?: throw TomlParseException("no fragment with id $id", pos)
-	
 	// read the conf space
 	val confSpaceTable = doc.getTableOrThrow("confspace")
 
 	val confSpace = ConfSpace(typesAndMols).apply {
 
 		name = confSpaceTable.getStringOrThrow("name")
+
+		// read the conflibs, if any
+		var wtConflib: ConfLib? = null
+		val conflibsTable = doc.getTable("conflibs")
+		if (conflibsTable != null) {
+			for (conflibId in conflibsTable.keySet()) {
+				val conflibTable = conflibsTable.getTableOrThrow(conflibId)
+
+				val conflib = ConfLib.from(conflibTable)
+
+				// add all but the wildtype library to the conf space
+				if (conflibId == wtConflibId) {
+					wtConflib = conflib
+				} else {
+					conflibs.add(conflib)
+				}
+			}
+		}
 
 		// read the positions, if any
 		val positionsTable = confSpaceTable.getTable("positions")
@@ -246,7 +273,8 @@ fun ConfSpace.Companion.fromTomlWithConfLib(toml: String): Pair<ConfSpace,ConfLi
 					positionConfSpaces.getOrMake(this@pos).apply {
 
 						// get the wild type fragment, if any
-						wildTypeFragment = posConfSpaceTable.getString("wtfrag")?.let { getFrag(it, posConfSpacePos) }
+						wildTypeFragment = posConfSpaceTable.getString("wtfrag")
+							?.let { id -> wtConflib?.fragments?.get(id) }
 
 						// read the mutations
 						val mutationsArray = posConfSpaceTable.getArrayOrThrow("mutations", posConfSpacePos)
@@ -261,8 +289,21 @@ fun ConfSpace.Companion.fromTomlWithConfLib(toml: String): Pair<ConfSpace,ConfLi
 								val confTable = confsTable.getTableOrThrow(confkey)
 								val confPos = confsTable.inputPositionOf(confkey)
 
-								val frag = getFrag(confTable.getStringOrThrow("frag"), confPos)
+								// get the conformation library
+								val conflibId = confTable.getStringOrThrow("conflib", confPos)
+								val conflib =
+									if (conflibId == wtConflibId) {
+										wtConflib ?: throw TomlParseException("Wild-type fragment was specified, but no wild-type conformation library was included")
+									} else {
+										conflibs.getOrThrow(conflibId)
+									}
 
+								// get the fragment
+								val fragId = confTable.getStringOrThrow("frag", confPos)
+								val frag = conflib.fragments[fragId]
+									?: throw TomlParseException("no fragment with id $fragId in conformation library $conflibId")
+
+								// get the conf
 								val confId = confTable.getStringOrThrow("conf")
 								val conf = frag.confs[confId]
 									?: throw TomlParseException("no conf with id $confId in fragment ${frag.id}", confPos)
@@ -383,15 +424,5 @@ fun ConfSpace.Companion.fromTomlWithConfLib(toml: String): Pair<ConfSpace,ConfLi
 		}
 	}
 
-	val wtFragIds = confSpace.wildTypeFragments()
-		.map { it.id }
-		.toSet()
-
-	val confLib = ConfLib(
-		name = "Conformation Space",
-		fragments = frags.filter { (id, _) -> id !in wtFragIds },
-		description = "from the conformation space named: \"${confSpace.name}\""
-	)
-
-	return confSpace to confLib
+	return confSpace
 }

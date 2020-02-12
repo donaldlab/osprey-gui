@@ -28,6 +28,43 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 			.sortedBy { (mol, _) -> mol.name }
 			.flatMap { (_, positions) -> positions }
 
+	class DuplicateConfLibException(val conflib: ConfLib) : RuntimeException("Conformation library already loaded: ${conflib.name}")
+
+	class ConfLibs : Iterable<ConfLib> {
+
+		private val conflibs = HashMap<String,ConfLib>()
+
+		override fun iterator() = conflibs.values
+			.sortedBy { it.name }
+			.iterator()
+
+		fun contains(conflib: ConfLib) =
+			conflibs.containsKey(conflib.id)
+
+		fun get(id: String) =
+			conflibs[id]
+
+		fun getOrThrow(id: String) =
+			get(id) ?: throw NoSuchElementException("no conformation library with id $id")
+
+		fun add(conflib: ConfLib) {
+
+			// don't load the same library more than once
+			if (contains(conflib)) {
+				throw DuplicateConfLibException(conflib)
+			}
+
+			conflibs[conflib.id] = conflib
+		}
+
+		fun addAll(conflibs: Iterable<ConfLib>) {
+			for (conflib in conflibs) {
+				add(conflib)
+			}
+		}
+	}
+	val conflibs = ConfLibs()
+
 	/**
 	 * Collect all the unique library (ie non-wild-type) fragments used by the conf space.
 	 */
@@ -225,6 +262,9 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 		// copy the name
 		new.name = old.name
 
+		// copy over the conformation libraries
+		new.conflibs.addAll(old.conflibs)
+
 		for ((oldMol, newMol) in oldMols.zip(newMols)) {
 
 			// make an atom map across the two molecules
@@ -282,7 +322,17 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 					newPosConfSpace.mutations.addAll(oldPosConfSpace.mutations)
 
 					for (oldSpace in oldPosConfSpace.confs) {
-						val newSpace = newPosConfSpace.confs.add(oldSpace.frag, oldSpace.conf)
+
+						// copy the fragment/conformation
+						val isWildtype = oldSpace.frag === oldPosConfSpace.wildTypeFragment
+						val newSpace = if (isWildtype) {
+							val newWTFrag = newPosConfSpace.wildTypeFragment!!
+							newPosConfSpace.confs.add(newWTFrag, newWTFrag.confs.values.first())
+						} else {
+							newPosConfSpace.confs.add(oldSpace.frag, oldSpace.conf)
+						}
+
+						// copy the motions
 						for (oldMotion in oldSpace.motions) {
 							newSpace.motions.add(oldMotion.copyTo(newPos))
 						}

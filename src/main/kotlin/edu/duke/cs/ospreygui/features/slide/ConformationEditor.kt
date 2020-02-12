@@ -13,7 +13,7 @@ import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.motions.DihedralAngle
 import edu.duke.cs.ospreygui.motions.MolMotion
 import edu.duke.cs.ospreygui.motions.TranslationRotation
-import edu.duke.cs.ospreygui.prep.ConfSpacePrep
+import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import java.math.BigInteger
 import java.text.NumberFormat
@@ -21,7 +21,7 @@ import java.util.*
 import kotlin.collections.ArrayList
 
 
-class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
+class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 
 	override val id = FeatureId("edit.conformations")
 
@@ -54,7 +54,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		var numConfs: BigInteger = BigInteger.ZERO
 
 		val motions get() =
-			prep.confSpace.molMotions
+			confSpace.molMotions
 				.getOrPut(mol) { ArrayList() }
 
 		val motionInfos = motions
@@ -70,7 +70,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		fun makeNewPosition(): PosInfo {
 
-			val positions = prep.confSpace.designPositionsByMol
+			val positions = confSpace.designPositionsByMol
 				.getOrPut(mol) { ArrayList() }
 
 			// choose a default but unique name
@@ -98,14 +98,14 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 		fun removePosition(posInfo: PosInfo) {
 
 			posInfos.remove(posInfo)
-			prep.confSpace.designPositionsByMol[mol]?.remove(posInfo.pos)
-			prep.confSpace.positionConfSpaces.remove(posInfo.pos)
+			confSpace.designPositionsByMol[mol]?.remove(posInfo.pos)
+			confSpace.positionConfSpaces.remove(posInfo.pos)
 		}
 	}
 
 	inner class PosInfo(val pos: DesignPosition) {
 
-		val posConfSpace get() = prep.confSpace.positionConfSpaces.getOrMake(pos)
+		val posConfSpace get() = confSpace.positionConfSpaces.getOrMake(pos)
 		val isMutable get() = posConfSpace.isMutable()
 		val isFlexible get() = !isMutable
 	}
@@ -116,9 +116,9 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 		molInfos.clear()
 
-		for ((moltype, mol) in prep.confSpace.mols) {
+		for ((moltype, mol) in confSpace.mols) {
 			molInfos.getOrPut(mol) { MolInfo(mol, moltype) }.apply {
-				prep.confSpace.designPositionsByMol[mol]?.forEach { pos ->
+				confSpace.designPositionsByMol[mol]?.forEach { pos ->
 					posInfos.add(PosInfo(pos))
 				}
 			}
@@ -217,7 +217,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 										// start the conformation editor
 										posEditor = ConfPosEditor(
-											prep,
+											confSpace,
 											molInfo,
 											molInfo.makeNewPosition(),
 											onClose = {
@@ -240,7 +240,7 @@ class ConformationEditor(val prep: ConfSpacePrep) : SlideFeature {
 
 											// start the conformation editor
 											posEditor = ConfPosEditor(
-												prep,
+												confSpace,
 												molInfo,
 												selectedPosInfo,
 												onClose = {

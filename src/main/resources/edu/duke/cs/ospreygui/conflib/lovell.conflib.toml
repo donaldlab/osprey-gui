@@ -1,4 +1,5 @@
 
+id = 'lovell2000-osprey3'
 name = 'Amino Acids: The Penultimate Rotamer Library (with Hydroxyl rotamers)'
 description = '''
 An exact replica of the rotamer library for amino acids from Osprey 3,

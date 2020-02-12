@@ -35,12 +35,6 @@ class OpenConfSpace : WindowFeature {
 		val toml = path.read()
 
 		// resume a previous prep
-		val (confSpace, confLib) = ConfSpace.fromTomlWithConfLib(toml)
-		ConfSpacePrep(win, confSpace).apply {
-
-			// build an ad-hoc conf lib from the fragments in the conf space
-			// so the GUI can use them
-			conflibs.add(confLib)
-		}
+		ConfSpacePrep(win, ConfSpace.fromToml(toml))
 	}
 }
