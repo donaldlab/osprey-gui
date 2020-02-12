@@ -426,7 +426,8 @@ class ConfLib(
 
 			val frags = HashMap<String,Fragment>()
 
-			val fragsTable = doc.getTableOrThrow("frag")
+			val fragsTable = doc.getTable("frag") ?: return frags
+
 			for (fragId in fragsTable.keySet()) {
 				val fragTable = fragsTable.getTableOrThrow(fragId)
 				val fragPos = fragsTable.inputPositionOf(fragId)
