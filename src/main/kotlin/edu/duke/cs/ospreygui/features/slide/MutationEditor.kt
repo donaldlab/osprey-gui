@@ -257,6 +257,7 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 	private inner class PosInfo(val pos: DesignPosition, val moltype: MoleculeType) {
 
 		val label = pos.name
+		val numSequences = pos.confSpace.mutations.size
 	}
 
 	private val DesignPosition.confSpace get() =
@@ -308,6 +309,20 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 	}
 	private val molInfos = ArrayList<MolInfo>()
 
+	private fun resetInfos() {
+
+		molInfos.clear()
+
+		for ((moltype, mol) in confSpace.mols) {
+			MolInfo(moltype, mol).apply {
+				molInfos.add(this)
+				confSpace.designPositionsByMol[mol]?.forEach { pos ->
+					posInfos.add(PosInfo(pos, moltype))
+				}
+			}
+		}
+	}
+
 	private var selectedPosInfo = null as PosInfo?
 
 	private val sequenceFormatter = NumberFormat.getIntegerInstance()
@@ -337,17 +352,7 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 		winState.render(
 			onOpen = {
 
-				// reset infos
-				molInfos.clear()
-				for ((moltype, mol) in confSpace.mols) {
-					MolInfo(moltype, mol).apply {
-						molInfos.add(this)
-						confSpace.designPositionsByMol[mol]?.forEach { pos ->
-							posInfos.add(PosInfo(pos, moltype))
-						}
-					}
-				}
-
+				resetInfos()
 				updateSequenceCounts()
 			},
 			whenOpen = {
@@ -362,11 +367,16 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 
 								text("${molInfo.posInfos.size} positions(s)")
 								child("positions", 300f, 200f, true) {
+									columns(2)
 									for (posInfo in molInfo.posInfos) {
 										if (selectable(posInfo.label, selectedPosInfo === posInfo)) {
 											selectedPosInfo = posInfo
 										}
+										nextColumn()
+										text("${posInfo.numSequences} seqs")
+										nextColumn()
 									}
+									columns(1)
 								}
 
 								if (button("Add")) {
