@@ -2,7 +2,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 
 plugins {
-	kotlin("jvm") version "1.3.21"
+	kotlin("jvm") version "1.3.60"
+	kotlin("plugin.serialization") version "1.3.61"
 	application
 }
 
@@ -20,6 +21,11 @@ dependencies {
 	implementation(kotlin("reflect"))
 	implementation("edu.duke.cs:molscope")
 	implementation("edu.duke.cs:osprey3")
+	implementation("edu.duke.cs:osprey-service")
+
+	val ktorVersion = "1.3.0"
+	implementation("io.ktor:ktor-client-cio:$ktorVersion")
+	implementation("io.ktor:ktor-client-serialization-jvm:$ktorVersion")
 
 	testImplementation("io.kotlintest:kotlintest-runner-junit5:3.4.0")
 }
