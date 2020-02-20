@@ -4,8 +4,10 @@ import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.ospreygui.io.OspreyService
 import edu.duke.cs.ospreygui.io.fromMol2
 import edu.duke.cs.ospreygui.io.toPDB
+import edu.duke.cs.ospreyservice.services.MissingAtomsRequest
 
 
 /**
@@ -52,20 +54,8 @@ fun Molecule.inferMissingAtomsAmber(): List<Pair<Atom,Polymer.Residue?>> {
 private fun runLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom,Polymer.Residue?>> {
 
 	// run LEaP to infer all the missing atoms
-	val pdb = mol.toPDB()
-	val results = Leap.run(
-		filesToWrite = mapOf("in.pdb" to pdb),
-		commands = """
-			|verbosity 2
-			|source leaprc.${ffname.name}
-			|mol = loadPDB in.pdb
-			|saveMol2 mol out.mol2 0
-		""".trimMargin(),
-		filesToRead = listOf("out.mol2")
-	)
-
-	val src = Molecule.fromMol2(results.files["out.mol2"]
-		?: throw Leap.Exception("LEaP didn't produce an output molecule", pdb, results))
+	val response = OspreyService.missingAtoms(MissingAtomsRequest(mol.toPDB(), ffname.name))
+	val src = Molecule.fromMol2(response.mol2)
 
 	val dst = mol
 	val mapper = src.mapTo(dst)

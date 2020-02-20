@@ -21,6 +21,9 @@ import org.joml.AABBf
 
 fun main() = autoCloser {
 
+	// auto-stop the local service, if it gets started
+	LocalServiceRunner.autoClose()
+
 	// open a window
 	val win = Window(
 		width = 1280, // TODO: make this bigger?
@@ -30,6 +33,11 @@ fun main() = autoCloser {
 
 	// add window features
 	win.features.run {
+		if (OspreyGui.dev) {
+			menu("Dev") {
+				add(LocalService())
+			}
+		}
 		menu("File") {
 			add(ImportPDB())
 			add(OpenOMOL())
