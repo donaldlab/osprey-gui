@@ -10,22 +10,21 @@ import edu.duke.cs.ospreyservice.OspreyService as Server
 
 class TestOspreyService : SharedSpec({
 
-	val serviceDir = Paths.get("../osprey-service")
-
-	test("about") {
-		Server.use(serviceDir) {
-			OspreyService.about()
+	fun testService(name: String, block: () -> Unit) {
+		test(name) {
+			Server.Instance(Paths.get("../osprey-service"), wait = false).use {
+				block()
+			}
 		}
 	}
 
-	test("missingAtoms") {
-		Server.use(serviceDir) {
-
-			val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
-			val type = MoleculeType.Protein
-			OspreyService.missingAtoms(MissingAtomsRequest(pdb, type.defaultForcefieldNameOrThrow.name))
-		}
+	testService("about") {
+		OspreyService.about()
 	}
 
-	// TODO: fix issues with starting/stopping the service multiple times
+	testService("missingAtoms") {
+		val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
+		val type = MoleculeType.Protein
+		OspreyService.missingAtoms(MissingAtomsRequest(pdb, type.defaultForcefieldNameOrThrow.name))
+	}
 })
