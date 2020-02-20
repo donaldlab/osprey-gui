@@ -40,9 +40,8 @@ tasks.withType<KotlinCompile> {
 
 		jvmTarget = "1.8"
 
-		// enable experimental features
-		languageVersion = "1.3"
-		freeCompilerArgs += "-XXLanguage:+InlineClasses"
+		// enable experimental features so we can use the fancy ktor stuff
+		freeCompilerArgs += "-Xuse-experimental=kotlin.Experimental"
 	}
 }
 

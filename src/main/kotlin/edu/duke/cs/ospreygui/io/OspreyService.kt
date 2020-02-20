@@ -1,24 +1,35 @@
 package edu.duke.cs.ospreygui.io
 
-import edu.duke.cs.ospreyservice.HelloRequest
-import edu.duke.cs.ospreyservice.HelloResponse
+import edu.duke.cs.ospreyservice.ServiceResponse
+import edu.duke.cs.ospreyservice.services.AboutResponse
+import edu.duke.cs.ospreyservice.OspreyService as Server
 import io.ktor.client.HttpClient
+import io.ktor.client.call.TypeInfo
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.features.json.JsonFeature
+import io.ktor.client.features.json.JsonSerializer
 import io.ktor.client.features.json.serializer.KotlinxSerializer
 import io.ktor.client.request.HttpRequestBuilder
 import io.ktor.client.request.get
 import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
+import io.ktor.util.KtorExperimentalAPI
+import io.ktor.utils.io.core.Input
+import io.ktor.utils.io.core.readText
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ImplicitReflectionSerializer
+import kotlinx.serialization.serializer
+import kotlin.reflect.jvm.jvmErasure
 
 
 object OspreyService {
 
+	@UseExperimental(KtorExperimentalAPI::class)
 	private val client =
 		HttpClient(CIO) {
 			install(JsonFeature) {
-				serializer = KotlinxSerializer()
+				serializer = ServiceSerializer()
 			}
 		}
 
@@ -39,15 +50,43 @@ object OspreyService {
 		body = obj
 	}
 
-	fun hello(name: String) = runBlocking {
-		client.get<HelloResponse> {
-			path("/")
-			send(HelloRequest(name))
+	fun about() = runBlocking {
+		client.get<ServiceResponse<AboutResponse>> {
+			path("/about")
+			method = HttpMethod.Get
 		}
+		.responseOrThrow()
 	}
 }
 
-fun main() = edu.duke.cs.ospreyservice.OspreyService.use {
 
-	println(OspreyService.hello("Jeff"))
+private class ServiceSerializer : JsonSerializer {
+
+	// get ktor's usual serializer
+	private val ktorSerializer = KotlinxSerializer()
+
+	// for writes, just pass through to the usual serializer
+	override fun write(data: Any, contentType: ContentType) =
+		ktorSerializer.write(data, contentType)
+
+	// for reads, look for our ServiceResponse type and handle it specially
+	@UseExperimental(ImplicitReflectionSerializer::class)
+	override fun read(type: TypeInfo, body: Input) =
+		when (type.type) {
+
+			ServiceResponse::class -> {
+
+				// get the response type from the given type info
+				val rtype = type.kotlinType!!.arguments[0].type!!.jvmErasure
+
+				// de-serialize the json
+				Server.json.parse(
+					ServiceResponse.serializer(rtype.serializer()),
+					body.readText()
+				)
+			}
+
+			// otherwise, pass on to the usual serializer
+			else -> ktorSerializer.read(type, body)
+		}
 }
