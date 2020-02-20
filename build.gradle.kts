@@ -63,6 +63,9 @@ tasks {
 	// tell gradle to write down the version number where the app can read it
 	processResources {
 
+		// always update the build properties
+		outputs.upToDateWhen { false }
+
 		from(sourceSets["main"].resources.srcDirs) {
 			include("**/build.properties")
 			expand(
