@@ -1,9 +1,7 @@
 package edu.duke.cs.ospreygui.io
 
 import edu.duke.cs.ospreyservice.ServiceResponse
-import edu.duke.cs.ospreyservice.services.AboutResponse
-import edu.duke.cs.ospreyservice.services.MissingAtomsRequest
-import edu.duke.cs.ospreyservice.services.MissingAtomsResponse
+import edu.duke.cs.ospreyservice.services.*
 import edu.duke.cs.ospreyservice.OspreyService as Server
 import io.ktor.client.HttpClient
 import io.ktor.client.call.TypeInfo
@@ -63,6 +61,15 @@ object OspreyService {
 	fun missingAtoms(request: MissingAtomsRequest) = runBlocking {
 		client.get<ServiceResponse<MissingAtomsResponse>> {
 			path("missingAtoms")
+			method = HttpMethod.Post
+			send(request)
+		}
+		.responseOrThrow()
+	}
+
+	fun bonds(request: BondsRequest) = runBlocking {
+		client.get<ServiceResponse<BondsResponse>> {
+			path("bonds")
 			method = HttpMethod.Post
 			send(request)
 		}
