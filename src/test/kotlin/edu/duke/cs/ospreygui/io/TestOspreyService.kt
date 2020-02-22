@@ -1,45 +1,124 @@
 package edu.duke.cs.ospreygui.io
 
+import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.Element
+import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreyservice.services.BondsRequest
 import edu.duke.cs.ospreyservice.services.MissingAtomsRequest
+import edu.duke.cs.ospreyservice.services.ProtonateRequest
+import edu.duke.cs.ospreyservice.services.ProtonationRequest
 import java.nio.file.Paths
 import edu.duke.cs.ospreyservice.OspreyService as Server
 
 
 class TestOspreyService : SharedSpec({
 
-	fun testService(name: String, block: () -> Unit) {
-		test(name) {
-			Server.Instance(Paths.get("../osprey-service"), wait = false).use {
-				block()
-			}
+	// NOTE: these tests mostly make sure nothing crashes, rather than test for correct output
+
+	fun withService(block: () -> Unit) {
+		Server.Instance(Paths.get("../osprey-service"), wait = false).use {
+			block()
 		}
 	}
 
-	testService("about") {
-		OspreyService.about()
+	test("about") {
+		withService {
+			OspreyService.about()
+		}
 	}
 
-	testService("missingAtoms") {
-		val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
-		val type = MoleculeType.Protein
-		OspreyService.missingAtoms(MissingAtomsRequest(pdb, type.defaultForcefieldNameOrThrow.name))
+	test("missingAtoms") {
+		withService {
+			val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
+			val type = MoleculeType.Protein
+			OspreyService.missingAtoms(MissingAtomsRequest(pdb, type.defaultForcefieldNameOrThrow.name))
+		}
 	}
 
 	group("bonds") {
 
-		testService("protein") {
-			val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
-			val type = MoleculeType.Protein
-			OspreyService.bonds(BondsRequest(pdb, type.defaultForcefieldNameOrThrow.name))
+		test("protein") {
+			withService {
+				val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
+				val type = MoleculeType.Protein
+				OspreyService.bonds(BondsRequest(pdb, type.defaultForcefieldNameOrThrow.name))
+			}
 		}
 
-		testService("small mol") {
-			val pdb = OspreyGui.getResourceAsString("benzamidine.pdb")
-			OspreyService.bonds(BondsRequest(pdb, null))
+		test("small mol") {
+			withService {
+				val pdb = OspreyGui.getResourceAsString("benzamidine.pdb")
+				OspreyService.bonds(BondsRequest(pdb, null))
+			}
+		}
+	}
+
+	group("protonation") {
+
+		test("protein") {
+			withService {
+				val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
+				val ffname = MoleculeType.Protein.defaultForcefieldNameOrThrow
+				OspreyService.protonation(ProtonationRequest(pdb, ffname.name, null))
+			}
+		}
+
+		test("small mol") {
+			withService {
+				val pdb = OspreyGui.getResourceAsString("benzamidine.pdb")
+				val ffname = MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow
+				OspreyService.protonation(ProtonationRequest(pdb, ffname.name, ffname.atomTypesOrThrow.name))
+			}
+		}
+	}
+
+	group("protonate") {
+
+		test("methylene") {
+			withService {
+
+				val c = Atom(Element.Carbon, "C", 0.0, 0.0, 0.0)
+				val mol = Molecule(description().name).apply {
+					atoms.add(c)
+				}
+
+				OspreyService.protonate(ProtonateRequest(
+					mol.toMol2(),
+					c.name, "c1",
+					emptyList(),
+					listOf(
+						ProtonateRequest.Hydrogen("h1", "hc"),
+						ProtonateRequest.Hydrogen("h2", "hc")
+					)
+				))
+			}
+		}
+
+		test("diazynediium") {
+			withService {
+
+				val n1 = Atom(Element.Nitrogen, "N1",  0.6334, 0.0, 0.0)
+				val n2 = Atom(Element.Nitrogen, "N2", -0.6334, 0.0, 0.0)
+				val mol = Molecule(description().name).apply {
+					atoms.add(n1)
+					atoms.add(n2)
+					bonds.add(n1, n2)
+				}
+
+				OspreyService.protonate(ProtonateRequest(
+					mol.toMol2(),
+					n1.name, "n1",
+					listOf(
+						ProtonateRequest.Bond(n2.name, "n1", "T")
+					),
+					listOf(
+						ProtonateRequest.Hydrogen("h1", "hn")
+					)
+				))
+			}
 		}
 	}
 })

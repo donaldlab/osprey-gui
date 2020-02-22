@@ -4,9 +4,12 @@ import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.ospreygui.io.OspreyService
 import edu.duke.cs.ospreygui.io.fromMol2
 import edu.duke.cs.ospreygui.io.toMol2
 import edu.duke.cs.ospreygui.io.toPDB
+import edu.duke.cs.ospreyservice.services.ProtonateRequest
+import edu.duke.cs.ospreyservice.services.ProtonationRequest
 
 
 /**
@@ -79,101 +82,79 @@ fun Molecule.protonate(atom: Atom, protonation: Protonation) {
 		}
 		.toMol2()
 
-	// build the LEaP commands
-	val commands = ArrayList<String>().apply {
-
-		// show all the info in the console
-		add("verbosity 2")
-
-		// load the generalized amber forcefield (for small molecules)
-		// TODO: let caller pick the forcefield? (will have to have AmberTypes for each possible choice)
-		add("source leaprc.${MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow.name}")
-
-		// read our molecule fragment
-		add("mol = loadMol2 in.mol2")
-
-		// set the central atom type
-		add("set mol.1.${atom.name} type ${amberTypes.heavy}")
-
-		// do we need to set bond type info?
-		if (protonation.numHeavy == 1 && amberTypes.bondedHeavy != null && amberTypes.heavyBond != null) {
-
-			// yup, try to set the bond and atoms types explicitly so we get the desired geometry
-			// (leap doesn't recognize Sp hybridization explicitly,
-			// and sometimes gets Sp2 hybridization wrong when we don't label the bonds correctly)
-
-			// what's the other heavy atom?
-			val heavyAtom = mol.bonds.bondedAtoms(atom)
-				.filter { it.element != Element.Hydrogen }
-				.takeIf { it.size == 1 }
-				?.first()
-				?: throw IllegalArgumentException("couldn't find unique heavy bonded atom")
-
-			// set the other heavy atom type
-			val heavyAtomType = amberTypes.bondedHeavy[heavyAtom.element]
-				?: throw Error("protonation is Sp hybridized, but has no bonded heavy atom type for ${heavyAtom.element}")
-			add("set mol.1.${heavyAtom.name} type $heavyAtomType")
-
-			// replace the bond
-			add("deleteBond mol.1.${atom.name} mol.1.${heavyAtom.name}")
-			add("bond mol.1.${atom.name} mol.1.${heavyAtom.name} ${amberTypes.heavyBond}")
+	// get the hydrogens whose names we shouldn't match
+	val domainHydrogens = HashMap<String,Int?>().apply {
+		if (mol is Polymer) {
+			mol.findResidueOrThrow(atom).atoms
+		} else {
+			mol.atoms
 		}
-
-		// get the hydrogens whose names we shouldn't match
-		val domainHydrogens = HashMap<String,Int?>().apply {
-			if (mol is Polymer) {
-				mol.findResidueOrThrow(atom).atoms
-			} else {
-				mol.atoms
-			}
-			.filter { it.element == Element.Hydrogen }
-			.forEach { atom ->
-				this[atom.name] = atom.name
-					.filter { it.isDigit() }
-					.takeIf { it.isNotBlank() }
-					?.toInt()
-			}
+		.filter { it.element == Element.Hydrogen }
+		.forEach { atom ->
+			this[atom.name] = atom.name
+				.filter { it.isDigit() }
+				.takeIf { it.isNotBlank() }
+				?.toInt()
 		}
-
-		// add the hydrogens
-		for (i in 0 until protonation.numH) {
-
-			// pick a number for the hydrogen
-			// try not to match other hydrogens in the molecule
-			val atomNumber = atom.name.filter { it.isDigit() }
-			var hNumber = "$atomNumber${i + 1}".toInt()
-			if (hNumber in domainHydrogens.values) {
-				hNumber = (domainHydrogens.values.maxBy { it ?: 0 } ?: 0) + 1
-			}
-			val hName = "H$hNumber"
-			domainHydrogens[hName] = hNumber
-
-			add("h$i = createAtom $hName ${amberTypes.hydrogen} 0.0")
-			add("set h$i element H")
-			add("add mol.1 h$i")
-			add("bond mol.1.${atom.name} h$i")
-			add("select h$i")
-		}
-		add("rebuildSelectedAtoms mol")
-
-		// save the built molecule
-		add("saveMol2 mol out.mol2 0")
 	}
 
-	// run LEaP
-	val results = Leap.run(
-		filesToWrite = mapOf(
-			"in.mol2" to smol
-		),
-		commands = commands.joinToString("\n"),
-		filesToRead = listOf("out.mol2"),
-		// use the debug build of teLeap, so we get more info in the console
-		debugFiles = listOf("model.c")
+	// pick a number for the hydrogen
+	// try not to match other hydrogens in the molecule
+	fun pickHydrogenName(i: Int): String {
+		val atomNumber = atom.name.filter { it.isDigit() }
+		var hNumber = "$atomNumber${i + 1}".toInt()
+		if (hNumber in domainHydrogens.values) {
+			hNumber = (domainHydrogens.values.maxBy { it ?: 0 } ?: 0) + 1
+		}
+		val hName = "H$hNumber"
+		domainHydrogens[hName] = hNumber
+
+		return hName
+	}
+
+	// build the service request
+
+	val request = ProtonateRequest(
+		mol2 = smol,
+		atomName = atom.name,
+		atomType = amberTypes.heavy,
+		bonds = if (protonation.numHeavy == 1 && amberTypes.bondedHeavy != null && amberTypes.heavyBond != null) {
+
+				// yup, try to set the bond and atoms types explicitly so we get the desired geometry
+				// (leap doesn't recognize Sp hybridization explicitly,
+				// and sometimes gets Sp2 hybridization wrong when we don't label the bonds correctly)
+
+				// what's the other heavy atom?
+				val heavyAtom = mol.bonds.bondedAtoms(atom)
+					.filter { it.element != Element.Hydrogen }
+					.takeIf { it.size == 1 }
+					?.first()
+					?: throw IllegalArgumentException("couldn't find unique heavy bonded atom")
+
+				// set the other heavy atom type
+				val heavyAtomType = amberTypes.bondedHeavy[heavyAtom.element]
+					?: throw Error("protonation is Sp hybridized, but has no bonded heavy atom type for ${heavyAtom.element}")
+
+				listOf(ProtonateRequest.Bond(
+					atomName = heavyAtom.name,
+					atomType = heavyAtomType,
+					bondType = amberTypes.heavyBond
+				))
+			} else {
+				emptyList()
+			},
+		hydrogens = (0 until protonation.numH)
+			.map { i ->
+				ProtonateRequest.Hydrogen(
+					atomName = pickHydrogenName(i),
+					atomType = amberTypes.hydrogen
+				)
+			}
 	)
 
+	val hmol = Molecule.fromMol2(OspreyService.protonate(request).mol2)
+
 	// read the output mol2 and copy the new hydrogens
-	val hmol = Molecule.fromMol2(results.files["out.mol2"]
-		?: throw Leap.Exception("LEaP didn't produce an output molecule", smol, results))
 	val centerAtom = hmol.atoms.find { it.name == atom.name }
 		?: throw Error("can't find central atom in LEaP output molecule")
 	mol.deprotonate(atom)
@@ -201,15 +182,19 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 	partition@for ((type, src) in partition) {
 
 		// TODO: allow user to pick the forcefields?
-		val srcAtoms = when (type) {
+		val request = when (type) {
 
 			// treat molecules with either leap or antechamber
 			MoleculeType.Protein,
 			MoleculeType.DNA,
 			MoleculeType.RNA,
-			MoleculeType.Solvent -> inferProtonationLeap(src, type.defaultForcefieldNameOrThrow)
+			MoleculeType.Solvent ->
+				ProtonationRequest(src.toPDB(), type.defaultForcefieldNameOrThrow.name, null)
 
-			MoleculeType.SmallMolecule -> inferProtonationAntechamberThenLeap(src, type.defaultForcefieldNameOrThrow)
+			MoleculeType.SmallMolecule -> {
+				val ffname = type.defaultForcefieldNameOrThrow
+				ProtonationRequest(src.toPDB(), ffname.name, ffname.atomTypesOrThrow.name)
+			}
 
 			// atomic ions don't have protonation
 			MoleculeType.AtomicIon -> continue@partition
@@ -217,8 +202,10 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 			// synthetics aren't real molecules, just ignore them
 			MoleculeType.Synthetic -> continue@partition
 		}
+		val protonatedMol = Molecule.fromMol2(OspreyService.protonation(request).mol2)
 
 		// translate the atoms to the input mol
+		val srcAtoms = protonatedMol.translateHydrogens(src)
 		for ((srcHeavy, h) in srcAtoms) {
 			val dstHeavy = atomMap.getAOrThrow(srcHeavy)
 			dstAtoms.add(dstHeavy to h)
@@ -226,55 +213,6 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 	}
 
 	return dstAtoms
-}
-
-private fun inferProtonationLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom, Atom>> {
-
-	// run LEaP to add the hydrogens
-	val pdb = mol.toPDB()
-	val results = Leap.run(
-		filesToWrite = mapOf("in.pdb" to pdb),
-		commands = """
-			|verbosity 2
-			|source leaprc.${ffname.name}
-			|mol = loadPDB in.pdb
-			|addH mol
-			|saveMol2 mol out.mol2 0
-		""".trimMargin(),
-		filesToRead = listOf("out.mol2")
-	)
-
-	val protonatedMol = Molecule.fromMol2(results.files["out.mol2"]
-		?: throw Leap.Exception("LEaP didn't produce an output molecule", pdb, results))
-
-	return protonatedMol.translateHydrogens(mol)
-}
-
-private fun inferProtonationAntechamberThenLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom, Atom>> {
-
-	// run antechamber to infer all the atom and bond types
-	val pdb = mol.toPDB()
-	val antechamberResults = Antechamber.run(pdb, Antechamber.InType.Pdb, ffname.atomTypesOrThrow)
-	val mol2 = antechamberResults.mol2
-		?: throw Antechamber.Exception("Antechamber didn't produce an output molecule", pdb, antechamberResults)
-
-	// run LEaP to add the hydrogens
-	val results = Leap.run(
-		filesToWrite = mapOf("in.mol2" to mol2),
-		commands = """
-			|verbosity 2
-			|source leaprc.${ffname.name}
-			|mol = loadMol2 in.mol2
-			|addH mol
-			|saveMol2 mol out.mol2 0
-		""".trimMargin(),
-		filesToRead = listOf("out.mol2")
-	)
-
-	val protonatedMol = Molecule.fromMol2(results.files["out.mol2"]
-		?: throw Leap.Exception("LEaP didn't produce an output molecule", pdb, results))
-
-	return protonatedMol.translateHydrogens(mol)
 }
 
 private fun Molecule.translateHydrogens(dst: Molecule): List<Pair<Atom,Atom>> {

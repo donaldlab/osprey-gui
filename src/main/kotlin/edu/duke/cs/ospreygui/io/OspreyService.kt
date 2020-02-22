@@ -50,6 +50,10 @@ object OspreyService {
 		body = obj
 	}
 
+	// NOTE: tragically, we can't reduce code duplication here due to a compiler bug
+	// see: https://youtrack.jetbrains.com/issue/KT-34051
+	// maybe someday we can?
+
 	fun about() = runBlocking {
 		client.get<ServiceResponse<AboutResponse>> {
 			path("about")
@@ -75,6 +79,24 @@ object OspreyService {
 		}
 		.responseOrThrow()
 	}
+
+	fun protonation(request: ProtonationRequest) = runBlocking {
+		client.get<ServiceResponse<ProtonationResponse>> {
+			path("protonation")
+			method = HttpMethod.Post
+			send(request)
+		}
+		.responseOrThrow()
+	}
+
+	fun protonate(request: ProtonateRequest) = runBlocking {
+		client.get<ServiceResponse<ProtonateResponse>> {
+			path("protonate")
+			method = HttpMethod.Post
+			send(request)
+		}
+	}
+	.responseOrThrow()
 }
 
 
