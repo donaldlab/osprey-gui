@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.forcefield.amber
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.ospreygui.io.*
+import edu.duke.cs.ospreyservice.services.MoleculeFFInfoRequest
 import edu.duke.cs.ospreyservice.services.TypesRequest
 import java.util.*
 
@@ -173,15 +174,8 @@ fun Molecule.calcModsAmber(types: AmberTypes): String? {
 		.takeIf { it.size == 1 }
 		?.first()
 		?: throw IllegalArgumentException("must have only a single forcefield name to calculate forcefield modifications")
-	val atomTypes = Parmchk.AtomTypes.from(ffname) ?: return null
 
-	val results = Parmchk.run(mol2, atomTypes)
-
-	if (results.frcmod == null) {
-		throw Parmchk.Exception("No results generated", mol2, results)
-	}
-
-	return results.frcmod
+	return OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, ffname.name)).ffinfo
 }
 
 fun List<Pair<Molecule,AmberTypes>>.combine(): Pair<Molecule,AmberTypes> {

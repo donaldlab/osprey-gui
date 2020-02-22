@@ -106,6 +106,15 @@ object OspreyService {
 		}
 		.responseOrThrow()
 	}
+
+	fun moleculeFFInfo(request: MoleculeFFInfoRequest) = runBlocking {
+		client.get<ServiceResponse<MoleculeFFInfoResponse>> {
+			path("moleculeFFInfo")
+			method = HttpMethod.Post
+			send(request)
+		}
+		.responseOrThrow()
+	}
 }
 
 

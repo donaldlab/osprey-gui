@@ -7,6 +7,8 @@ import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreyservice.services.*
+import io.kotlintest.shouldBe
+import io.kotlintest.shouldNotBe
 import java.nio.file.Paths
 import edu.duke.cs.ospreyservice.OspreyService as Server
 
@@ -147,6 +149,26 @@ class TestOspreyService : SharedSpec({
 					numMinimizationSteps = 0
 				)
 				OspreyService.types(TypesRequest.SmallMoleculeSettings(mol2, ffname.atomTypesOrThrow.id, chargeSettings).toRequest())
+			}
+		}
+	}
+
+	group("moleculeFFInfo") {
+
+		test("protein") {
+			withService {
+				val mol2 = OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2")
+				val ffname = MoleculeType.Protein.defaultForcefieldNameOrThrow
+				OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, ffname.name)).ffinfo shouldBe null
+			}
+
+		}
+
+		test("benzamidine") {
+			withService {
+				val mol2 = OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2")
+				val ffname = MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow
+				OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, ffname.name)).ffinfo shouldNotBe null
 			}
 		}
 	}
