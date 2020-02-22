@@ -193,7 +193,7 @@ fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 
 			MoleculeType.SmallMolecule -> {
 				val ffname = type.defaultForcefieldNameOrThrow
-				ProtonationRequest(src.toPDB(), ffname.name, ffname.atomTypesOrThrow.name)
+				ProtonationRequest(src.toPDB(), ffname.name, ffname.atomTypesOrThrow.id)
 			}
 
 			// atomic ions don't have protonation

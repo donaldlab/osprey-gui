@@ -95,8 +95,17 @@ object OspreyService {
 			method = HttpMethod.Post
 			send(request)
 		}
+		.responseOrThrow()
 	}
-	.responseOrThrow()
+
+	fun types(request: TypesRequest) = runBlocking {
+		client.get<ServiceResponse<TypesResponse>> {
+			path("types")
+			method = HttpMethod.Post
+			send(request)
+		}
+		.responseOrThrow()
+	}
 }
 
 

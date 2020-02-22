@@ -6,10 +6,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
-import edu.duke.cs.ospreyservice.services.BondsRequest
-import edu.duke.cs.ospreyservice.services.MissingAtomsRequest
-import edu.duke.cs.ospreyservice.services.ProtonateRequest
-import edu.duke.cs.ospreyservice.services.ProtonationRequest
+import edu.duke.cs.ospreyservice.services.*
 import java.nio.file.Paths
 import edu.duke.cs.ospreyservice.OspreyService as Server
 
@@ -70,7 +67,7 @@ class TestOspreyService : SharedSpec({
 			withService {
 				val pdb = OspreyGui.getResourceAsString("benzamidine.pdb")
 				val ffname = MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow
-				OspreyService.protonation(ProtonationRequest(pdb, ffname.name, ffname.atomTypesOrThrow.name))
+				OspreyService.protonation(ProtonationRequest(pdb, ffname.name, ffname.atomTypesOrThrow.id))
 			}
 		}
 	}
@@ -118,6 +115,38 @@ class TestOspreyService : SharedSpec({
 						ProtonateRequest.Hydrogen("h1", "hn")
 					)
 				))
+			}
+		}
+	}
+
+	group("types") {
+
+		test("protein") {
+			withService {
+				val pdb = OspreyGui.getResourceAsString("1cc8.protein.pdb")
+				val ffname = MoleculeType.Protein.defaultForcefieldNameOrThrow
+				OspreyService.types(TypesRequest.MoleculeSettings(pdb, ffname.name).toRequest())
+			}
+		}
+
+		test("small mol") {
+			withService {
+				val mol2 = OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2")
+				val ffname = MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow
+				OspreyService.types(TypesRequest.SmallMoleculeSettings(mol2, ffname.atomTypesOrThrow.id).toRequest())
+			}
+		}
+
+		test("small mol w/ charges") {
+			withService {
+				val mol2 = OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2")
+				val ffname = MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow
+				val chargeSettings = TypesRequest.ChargeSettings(
+					chargeMethod = "bcc",
+					netCharge = -1,
+					numMinimizationSteps = 0
+				)
+				OspreyService.types(TypesRequest.SmallMoleculeSettings(mol2, ffname.atomTypesOrThrow.id, chargeSettings).toRequest())
 			}
 		}
 	}

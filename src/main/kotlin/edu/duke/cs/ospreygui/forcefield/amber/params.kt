@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.forcefield.amber
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.ospreygui.io.*
+import edu.duke.cs.ospreyservice.services.TypesRequest
 import java.util.*
 
 
@@ -64,6 +65,12 @@ data class AmberTypes(
 	}
 }
 
+data class AmberChargeGeneration(
+	val method: Antechamber.ChargeMethod,
+	val netCharge: Int,
+	val minimizationSteps: Int
+)
+
 /**
  * Calculate Amber types for atoms and bonds.
  * Pass values to `chargeMethod` and `netCharge` to calculate partial charges for small molecules as well.
@@ -71,34 +78,28 @@ data class AmberTypes(
 fun Molecule.calcTypesAmber(
 	molType: MoleculeType,
 	ffname: ForcefieldName = molType.defaultForcefieldNameOrThrow,
-	chargeMethod: Antechamber.ChargeMethod? = null,
-	netCharge: Int? = null,
-	sqmOptions: SQM.Options = SQM.Options()
+	generateCharges: AmberChargeGeneration? = null
 ): AmberTypes {
 
 	val dst = this
 
 	val (srcMetadata, atomMap) = when (molType) {
 
-		// use antechamber to get types for small molecules
 		MoleculeType.SmallMolecule -> {
 
-			val inMol2 = dst.toMol2()
-
-			val antechamberResults = Antechamber.run(
-				inMol2,
-				Antechamber.InType.Mol2,
-				ffname.atomTypesOrThrow,
-				useACDoctor = false,
-				generateCharges = chargeMethod,
-				netCharge = netCharge,
-				sqmOptions = sqmOptions
-			)
-
-			// read the resulting mol2 file
-			val outMol2 = antechamberResults.mol2
-				?: throw Antechamber.Exception("Antechamber didn't produce an output molecule", inMol2, antechamberResults)
-			val (src, srcMetadata) = Molecule.fromMol2WithMetadata(outMol2)
+			// call osprey service with small molecule settings
+			val request = TypesRequest.SmallMoleculeSettings(
+				mol2 = dst.toMol2(),
+				atomTypes = ffname.atomTypesOrThrow.id,
+				chargeSettings = generateCharges?.let {
+					TypesRequest.ChargeSettings(
+						chargeMethod = it.method.id,
+						netCharge = it.netCharge,
+						numMinimizationSteps = it.minimizationSteps
+					)
+				}
+			).toRequest()
+			val (src, srcMetadata) = Molecule.fromMol2WithMetadata(OspreyService.types(request).mol2)
 
 			// Tragically, we antechamber doesn't write the residue info back into the mol2 file,
 			// so we can't use our usual MoleculeMapper to do the atom mapping here.
@@ -109,25 +110,14 @@ fun Molecule.calcTypesAmber(
 			}
 		}
 
-		// for everything else, use LEaP
+		// for everything else, call osprey service with molecule settings
 		else -> {
 
-			val pdb = dst.toPDB()
-
-			val results = Leap.run(
-				filesToWrite = mapOf("in.pdb" to pdb),
-				commands = """
-					|verbosity 2
-					|source leaprc.${ffname.name}
-					|mol = loadPDB in.pdb
-					|saveMol2 mol out.mol2 1
-				""".trimMargin(),
-				filesToRead = listOf("out.mol2")
-			)
-
-			val outMol2 = results.files["out.mol2"]
-				?: throw Leap.Exception("LEaP didn't produce an output molecule", pdb, results)
-			val (src, srcMetadata) = Molecule.fromMol2WithMetadata(outMol2)
+			val request = TypesRequest.MoleculeSettings(
+				pdb = dst.toPDB(),
+				ffname = ffname.name
+			).toRequest()
+			val (src, srcMetadata) = Molecule.fromMol2WithMetadata(OspreyService.types(request).mol2)
 
 			// check for unmapped atoms with the dst->src mapping
 			MoleculeMapper(dst, src)
@@ -145,7 +135,7 @@ fun Molecule.calcTypesAmber(
 						?: atom.name
 				}
 				?.let { unmappedAtoms ->
-					throw Leap.Exception("LEaP didn't generate atom info for ${unmappedAtoms.size} atom(s):\n$unmappedAtoms", pdb, results)
+					throw NoSuchElementException("LEaP didn't generate atom info for ${unmappedAtoms.size} atom(s):\n$unmappedAtoms")
 				}
 
 			// use the molecule mapper to map the metadata back with the src->dst mapping

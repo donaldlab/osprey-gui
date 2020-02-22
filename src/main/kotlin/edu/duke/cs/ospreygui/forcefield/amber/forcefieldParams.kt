@@ -115,8 +115,12 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		val ffname = ffnameOverrides[molType] ?: molType.defaultForcefieldNameOrThrow
 
 		// get charge generation settings if small molecule
-		val chargeMethod = when (molType) {
-			MoleculeType.SmallMolecule -> chargeMethod
+		val generateCharges = when (molType) {
+			MoleculeType.SmallMolecule -> AmberChargeGeneration(
+				chargeMethod,
+				netCharge ?: throw IllegalArgumentException("net charge needed to generate partial charges for small molecule"),
+				sqmMinimizationSteps
+			)
 			else -> null
 		}
 
@@ -126,14 +130,7 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 			mol.calcTypesAmber(
 				mol.findTypeOrThrow(),
 				ffname,
-				chargeMethod,
-				netCharge,
-				SQM.Options(
-					maxCyc = sqmMinimizationSteps,
-
-					// print out progress info as frequently as possible
-					ntpr = 1
-				)
+				generateCharges
 			)
 
 		} catch (ex: Antechamber.Exception) {
