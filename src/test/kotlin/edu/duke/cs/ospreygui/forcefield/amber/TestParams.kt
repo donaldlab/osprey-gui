@@ -444,7 +444,7 @@ class TestParams : SharedSpec({
 			test("params") {
 
 				val types = mol.calcTypesAmber(MoleculeType.Protein, ForcefieldName.ff96)
-				val params = mol.calcParamsAmber(types)
+				val params = AmberMolParams(mol, types, null).calcParamsAmber()
 
 				params.assert(
 					OspreyGui.getResourceAsString("1cc8.protein.top"),
@@ -481,7 +481,7 @@ class TestParams : SharedSpec({
 
 			test("mods") {
 
-				val types = AmberTypes(listOf(ForcefieldName.gaff2), metadata)
+				val types = AmberTypes(ForcefieldName.gaff2, metadata)
 				val frcmod = mol.calcModsAmber(types)
 
 				frcmod shouldBe OspreyGui.getResourceAsString("benzamidine.h.frcmod")
@@ -489,9 +489,9 @@ class TestParams : SharedSpec({
 
 			test("params") {
 
-				val types = AmberTypes(listOf(ForcefieldName.gaff2), metadata)
+				val types = AmberTypes(ForcefieldName.gaff2, metadata)
 				val frcmod = OspreyGui.getResourceAsString("benzamidine.h.frcmod")
-				val params = mol.calcParamsAmber(types, listOf(frcmod))
+				val params = AmberMolParams(mol, types, frcmod).calcParamsAmber()
 
 				params.assert(
 					OspreyGui.getResourceAsString("benzamidine.top"),
@@ -505,35 +505,30 @@ class TestParams : SharedSpec({
 			val (molProtein, metadataProtein) = Molecule.fromMol2WithMetadata(OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"))
 			val (molSmall, metadataSmall) = Molecule.fromMol2WithMetadata(OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"))
 
-			val typesProtein = AmberTypes(listOf(ForcefieldName.ff96), metadataProtein)
-			val typesSmall = AmberTypes(listOf(ForcefieldName.gaff2), metadataSmall)
-
-			val molsAndTypes = listOf(
-				molProtein to typesProtein,
-				molSmall to typesSmall
-			)
+			val typesProtein = AmberTypes(ForcefieldName.ff96, metadataProtein)
+			val typesSmall = AmberTypes(ForcefieldName.gaff2, metadataSmall)
 
 			test("types") {
 
-				val (mol, types) = molsAndTypes.combine()
-				mol as Polymer
-
 				// spot check a few of the types
-				mol.findNonTerminalResidue("THR").apply {
-					atoms.assertType(types, "N", "N")
-					atoms.assertType(types, "CA", "CT")
-					atoms.assertType(types, "HG23", "HC")
+				molProtein as Polymer
+				molProtein.findNonTerminalResidue("THR").apply {
+					atoms.assertType(typesProtein, "N", "N")
+					atoms.assertType(typesProtein, "CA", "CT")
+					atoms.assertType(typesProtein, "HG23", "HC")
 				}
 
-				mol.atoms.assertType(types, "C6", "ca")
-				mol.atoms.assertType(types, "N1", "n2")
-				mol.atoms.assertType(types, "N2", "n2")
+				molSmall.atoms.assertType(typesSmall, "C6", "ca")
+				molSmall.atoms.assertType(typesSmall, "N1", "n2")
+				molSmall.atoms.assertType(typesSmall, "N2", "n2")
 			}
 
 			test("params") {
 
-				val frcmod = OspreyGui.getResourceAsString("benzamidine.h.frcmod")
-				val params = molsAndTypes.calcParamsAmber(listOf(frcmod))
+				val params = listOf(
+					AmberMolParams(molProtein, typesProtein, null),
+					AmberMolParams(molSmall, typesSmall, OspreyGui.getResourceAsString("benzamidine.h.frcmod"))
+				).calcParamsAmber()
 
 				params.assert(
 					OspreyGui.getResourceAsString("1cc8.protein.benzamidine.top"),

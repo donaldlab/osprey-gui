@@ -161,7 +161,6 @@ class TestOspreyService : SharedSpec({
 				val ffname = MoleculeType.Protein.defaultForcefieldNameOrThrow
 				OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, ffname.name)).ffinfo shouldBe null
 			}
-
 		}
 
 		test("benzamidine") {
@@ -169,6 +168,50 @@ class TestOspreyService : SharedSpec({
 				val mol2 = OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2")
 				val ffname = MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow
 				OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, ffname.name)).ffinfo shouldNotBe null
+			}
+		}
+	}
+
+	group("forcefieldParams") {
+
+		test("protein") {
+			withService {
+				OspreyService.forcefieldParams(ForcefieldParamsRequest(
+					ForcefieldParamsRequest.MolInfo(
+						OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"),
+						MoleculeType.Protein.defaultForcefieldNameOrThrow.name,
+						null
+					)
+				))
+			}
+		}
+
+		test("benzamidine") {
+			withService {
+				OspreyService.forcefieldParams(ForcefieldParamsRequest(
+					ForcefieldParamsRequest.MolInfo(
+						OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"),
+						MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow.name,
+						OspreyGui.getResourceAsString("benzamidine.h.frcmod")
+					)
+				))
+			}
+		}
+
+		test("protein and benzamidine") {
+			withService {
+				OspreyService.forcefieldParams(ForcefieldParamsRequest(
+					ForcefieldParamsRequest.MolInfo(
+						OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"),
+						MoleculeType.Protein.defaultForcefieldNameOrThrow.name,
+						null
+					),
+					ForcefieldParamsRequest.MolInfo(
+						OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"),
+						MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow.name,
+						OspreyGui.getResourceAsString("benzamidine.h.frcmod")
+					)
+				))
 			}
 		}
 	}

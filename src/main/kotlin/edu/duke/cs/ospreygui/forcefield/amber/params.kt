@@ -3,20 +3,21 @@ package edu.duke.cs.ospreygui.forcefield.amber
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.ospreygui.io.*
+import edu.duke.cs.ospreyservice.services.ForcefieldParamsRequest
 import edu.duke.cs.ospreyservice.services.MoleculeFFInfoRequest
 import edu.duke.cs.ospreyservice.services.TypesRequest
 import java.util.*
 
 
 data class AmberTypes(
-	val ffnames: List<ForcefieldName>,
+	val ffname: ForcefieldName,
 	val atomTypes: Map<Atom,String>,
 	val bondTypes: Map<AtomPair,String>,
 	val atomCharges: Map<Atom,String>
 ) {
 
-	constructor(ffnames: List<ForcefieldName>, mol2Metadata: Mol2Metadata)
-		: this(ffnames, mol2Metadata.atomTypes, mol2Metadata.bondTypes, mol2Metadata.atomCharges)
+	constructor(ffname: ForcefieldName, mol2Metadata: Mol2Metadata)
+		: this(ffname, mol2Metadata.atomTypes, mol2Metadata.bondTypes, mol2Metadata.atomCharges)
 
 	fun toMol2Metadata(mol: Molecule): Mol2Metadata {
 
@@ -49,7 +50,7 @@ data class AmberTypes(
 			?: throw NoSuchElementException("destination molecule doesn't have equivalent atom for $this")
 
 		return AmberTypes(
-			ffnames = ffnames,
+			ffname = ffname,
 			atomTypes = atomTypes
 				.mapKeys { (srcAtom, _) ->
 					srcAtom.match()
@@ -163,125 +164,40 @@ fun Molecule.calcTypesAmber(
 		dstMetadata.atomCharges[dstAtom] = charge
 	}
 
-	return AmberTypes(listOf(ffname), dstMetadata)
+	return AmberTypes(ffname, dstMetadata)
 }
 
 
 fun Molecule.calcModsAmber(types: AmberTypes): String? {
-
 	val mol2 = toMol2(types.toMol2Metadata(this))
-	val ffname = types.ffnames
-		.takeIf { it.size == 1 }
-		?.first()
-		?: throw IllegalArgumentException("must have only a single forcefield name to calculate forcefield modifications")
-
-	return OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, ffname.name)).ffinfo
+	return OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, types.ffname.name)).ffinfo
 }
 
-fun List<Pair<Molecule,AmberTypes>>.combine(): Pair<Molecule,AmberTypes> {
-
-	val (combinedMol, atomMap ) =
-		map { (mol, _) -> mol }
-		.combine("combined")
-
-	val atomTypes = IdentityHashMap<Atom,String>()
-	val bondTypes = HashMap<AtomPair,String>()
-	val atomCharges = IdentityHashMap<Atom,String>()
-	for ((_, types) in this) {
-
-		for ((atom, type) in types.atomTypes) {
-			atomTypes[atomMap.getBOrThrow(atom)] = type
-		}
-
-		for ((bond, type) in types.bondTypes) {
-			bondTypes[AtomPair(
-				atomMap.getBOrThrow(bond.a),
-				atomMap.getBOrThrow(bond.b)
-			)] = type
-		}
-
-		for ((atom, charge) in types.atomCharges) {
-			atomCharges[atomMap.getBOrThrow(atom)] = charge
-		}
-	}
-
-	val combinedTypes = AmberTypes(
-		flatMap { (_, types) -> types.ffnames },
-		atomTypes,
-		bondTypes,
-		atomCharges
-	)
-
-	return combinedMol to combinedTypes
-}
-
+data class AmberMolParams(
+	val mol: Molecule,
+	val types: AmberTypes,
+	val frcmod: String?
+)
 
 data class AmberParams(
-	/** topology file */
 	val top: String,
-	/** coordinates file */
 	val crd: String
-) {
+)
 
-	companion object {
+fun List<AmberMolParams>.calcParamsAmber(): AmberParams {
 
-		fun from(mol2s: List<String>, ffnames: List<ForcefieldName>, frcmods: List<String> = emptyList()): AmberParams {
-
-			val molname = "mol.%d.mol2"
-			val frcname = "mol.%d.frc"
-			val topname = "mol.top"
-			val crdname = "mol.crd"
-
-			val commands = ArrayList<String>()
-			commands += "verbosity 2"
-			for (ffname in ffnames) {
-				commands += "source leaprc.${ffname.name}"
-			}
-			for (i in frcmods.indices) {
-				commands += "loadAmberParams ${frcname.format(i)}"
-			}
-			for (i in mol2s.indices) {
-				commands += "mol$i = loadMol2 ${molname.format(i)}"
-			}
-			commands += if (mol2s.size > 1) {
-					"combined = combine { ${mol2s.indices.joinToString(" ") { "mol$it" }} }"
-				} else {
-					"combined = mol0"
-				}
-			commands += "saveAmberParm combined $topname, $crdname"
-
-			val filesToWrite = HashMap<String,String>()
-			mol2s.forEachIndexed { i, mol2 ->
-				filesToWrite[molname.format(i)] = mol2
-			}
-			frcmods.forEachIndexed { i, frcmod ->
-				filesToWrite[frcname.format(i)] = frcmod
-			}
-
-			// run LEaP to get the params
-			val leapResults = Leap.run(
-				filesToWrite,
-				commands = commands.joinToString("\n"),
-				filesToRead = listOf(topname, crdname)
-			)
-
-			return AmberParams(
-				leapResults.files[topname] ?: throw Leap.Exception("no topology file", mol2s.joinToString("\n"), leapResults),
-				leapResults.files[crdname] ?: throw Leap.Exception("no coordinates file", mol2s.joinToString("\n"), leapResults)
+	val response = OspreyService.forcefieldParams(ForcefieldParamsRequest(
+		map {
+			ForcefieldParamsRequest.MolInfo(
+				mol2 = it.mol.toMol2(it.types.toMol2Metadata(it.mol)),
+				ffname = it.types.ffname.name,
+				ffinfo = it.frcmod
 			)
 		}
-	}
+	))
+
+	return AmberParams(response.params, response.coords)
 }
 
-fun Molecule.calcParamsAmber(types: AmberTypes, frcmods: List<String> = emptyList()) =
-	listOf(this to types).calcParamsAmber(frcmods)
-
-fun List<Pair<Molecule,AmberTypes>>.calcParamsAmber(frcmods: List<String> = emptyList()) =
-	AmberParams.from(
-		mol2s = map { (mol, types) -> mol.toMol2(types.toMol2Metadata(mol)) },
-		ffnames = flatMap { (_, types) -> types.ffnames }
-			.toSet()
-			.toList(),
-		frcmods = frcmods
-	)
-
+fun AmberMolParams.calcParamsAmber() =
+	listOf(this).calcParamsAmber()

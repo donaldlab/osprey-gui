@@ -91,6 +91,8 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 			"type=$type, charge=$charge"
 	}
 
+	// TODO: this is basically the same as AmberMolParams, except for the base class
+	//  maybe merge or compose the two classes somehow?
 	class MolParams(
 		mol: Molecule,
 		val types: AmberTypes,
@@ -260,8 +262,15 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 			}
 
 			// run amber to get the params
-			val frcmods = listOf(molaParams, molbParams).mapNotNull { it.frcmod }
-			val params = molsAndTypes.calcParamsAmber(frcmods)
+			val params = listOf(molaParams, molbParams)
+				.map {
+					AmberMolParams(
+						it.mol,
+						it.types,
+						it.frcmod
+					)
+				}
+				.calcParamsAmber()
 
 			// NOTE: calcParamsAmber() eventually calls LEaP in a separate process
 			// profiling shows this is by far the bottleneck in compiling atom pairs

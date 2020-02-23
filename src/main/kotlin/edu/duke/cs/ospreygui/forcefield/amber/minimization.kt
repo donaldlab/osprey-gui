@@ -68,8 +68,7 @@ fun List<MinimizerInfo>.minimize(
 	val atomsByIndex = ArrayList<Atom>()
 
 	// get the amber params for the combined molecules
-	val frcmods = ArrayList<String>()
-	val molsAndTypes = this
+	val params = this
 		.flatMap { info ->
 			info.partitionWithoutSolvent
 				.map { (moltype, mol) ->
@@ -87,13 +86,11 @@ fun List<MinimizerInfo>.minimize(
 					}
 
 					val types = mol.calcTypesAmber(moltype)
-
-					mol.calcModsAmber(types)?.let { frcmods.add(it) }
-
-					mol to types
+					val frcmod = mol.calcModsAmber(types)
+					AmberMolParams(mol, types, frcmod)
 				}
 		}
-	val params = molsAndTypes.calcParamsAmber(frcmods)
+		.calcParamsAmber()
 
 	// just in case, check the atom indices by matching atom names
 	assert {

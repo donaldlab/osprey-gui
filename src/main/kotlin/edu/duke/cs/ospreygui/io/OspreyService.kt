@@ -115,6 +115,15 @@ object OspreyService {
 		}
 		.responseOrThrow()
 	}
+
+	fun forcefieldParams(request: ForcefieldParamsRequest) = runBlocking {
+		client.get<ServiceResponse<ForcefieldParamsResponse>> {
+			path("forcefieldParams")
+			method = HttpMethod.Post
+			send(request)
+		}
+		.responseOrThrow()
+	}
 }
 
 
