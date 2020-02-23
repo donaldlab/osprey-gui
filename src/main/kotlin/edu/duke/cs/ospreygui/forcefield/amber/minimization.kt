@@ -5,6 +5,7 @@ import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.tools.assert
 import edu.duke.cs.ospreygui.io.OspreyService
+import edu.duke.cs.ospreygui.io.toVector3d
 import edu.duke.cs.ospreyservice.services.MinimizeRequest
 import org.joml.Vector3d
 import java.util.*
@@ -125,7 +126,7 @@ fun List<MinimizerInfo>.minimize(
 			?.second
 			?: throw NoSuchElementException("no MolInfo for minimized atom index $i")
 
-		coordsByInfo.getOrPut(info) { ArrayList() }.add(Vector3d(pos[0], pos[1], pos[2]))
+		coordsByInfo.getOrPut(info) { ArrayList() }.add(pos.toVector3d())
 	}
 
 	// update the info with the minimized coords

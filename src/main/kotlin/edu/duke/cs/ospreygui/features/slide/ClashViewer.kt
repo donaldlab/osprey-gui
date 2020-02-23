@@ -11,9 +11,11 @@ import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.combine
 import edu.duke.cs.molscope.molecule.filter
 import edu.duke.cs.molscope.view.MoleculeRenderView
+import edu.duke.cs.ospreygui.io.OspreyService
 import edu.duke.cs.ospreygui.io.toPDB
-import edu.duke.cs.ospreygui.prep.Probe
+import edu.duke.cs.ospreygui.io.toVector3d
 import edu.duke.cs.ospreygui.view.ProbeView
+import edu.duke.cs.ospreyservice.services.ClashesRequest
 
 
 class ClashViewer : SlideFeature {
@@ -102,8 +104,17 @@ class ClashViewer : SlideFeature {
 			.toPDB()
 
 		// run probe
-		val results = Probe.run(pdb)
+		val results = OspreyService.clashes(ClashesRequest(pdb))
 		view.groups = results.groups
+			.mapValues { (id, group) ->
+				ProbeView.Group(
+					id,
+					group.dots.mapValues { (_, dots) -> dots.map { it.toVector3d() } },
+					group.vectors.mapValues { (_, vectors) ->
+						vectors.map { (a, b) -> a.toVector3d() to b.toVector3d() }
+					}
+				)
+			}
 
 		// update the counts
 		countsByType.clear()

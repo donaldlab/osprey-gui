@@ -10,12 +10,17 @@ import edu.duke.cs.molscope.view.Color
 import edu.duke.cs.molscope.view.ColorPalette
 import edu.duke.cs.molscope.view.ColorsMode
 import edu.duke.cs.molscope.view.RenderView
-import edu.duke.cs.ospreygui.prep.Probe
 import org.joml.Vector3d
 import java.nio.ByteBuffer
 
 
 class ProbeView : RenderView {
+
+	data class Group(
+		val id: String,
+		val dots: Map<String,List<Vector3d>>,
+		val vectors: Map<String,List<Pair<Vector3d,Vector3d>>>
+	)
 
 	override var isVisible = true
 
@@ -35,7 +40,7 @@ class ProbeView : RenderView {
 	}
 	val visibility = Visibility()
 
-	var groups: Map<String,Probe.Group>? = null
+	var groups: Map<String,Group>? = null
 		set(value) {
 			field = value
 			sequence += 1

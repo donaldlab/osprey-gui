@@ -1,5 +1,6 @@
 package edu.duke.cs.ospreygui.io
 
+import edu.duke.cs.ospreyservice.Point3d
 import edu.duke.cs.ospreyservice.ServiceResponse
 import edu.duke.cs.ospreyservice.services.*
 import edu.duke.cs.ospreyservice.OspreyService as Server
@@ -20,6 +21,7 @@ import io.ktor.utils.io.core.readText
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ImplicitReflectionSerializer
 import kotlinx.serialization.serializer
+import org.joml.Vector3d
 import kotlin.reflect.jvm.jvmErasure
 
 
@@ -127,6 +129,13 @@ object OspreyService {
 		}
 		.responseOrThrow()
 	}
+
+	fun clashes(request: ClashesRequest) = runBlocking {
+		client.get<ServiceResponse<ClashesResponse>> {
+			post("clashes", request)
+		}
+		.responseOrThrow()
+	}
 }
 
 private class ServiceSerializer : JsonSerializer {
@@ -159,3 +168,5 @@ private class ServiceSerializer : JsonSerializer {
 			else -> ktorSerializer.read(type, body)
 		}
 }
+
+fun Point3d.toVector3d() = Vector3d(x, y, z)
