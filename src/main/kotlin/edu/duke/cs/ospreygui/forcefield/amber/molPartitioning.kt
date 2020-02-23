@@ -64,7 +64,7 @@ private val syntheticResTypes = setOf(
 
 data class ForcefieldName(
 	val name: String,
-	val atomTypes: Antechamber.AtomTypes? = null
+	val atomTypes: AmberAtomTypes? = null
 ) {
 
 	val atomTypesOrThrow get() =
@@ -74,15 +74,15 @@ data class ForcefieldName(
 
 	companion object {
 
-		val ff96 = ForcefieldName("ff96", Antechamber.AtomTypes.Amber)
-		val ff14SB = ForcefieldName("protein.ff14SB", Antechamber.AtomTypes.Amber)
+		val ff96 = ForcefieldName("ff96", AmberAtomTypes.Amber)
+		val ff14SB = ForcefieldName("protein.ff14SB", AmberAtomTypes.Amber)
 
-		val DNAOL15 = ForcefieldName("DNA.OL15", Antechamber.AtomTypes.Amber)
-		val RNAOL15 = ForcefieldName("RNA.OL3", Antechamber.AtomTypes.Amber)
-		val tip3p = ForcefieldName("water.tip3p", Antechamber.AtomTypes.Amber)
+		val DNAOL15 = ForcefieldName("DNA.OL15", AmberAtomTypes.Amber)
+		val RNAOL15 = ForcefieldName("RNA.OL3", AmberAtomTypes.Amber)
+		val tip3p = ForcefieldName("water.tip3p", AmberAtomTypes.Amber)
 
-		val gaff = ForcefieldName("gaff", Antechamber.AtomTypes.Gaff)
-		val gaff2 = ForcefieldName("gaff2", Antechamber.AtomTypes.Gaff2)
+		val gaff = ForcefieldName("gaff", AmberAtomTypes.Gaff)
+		val gaff2 = ForcefieldName("gaff2", AmberAtomTypes.Gaff2)
 	}
 }
 

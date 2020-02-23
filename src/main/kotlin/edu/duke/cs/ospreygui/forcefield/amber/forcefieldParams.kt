@@ -5,6 +5,7 @@ import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
+import edu.duke.cs.ospreyservice.ServiceException
 import java.util.*
 
 
@@ -54,7 +55,7 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 	 *
 	 * The default AM1BCC method is currently recommended by Amber for most purposes.
 	 */
-	var chargeMethod = Antechamber.ChargeMethod.AM1BCC
+	var chargeMethod = AmberChargeMethod.AM1BCC
 
 	/**
 	 * Number of steps of `xmin` minimization to perform during partial charge calculation
@@ -135,7 +136,12 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 				generateCharges
 			)
 
-		} catch (ex: Antechamber.Exception) {
+		} catch (ex: ServiceException) {
+
+			// TEMP: just re-throw the exception
+			throw ex
+
+			/* TODO: try to diagnose problems and give helpful hints to the user
 
 			fun List<Pair<SQM.ErrorType,String>>.format(): String {
 				val buf = StringBuffer()
@@ -180,6 +186,7 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 				}
 				// if we got here, we didn't parse any errors from sqm, so just re-throw the original exception
 				?: throw ex
+			*/
 		}
 
 		// calculate the frcmod, if needed

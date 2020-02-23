@@ -11,6 +11,7 @@ import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.io.toOspreyMol
+import edu.duke.cs.ospreygui.io.withService
 import io.kotlintest.matchers.doubles.plusOrMinus
 import io.kotlintest.shouldBe
 
@@ -20,7 +21,7 @@ class TestEnergy : SharedSpec({
 	/**
 	 * Calculate the molecule energy using the new parameterization system.
 	 */
-	fun Molecule.calcEnergyParameterized(): Double {
+	fun Molecule.calcEnergyParameterized(): Double = withService {
 
 		// parameterize the molecule
 		val amberParams = Amber96Params()

@@ -114,7 +114,7 @@ class TestConfSpaceCompiler : SharedSpec({
 		}
 	}
 
-	fun ConfSpace.compile(): CompiledConfSpace {
+	fun ConfSpace.compile(): CompiledConfSpace = withService {
 
 		// compile the conf space
 		val bytes = ConfSpaceCompiler(this).run {

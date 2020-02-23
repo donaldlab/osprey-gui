@@ -9,6 +9,14 @@ import edu.duke.cs.ospreyservice.services.TypesRequest
 import java.util.*
 
 
+enum class AmberAtomTypes(val id: String) {
+	Gaff("gaff"),
+	Gaff2("gaff2"),
+	Amber("amber"),
+	BCC("bcc"),
+	SYBYL("sybyl")
+}
+
 data class AmberTypes(
 	val ffname: ForcefieldName,
 	val atomTypes: Map<Atom,String>,
@@ -67,8 +75,19 @@ data class AmberTypes(
 	}
 }
 
+enum class AmberChargeMethod(val id: String) {
+	RESP("resp"),
+	AM1BCC("bcc"),
+	CM1("cm1"),
+	CM2("cm2"),
+	ESP("esp"),
+	Mulliken("mul"),
+	Gasteiger("gas")
+}
+
+
 data class AmberChargeGeneration(
-	val method: Antechamber.ChargeMethod,
+	val method: AmberChargeMethod,
 	val netCharge: Int,
 	val minimizationSteps: Int
 )

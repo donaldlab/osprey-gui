@@ -6,6 +6,7 @@ import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.io.fromPDB
+import edu.duke.cs.ospreygui.io.withService
 import io.kotlintest.shouldBe
 
 
@@ -18,27 +19,29 @@ class TestMissingAtoms : SharedSpec({
 	}
 
 	test("1cc8") {
+		withService {
 
-		val mol = Molecule.fromPDB(OspreyGui.getResourceAsString("1cc8.protein.pdb"))
+			val mol = Molecule.fromPDB(OspreyGui.getResourceAsString("1cc8.protein.pdb"))
 
-		// 1cc8 should have all its heavy atoms already
-		mol.inferMissingAtomsAmber().size shouldBe 0
+			// 1cc8 should have all its heavy atoms already
+			mol.inferMissingAtomsAmber().size shouldBe 0
 
-		// but let's delete a couple atoms
-		val A = (mol as Polymer).chains.find { it.id == "A" }!!
-		val A23 = A.residues.find { it.id == "23" }!!
-		val A23N = A23.atoms.find { it.name == "N" }!!
-		mol.atoms.remove(A23N)
-		A23.atoms.remove(A23N)
-		val A45 = A.residues.find { it.id == "45" }!!
-		val A45CA = A45.atoms.find { it.name == "CA" }!!
-		mol.atoms.remove(A45CA)
-		A45.atoms.remove(A45CA)
+			// but let's delete a couple atoms
+			val A = (mol as Polymer).chains.find { it.id == "A" }!!
+			val A23 = A.residues.find { it.id == "23" }!!
+			val A23N = A23.atoms.find { it.name == "N" }!!
+			mol.atoms.remove(A23N)
+			A23.atoms.remove(A23N)
+			val A45 = A.residues.find { it.id == "45" }!!
+			val A45CA = A45.atoms.find { it.name == "CA" }!!
+			mol.atoms.remove(A45CA)
+			A45.atoms.remove(A45CA)
 
-		// they should show up again in the missing atoms list
-		val missingAtoms = mol.inferMissingAtomsAmber()
-		missingAtoms.shouldHave(A23N, A23)
-		missingAtoms.shouldHave(A45CA, A45)
-		missingAtoms.size shouldBe 2
+			// they should show up again in the missing atoms list
+			val missingAtoms = mol.inferMissingAtomsAmber()
+			missingAtoms.shouldHave(A23N, A23)
+			missingAtoms.shouldHave(A45CA, A45)
+			missingAtoms.size shouldBe 2
+		}
 	}
 })

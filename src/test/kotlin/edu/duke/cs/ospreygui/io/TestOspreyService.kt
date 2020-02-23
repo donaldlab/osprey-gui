@@ -13,15 +13,15 @@ import java.nio.file.Paths
 import edu.duke.cs.ospreyservice.OspreyService as Server
 
 
+inline fun <T> withService(block: () -> T): T {
+	Server.Instance(Paths.get("../osprey-service"), wait = false).use {
+		return block()
+	}
+}
+
 class TestOspreyService : SharedSpec({
 
 	// NOTE: these tests mostly make sure nothing crashes, rather than test for correct output
-
-	fun withService(block: () -> Unit) {
-		Server.Instance(Paths.get("../osprey-service"), wait = false).use {
-			block()
-		}
-	}
 
 	test("about") {
 		withService {
