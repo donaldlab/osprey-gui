@@ -215,4 +215,29 @@ class TestOspreyService : SharedSpec({
 			}
 		}
 	}
+
+	group("minimize") {
+
+		test("protein") {
+			withService {
+				OspreyService.minimize(MinimizeRequest(
+					OspreyGui.getResourceAsString("1cc8.protein.top"),
+					OspreyGui.getResourceAsString("1cc8.protein.crd"),
+					numCycles = 10,
+					restraintMask = "@1,2,3,4,5"
+				))
+			}
+		}
+
+		test("benzamidine") {
+			withService {
+				OspreyService.minimize(MinimizeRequest(
+					OspreyGui.getResourceAsString("benzamidine.top"),
+					OspreyGui.getResourceAsString("benzamidine.crd"),
+					numCycles = 10,
+					restraintMask = "@1,2,3,4,5"
+				))
+			}
+		}
+	}
 })

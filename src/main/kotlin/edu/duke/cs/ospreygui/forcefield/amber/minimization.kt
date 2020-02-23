@@ -4,6 +4,8 @@ import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.tools.assert
+import edu.duke.cs.ospreygui.io.OspreyService
+import edu.duke.cs.ospreyservice.services.MinimizeRequest
 import org.joml.Vector3d
 import java.util.*
 import kotlin.NoSuchElementException
@@ -107,24 +109,23 @@ fun List<MinimizerInfo>.minimize(
 	}
 
 	// minimize it!
-	// TODO: progress info?
-	val results = Sander.minimize(
+	val allCoords = OspreyService.minimize(MinimizeRequest(
 		params.top,
 		params.crd,
-		numCycles = numSteps,
-		restraintMask = restraintMask
-	)
+		numSteps,
+		restraintMask
+	)).coords
 
 	// grab the minimized coords for each mol
 	val coordsByInfo = IdentityHashMap<MinimizerInfo,MutableList<Vector3d>>()
-	results.coords.forEachIndexed { i, pos ->
+	allCoords.forEachIndexed { i, pos ->
 
 		val info = infosByAtomIndex
 			.find { (range, _) -> i in range }
 			?.second
 			?: throw NoSuchElementException("no MolInfo for minimized atom index $i")
 
-		coordsByInfo.getOrPut(info) { ArrayList() }.add(pos)
+		coordsByInfo.getOrPut(info) { ArrayList() }.add(Vector3d(pos[0], pos[1], pos[2]))
 	}
 
 	// update the info with the minimized coords

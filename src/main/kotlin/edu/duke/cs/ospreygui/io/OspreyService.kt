@@ -31,6 +31,10 @@ object OspreyService {
 			install(JsonFeature) {
 				serializer = ServiceSerializer()
 			}
+			engine {
+				// some requests can take a long time, so disable timeouts
+				requestTimeout = 0L
+			}
 		}
 
 	// TODO: make configurable
@@ -45,87 +49,85 @@ object OspreyService {
 		}
 	}
 
-	private fun HttpRequestBuilder.send(obj: Any) {
+	private fun HttpRequestBuilder.get(path: String) {
+		path(path)
+		method = HttpMethod.Get
+	}
+
+	private fun HttpRequestBuilder.post(path: String, obj: Any) {
+		path(path)
+		method = HttpMethod.Post
 		contentType(ContentType.Application.Json)
 		body = obj
 	}
 
-	// NOTE: tragically, we can't reduce code duplication here due to a compiler bug
+	// NOTE: tragically, we can't remove some code duplication here due to a compiler bug
 	// see: https://youtrack.jetbrains.com/issue/KT-34051
 	// maybe someday we can?
 
 	fun about() = runBlocking {
 		client.get<ServiceResponse<AboutResponse>> {
-			path("about")
-			method = HttpMethod.Get
+			get("about")
 		}
 		.responseOrThrow()
 	}
 
 	fun missingAtoms(request: MissingAtomsRequest) = runBlocking {
 		client.get<ServiceResponse<MissingAtomsResponse>> {
-			path("missingAtoms")
-			method = HttpMethod.Post
-			send(request)
+			post("missingAtoms", request)
 		}
 		.responseOrThrow()
 	}
 
 	fun bonds(request: BondsRequest) = runBlocking {
 		client.get<ServiceResponse<BondsResponse>> {
-			path("bonds")
-			method = HttpMethod.Post
-			send(request)
+			post("bonds", request)
 		}
 		.responseOrThrow()
 	}
 
 	fun protonation(request: ProtonationRequest) = runBlocking {
 		client.get<ServiceResponse<ProtonationResponse>> {
-			path("protonation")
-			method = HttpMethod.Post
-			send(request)
+			post("protonation", request)
 		}
 		.responseOrThrow()
 	}
 
 	fun protonate(request: ProtonateRequest) = runBlocking {
 		client.get<ServiceResponse<ProtonateResponse>> {
-			path("protonate")
-			method = HttpMethod.Post
-			send(request)
+			post("protonate", request)
 		}
 		.responseOrThrow()
 	}
 
 	fun types(request: TypesRequest) = runBlocking {
 		client.get<ServiceResponse<TypesResponse>> {
-			path("types")
-			method = HttpMethod.Post
-			send(request)
+			post("types", request)
 		}
 		.responseOrThrow()
 	}
 
 	fun moleculeFFInfo(request: MoleculeFFInfoRequest) = runBlocking {
 		client.get<ServiceResponse<MoleculeFFInfoResponse>> {
-			path("moleculeFFInfo")
-			method = HttpMethod.Post
-			send(request)
+			post("moleculeFFInfo", request)
 		}
 		.responseOrThrow()
 	}
 
 	fun forcefieldParams(request: ForcefieldParamsRequest) = runBlocking {
 		client.get<ServiceResponse<ForcefieldParamsResponse>> {
-			path("forcefieldParams")
-			method = HttpMethod.Post
-			send(request)
+			post("forcefieldParams", request)
+		}
+		.responseOrThrow()
+	}
+
+	fun minimize(request: MinimizeRequest) = runBlocking {
+		client.get<ServiceResponse<MinimizeResponse>> {
+			post("minimize", request)
 		}
 		.responseOrThrow()
 	}
 }
-
 
 private class ServiceSerializer : JsonSerializer {
 
