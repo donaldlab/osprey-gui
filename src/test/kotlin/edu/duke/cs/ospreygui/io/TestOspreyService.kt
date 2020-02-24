@@ -15,6 +15,7 @@ import edu.duke.cs.ospreyservice.OspreyService as Server
 
 inline fun <T> withService(block: () -> T): T {
 	Server.Instance(Paths.get("../osprey-service"), wait = false).use {
+		UserSettings.serviceProvider = UserSettings.ServiceProvider("localhost")
 		return block()
 	}
 }

@@ -23,6 +23,9 @@ fun TomlTable.getIntOrThrow(key: String, pos: TomlPosition? = null) =
 fun TomlTable.getBooleanOrThrow(key: String, pos: TomlPosition? = null) =
 	getBoolean(key) ?: throw TomlParseException("missing field \"$key\", or it is not a booelan", pos)
 
+fun TomlTable.getInt(key: String) =
+	getLong(key)?.toInt()
+
 fun TomlArray.getInt(index: Int) =
 	getLong(index).toInt()
 

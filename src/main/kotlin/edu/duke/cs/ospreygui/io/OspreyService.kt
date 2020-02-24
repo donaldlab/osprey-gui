@@ -39,14 +39,12 @@ object OspreyService {
 			}
 		}
 
-	// TODO: make configurable
-	private var host = "localhost"
-	private var port = 8080
-
 	private fun HttpRequestBuilder.path(path: String) {
 		url {
-			host = this@OspreyService.host
-			port = this@OspreyService.port
+			val provider = UserSettings.serviceProvider
+				?: throw NoSuchElementException("no Osprey Service provider configured")
+			host = provider.hostname
+			port = provider.port
 			path(path)
 		}
 	}
