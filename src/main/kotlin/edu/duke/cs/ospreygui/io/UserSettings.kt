@@ -39,7 +39,7 @@ object UserSettings {
 			// set default service providers
 			serviceProviders.clear()
 			serviceProviders.add(
-				ServiceProvider("workbox") // TODO: figure out public domain
+				ServiceProvider("darius.istmein.de")
 			)
 			serviceProvider = serviceProviders[0]
 
