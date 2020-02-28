@@ -17,9 +17,17 @@ import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.ospreygui.features.slide.ClashViewer
 import edu.duke.cs.ospreygui.features.win.*
 import org.joml.AABBf
+import org.slf4j.LoggerFactory
 
 
 fun main() = autoCloser {
+
+	OspreyGui.log.info	("Osprey GUI started!")
+
+	// create the default exception handler
+	Thread.setDefaultUncaughtExceptionHandler { _, t ->
+		OspreyGui.log.error("Uncaught exception", t)
+	}
 
 	// auto-stop the local service, if it gets started
 	LocalServiceRunner.autoClose()

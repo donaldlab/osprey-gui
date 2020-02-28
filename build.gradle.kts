@@ -20,6 +20,7 @@ dependencies {
 	
 	implementation(kotlin("stdlib-jdk8"))
 	implementation(kotlin("reflect"))
+	implementation("ch.qos.logback:logback-classic:1.2.3")
 	implementation("edu.duke.cs:molscope")
 	implementation("edu.duke.cs:osprey3")
 	implementation("edu.duke.cs:osprey-service")
@@ -125,83 +126,20 @@ runtime {
 
 distributions {
 
-	fun CopySpec.sharedBuildInfo() {
-
-		// get all the java build stuff from the "main" distribution
-		with(get("main").contents)
-
-		// add extra documentation
-		into("") { // project root
-			from("readme.md")
-			from("LICENSE.txt")
-			// TODO: contributing.md?
-		}
-
-		// add amber tools dat files
-		into("ambertools") {
-			into("dat") {
-				from("ambertools/dat")
-			}
-		}
-	}
-
-	create("linux-amd64").apply {
-		baseName = "${project.name}-$name"
+	get("main").apply {
 		contents {
 
-			// skip the windows startup script
-			exclude("${project.name}.bat")
-
-			sharedBuildInfo()
-
-			into("ambertools/bin") {
-				from("ambertools/linux/amd64")
-			}
-		}
-	}
-
-	create("windows-x64").apply {
-		baseName = "${project.name}-$name"
-		contents {
-
-			// skip the *nix startup script
-			exclude(project.name)
-
-			sharedBuildInfo()
-
-			into("ambertools/bin") {
-				// TODO: compile ambertools binaries in Win10
-				from("ambertools/windows/x64")
-			}
-		}
-	}
-
-	create("macos-x64").apply {
-		baseName = "${project.name}-$name"
-		contents {
-
-			// skip the windows startup script
-			exclude("${project.name}.bat")
-
-			sharedBuildInfo()
-
-			into("ambertools/bin") {
-				// TODO: compile ambertools binaries in OSX
-				from("ambertools/macos/x64")
+			// add extra documentation
+			into("") { // project root
+				from("readme.md")
+				from("LICENSE.txt")
+				// TODO: contributing.md?
 			}
 		}
 	}
 }
 
 tasks {
-
-	// turn off the "main" distribution
-	distZip {
-		enabled = false
-	}
-	distTar {
-		enabled = false
-	}
 
 	// turn off tar distributions
 	for (task in this) {

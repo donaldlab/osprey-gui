@@ -7,4 +7,4 @@ imgui.ini
 .kotlintest
 data
 logs
-ambertools/bin
+osprey-gui.log

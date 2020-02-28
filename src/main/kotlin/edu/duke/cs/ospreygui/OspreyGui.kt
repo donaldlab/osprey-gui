@@ -1,5 +1,6 @@
 package edu.duke.cs.ospreygui
 
+import org.slf4j.LoggerFactory
 import java.nio.charset.Charset
 import java.util.*
 
@@ -20,6 +21,8 @@ object OspreyGui {
 
 	val version = string("version")
 	val dev = bool("dev")
+
+	val log = LoggerFactory.getLogger(OspreyGui::class.java)
 
 	fun getResourceAsStream(path: String) = OspreyGui.javaClass.getResourceAsStream(path)
 
