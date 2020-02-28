@@ -1,10 +1,11 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.gradle.internal.os.OperatingSystem
 
 
 plugins {
 	kotlin("jvm") version "1.3.60"
 	kotlin("plugin.serialization") version "1.3.61"
-	application
+	id("org.beryx.runtime") version "1.8.0"
 }
 
 
@@ -101,6 +102,25 @@ tasks {
 
 application {
 	mainClassName = "edu.duke.cs.ospreygui.MainKt"
+}
+
+runtime {
+
+	options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
+	modules.set(listOf("java.desktop", "java.management", "java.xml"))
+
+	jpackage {
+
+		jpackageHome = System.getProperty("jpackage.home")
+
+		when (val os = OperatingSystem.current()) {
+
+			OperatingSystem.WINDOWS -> {
+				installerType = "msi"
+				installerOptions = listOf("--win-per-user-install", "--win-dir-chooser", "--win-menu", "--win-shortcut")
+			}
+		}
+	}
 }
 
 distributions {
