@@ -86,17 +86,18 @@ tasks {
 		}
 	}
 
-	startScripts {
+	// add documentation to the distribution
+	jpackageImage {
 		doLast {
-			// Tragically, an incompatibility between Windows and Gradle's batch script
-			// causes the batch script to fail when the classpath is long and complicated.
-			// This workaround isn't an ideal solution (because it destroys the classpath order),
-			// but there aren't any better solutions available (yet). see:
-			// https://github.com/gradle/gradle/issues/1989
-			windowsScript.writeText(windowsScript.readText().replace(
-				Regex("set CLASSPATH=.*"),
-				"set CLASSPATH=%APP_HOME%/lib/*"
-			))
+			val jp = project.runtime.jpackageData.get()
+			val imageDir = jp.imageOutputDir.resolve(jp.imageName)
+			copy {
+				from(
+					projectDir.resolve("readme.md"),
+					projectDir.resolve("LICENSE.txt")
+				)
+				into(imageDir)
+			}
 		}
 	}
 }
@@ -108,32 +109,28 @@ application {
 runtime {
 
 	options.set(listOf("--strip-debug", "--compress", "2", "--no-header-files", "--no-man-pages"))
-	modules.set(listOf("java.desktop", "java.management", "java.xml"))
+	modules.set(listOf(
+		"java.desktop",
+		"java.management",
+		"java.xml",
+		"java.naming",
+		"java.logging",
+		"jdk.unsupported"
+	))
 
 	jpackage {
 
 		jpackageHome = System.getProperty("jpackage.home")
+		imageName = "Osprey"
+		installerName = imageName
 
 		when (val os = OperatingSystem.current()) {
 
 			OperatingSystem.WINDOWS -> {
 				installerType = "msi"
 				installerOptions = listOf("--win-per-user-install", "--win-dir-chooser", "--win-menu", "--win-shortcut")
-			}
-		}
-	}
-}
-
-distributions {
-
-	get("main").apply {
-		contents {
-
-			// add extra documentation
-			into("") { // project root
-				from("readme.md")
-				from("LICENSE.txt")
-				// TODO: contributing.md?
+				// useful for debugging launcher issues
+				//imageOptions = listOf("--win-console")
 			}
 		}
 	}
