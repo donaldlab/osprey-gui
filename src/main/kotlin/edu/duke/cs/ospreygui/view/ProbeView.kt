@@ -67,7 +67,7 @@ class ProbeView : RenderView {
 	override val spheres = object : SphereRenderable {
 
 		override val numVertices get() = visibleGroups
-			.sumBy { group -> group.dots.values.sumBy { it.size } }
+			.sumBy { group -> group.dots.values.sumBy { it.size*4 } }
 
 		override val verticesSequence get() = sequence
 
@@ -82,17 +82,21 @@ class ProbeView : RenderView {
 
 					for (dot in dots) {
 
-						// downgrade pos to floats for rendering
-						buf.putFloat(dot.x.toFloat())
-						buf.putFloat(dot.y.toFloat())
-						buf.putFloat(dot.z.toFloat())
+						// copy the vertices 4 times
+						for (i in 0 until 4) {
 
-						buf.putFloat(radius)
-						buf.putColor4Bytes(color)
+							// downgrade pos to floats for rendering
+							buf.putFloat(dot.x.toFloat())
+							buf.putFloat(dot.y.toFloat())
+							buf.putFloat(dot.z.toFloat())
 
-						// no effects needed (yet?)
-						buf.putInt(0)
-						buf.put(null as RenderEffect?)
+							buf.putFloat(radius)
+							buf.putColor4Bytes(color)
+
+							// no effects needed (yet?)
+							buf.putInt(0)
+							buf.put(null as RenderEffect?)
+						}
 					}
 				}
 			}
@@ -103,7 +107,7 @@ class ProbeView : RenderView {
 	override val cylinders = object : CylinderRenderable {
 
 		override val numVertices get() = visibleGroups
-			.sumBy { group -> group.vectors.values.sumBy { it.size*2 } }
+			.sumBy { group -> group.vectors.values.sumBy { it.size*4 } }
 
 		override val verticesSequence get() = sequence
 
@@ -113,46 +117,38 @@ class ProbeView : RenderView {
 
 			for (group in visibleGroups) {
 				for ((colorName, vectors) in group.vectors) {
-
 					val color = getColor(colorName)[colorsMode]
 
-					fun writePoint(v: Vector3d) {
-
-						// downgrade pos to floats for rendering
-						buf.putFloat(v.x.toFloat())
-						buf.putFloat(v.y.toFloat())
-						buf.putFloat(v.z.toFloat())
-
-						buf.putFloat(radius)
-						buf.putColor4Bytes(color)
-
-						// no effects needed (yet?)
-						buf.putInt(0)
-						buf.put(null as RenderEffect?)
-					}
-
 					for ((a, b) in vectors) {
-						writePoint(a)
-						writePoint(b)
-					}
-				}
-			}
-		}
+						val points = listOf(a, b)
 
-		override val numIndices get() = numVertices
-		override val indicesSequence get() = sequence
+						// write each cylinder 4 times
+						for (i in 0 until 4) {
 
-		override fun fillIndexBuffer(buf: ByteBuffer) {
+							for (p in points) {
+								// downgrade pos to floats for rendering
+								buf.putFloat(p.x.toFloat())
+								buf.putFloat(p.y.toFloat())
+								buf.putFloat(p.z.toFloat())
+							}
 
-			var index = 0
+							for (p in points) {
+								buf.putFloat(radius)
+							}
 
-			for (group in visibleGroups) {
-				for (vectors in group.vectors.values) {
-					for (i in 0 until vectors.size) {
-						buf.putInt(index)
-						index += 1
-						buf.putInt(index)
-						index += 1
+							for (p in points) {
+								buf.putColor4Bytes(color)
+							}
+
+							for (p in points) {
+								buf.putInt(0)
+							}
+
+							// no effects needed (yet?)
+							for (p in points) {
+								buf.put(null as RenderEffect?)
+							}
+						}
 					}
 				}
 			}
