@@ -14,7 +14,7 @@ import java.nio.file.Paths
  */
 fun main() {
 
-	val extension = ".confspace.toml"
+	val extension = ".confspace"
 	val ospreyDir = Paths.get("../osprey3")
 	val dirs = listOf(
 		"test-resources/confSpaces",
@@ -63,7 +63,7 @@ fun main() {
 					val compiledConfSpace = report.compiled!!
 
 					// save the compressed conf space
-					val outPath = inPath.parent.resolve("$basename.ccs.xz")
+					val outPath = inPath.parent.resolve("$basename.ccsx")
 					println("saving $basename ...")
 					LZMA2.compress(compiledConfSpace.toBytes()).write(outPath)
 				}

@@ -36,7 +36,7 @@ class TestEnergy : SharedSpec({
 	}
 
 	fun readMol(name: String) =
-		Molecule.fromOMOL(OspreyGui.getResourceAsString("preppedMols/$name.omol.toml"))[0]
+		Molecule.fromOMOL(OspreyGui.getResourceAsString("preppedMols/$name.omol"))[0]
 
 	group("compared to templated ecalc") {
 
@@ -107,7 +107,7 @@ class TestEnergy : SharedSpec({
 		}
 
 		test("1cc8") {
-			val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0]
+			val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol"))[0]
 			mol.calcEnergyParameterized().shouldBeEnergy(mol.calcEnergyTemplated())
 		}
 	}
@@ -135,7 +135,7 @@ class TestEnergy : SharedSpec({
 		}
 
 		test("1cc8") {
-			val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0]
+			val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol"))[0]
 			mol.calcEnergyParameterized().shouldBeEnergy(-691.5469503851598)
 		}
 	}

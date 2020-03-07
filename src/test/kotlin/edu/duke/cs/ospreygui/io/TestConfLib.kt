@@ -18,7 +18,7 @@ class TestConfLib : SharedSpec({
 
 	test("read Lovell") {
 
-		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib"))
 
 		// spot check a few bits
 		conflib.name shouldBe "Amino Acids: The Penultimate Rotamer Library (with Hydroxyl rotamers)"
@@ -170,7 +170,7 @@ class TestConfLib : SharedSpec({
 	test("fragments list roundtrip") {
 
 		// get a list of fragments
-		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib"))
 		val expFrags = conflib.fragments
 			.values
 			.sortedBy { it.id }

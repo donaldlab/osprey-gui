@@ -15,7 +15,7 @@ class TestDihedralAngle : SharedSpec({
 		this shouldBe expected.plusOrMinus(epsilon)
 	}
 
-	val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
+	val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol"))[0] as Polymer
 
 	test("measure") {
 

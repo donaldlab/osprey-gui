@@ -37,7 +37,7 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 
 	companion object {
 		const val textExtension = "ccs"
-		const val compressedExtension = "ccs.xz"
+		const val compressedExtension = "ccsx"
 	}
 
 	// make the compiler and configure the default settings

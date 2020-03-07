@@ -78,8 +78,8 @@ class TestMutation : SharedSpec({
 
 	group("protein") {
 
-		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
-		val protein1cc8 = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
+		val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib"))
+		val protein1cc8 = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol"))[0] as Polymer
 
 		data class Instance(
 			val res: Polymer.Residue,

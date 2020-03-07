@@ -17,7 +17,7 @@ import java.nio.file.Paths
 object ConfLibs {
 
 	private val builtInConflibPaths = listOf(
-		"conflib/lovell.conflib.toml"
+		"conflib/lovell.conflib"
 	)
 
 	data class ConfLibInfo(
@@ -43,7 +43,7 @@ object ConfLibs {
 class ConfLibPicker(val confSpace: ConfSpace) {
 
 	private var libDir = Paths.get("").toAbsolutePath()
-	private val conflibFilter = FilterList(listOf("conflib.toml"))
+	private val conflibFilter = FilterList(listOf("conflib"))
 
 	private val alert = Alert()
 

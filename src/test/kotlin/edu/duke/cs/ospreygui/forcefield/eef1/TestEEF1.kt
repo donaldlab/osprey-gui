@@ -14,7 +14,7 @@ class TestEEF1 : SharedSpec({
 
 	group("1cc8") {
 
-		val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
+		val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol"))[0] as Polymer
 
 		fun Polymer.Residue.type(atomName: String) =
 			findAtomOrThrow(atomName).atomTypeEEF1(mol)

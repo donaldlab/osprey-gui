@@ -29,7 +29,7 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	override val id = FeatureId("save.splitConfspace")
 
 	companion object {
-		const val extension = "confspace.toml"
+		const val extension = "confspace"
 	}
 
 	val winState = WindowState()

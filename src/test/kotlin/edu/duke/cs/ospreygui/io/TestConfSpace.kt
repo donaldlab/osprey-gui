@@ -22,11 +22,11 @@ import org.joml.Vector3d
 fun makeTestConfSpace(): ConfSpace {
 
 	// load some molecules
-	val protein = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
-	val smallmol = Molecule.fromOMOL(OspreyGui.getResourceAsString("benzamidine.omol.toml"))[0]
+	val protein = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol"))[0] as Polymer
+	val smallmol = Molecule.fromOMOL(OspreyGui.getResourceAsString("benzamidine.omol"))[0]
 
 	// load some confs
-	val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+	val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib"))
 
 	// make the conf space
 	return ConfSpace(listOf(

@@ -19,7 +19,7 @@ class SaveOMOL(val getter: () -> List<Molecule>) : SlideFeature {
 	override val id = FeatureId("save.omol")
 
 	companion object {
-		const val extension = "omol.toml"
+		const val extension = "omol"
 	}
 
 	val filterList = FilterList(listOf(extension))

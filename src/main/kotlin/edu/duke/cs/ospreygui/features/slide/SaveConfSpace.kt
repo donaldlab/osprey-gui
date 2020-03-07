@@ -19,7 +19,7 @@ class SaveConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	override val id = FeatureId("save.confspace")
 
 	companion object {
-		const val extension = "confspace.toml"
+		const val extension = "confspace"
 	}
 
 	val filterList = FilterList(listOf(extension))

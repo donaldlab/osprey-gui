@@ -20,7 +20,7 @@ class NewConfSpace : WindowFeature {
 
 	override val id = FeatureId("new.confspace")
 
-	val filterList = FilterList(listOf("omol.toml"))
+	val filterList = FilterList(listOf("omol"))
 	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, win: WindowCommands) = imgui.run {

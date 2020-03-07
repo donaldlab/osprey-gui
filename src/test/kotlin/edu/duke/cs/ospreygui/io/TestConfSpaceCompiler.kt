@@ -33,7 +33,7 @@ import io.kotlintest.shouldBe
 class TestConfSpaceCompiler : SharedSpec({
 
 	// load some amino acid confs
-	val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+	val conflib = ConfLib.from(OspreyGui.getResourceAsString("conflib/lovell.conflib"))
 
 
 	/**
@@ -169,7 +169,7 @@ class TestConfSpaceCompiler : SharedSpec({
 	// this essentially tests the static energy calculation
 	group("1cc8 no positions") {
 
-		val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol.toml"))[0] as Polymer
+		val mol = Molecule.fromOMOL(OspreyGui.getResourceAsString("1cc8.protein.omol"))[0] as Polymer
 
 		// get the one conformation
 		val conf = ConfSpace(listOf(MoleculeType.Protein to mol))
@@ -188,7 +188,7 @@ class TestConfSpaceCompiler : SharedSpec({
 	group("glycine dipeptide") {
 
 		fun loadMol() =
-			Molecule.fromOMOL(OspreyGui.getResourceAsString("preppedMols/gly-gly.omol.toml"))[0] as Polymer
+			Molecule.fromOMOL(OspreyGui.getResourceAsString("preppedMols/gly-gly.omol"))[0] as Polymer
 
 		group("no positions") {
 
