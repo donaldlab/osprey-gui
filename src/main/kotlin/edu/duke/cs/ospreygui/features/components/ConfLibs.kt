@@ -21,6 +21,7 @@ object ConfLibs {
 	)
 
 	data class ConfLibInfo(
+		val path: String,
 		val name: String,
 		val description: String?,
 		val citation: String?
@@ -31,6 +32,7 @@ object ConfLibs {
 			for (path in builtInConflibPaths) {
 				val conflib = ConfLib.from(OspreyGui.getResourceAsString(path))
 				add(ConfLibInfo(
+					path,
 					conflib.name,
 					conflib.description,
 					conflib.citation
@@ -82,7 +84,7 @@ class ConfLibPicker(val confSpace: ConfSpace) {
 		popup("addlib") {
 			for (info in ConfLibs.infos) {
 				if (menuItem(info.name)) {
-					addLib(OspreyGui.getResourceAsString("conflib/lovell.conflib.toml"))
+					addLib(OspreyGui.getResourceAsString(info.path))
 				}
 				conflibTooltip(null, info.description, info.citation)
 			}
