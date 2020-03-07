@@ -17,12 +17,11 @@ import edu.duke.cs.molscope.view.BallAndStick
 import edu.duke.cs.ospreygui.features.slide.ClashViewer
 import edu.duke.cs.ospreygui.features.win.*
 import org.joml.AABBf
-import org.slf4j.LoggerFactory
 
 
 fun main() = autoCloser {
 
-	OspreyGui.log.info	("Osprey GUI started!")
+	OspreyGui.log.info("Osprey GUI started!")
 
 	// create the default exception handler
 	Thread.setDefaultUncaughtExceptionHandler { _, t ->
@@ -65,7 +64,10 @@ fun main() = autoCloser {
 		}
 	}
 
-	win.waitForClose()
+	// render the window
+	while (win.isOpen) {
+		win.render()
+	}
 
 } // end of scope here cleans up all autoClose() resources
 
@@ -79,64 +81,51 @@ val defaultRenderSettings = RenderSettings().apply {
 
 fun Molecule.show(focusAtom: Atom? = null, wait: Boolean = false) {
 	val mol = this
-	Thread {
-		autoCloser {
+	autoCloser {
 
-			// open a window
-			val win = Window(
-				width = 1280,
-				height = 720,
-				title = "Molscope"
-			).autoClose()
+		// open a window
+		val win = Window(
+			width = 1280,
+			height = 720,
+			title = "Molscope"
+		).autoClose()
 
-			// add window features
-			win.features.run {
-				menu("View") {
-					add(MenuColorsMode())
+		// add window features
+		win.features.run {
+			menu("View") {
+				add(MenuColorsMode())
+			}
+			menu("Help") {
+				add(AboutMolscope())
+			}
+		}
+
+		// prepare the slide
+		win.slides.add(Slide("molecule").apply {
+			lock { s ->
+
+				s.views.add(BallAndStick(mol))
+
+				if (focusAtom == null) {
+					s.camera.lookAtEverything()
+				} else {
+					s.camera.lookAtBox(AABBf().apply {
+						setMin(focusAtom.pos.toFloat())
+						setMax(focusAtom.pos.toFloat())
+						expand(10f)
+					})
 				}
-				menu("Help") {
-					add(AboutMolscope())
+
+				s.features.menu("View") {
+					add(CameraTool())
+					add(MenuRenderSettings(defaultRenderSettings))
+					add(ClashViewer())
 				}
 			}
+		})
 
-			// prepare the slide
-			win.slides.add(Slide("molecule").apply {
-				lock { s ->
-
-					s.views.add(BallAndStick(mol))
-
-					if (focusAtom == null) {
-						s.camera.lookAtEverything()
-					} else {
-						s.camera.lookAtBox(AABBf().apply {
-							setMin(focusAtom.pos.toFloat())
-							setMax(focusAtom.pos.toFloat())
-							expand(10f)
-						})
-					}
-
-					s.features.menu("View") {
-						add(CameraTool())
-						add(MenuRenderSettings(defaultRenderSettings))
-						add(ClashViewer())
-					}
-				}
-			})
-
-			win.waitForClose()
-		}
-	}.apply {
-
-		name = "Molscope"
-
-		// keep the JVM from exiting while the window is open
-		isDaemon = false
-
-		start()
-
-		// wait for the window to close if needed
-		if (wait) {
-			join()
+		while (win.isOpen) {
+			win.render()
 		}
 	}
 }
