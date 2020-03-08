@@ -56,7 +56,7 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	private val winState = WindowState()
 	private val pCompressed = Ref.of(true)
 
-	private var saveDir: Path = Paths.get(".").toAbsolutePath()
+	private var saveDir: Path = Paths.get("").toAbsolutePath()
 	private var progress: CompilerProgress? = null
 	private var extraInfoBuf: Commands.TextBuffer = Commands.TextBuffer(1024)
 
