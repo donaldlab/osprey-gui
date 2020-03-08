@@ -148,6 +148,13 @@ runtime {
 
 		when (os) {
 
+			OperatingSystem.LINUX -> {
+
+				checkJpackage(Paths.get(jpackageHome).resolve("bin").resolve("jpackage"))
+
+				installerType = "deb"
+			}
+
 			OperatingSystem.MAC_OS -> {
 
 				checkJpackage(Paths.get(jpackageHome).resolve("bin").resolve("jpackage"))
