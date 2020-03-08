@@ -1,5 +1,8 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.gradle.internal.os.OperatingSystem
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.Path
 
 
 plugins {
@@ -11,6 +14,9 @@ plugins {
 
 group = "edu.duke.cs"
 version = "0.1"
+
+val os = OperatingSystem.current()
+
 
 repositories {
 	jcenter()
@@ -90,7 +96,10 @@ tasks {
 	jpackageImage {
 		doLast {
 			val jp = project.runtime.jpackageData.get()
-			val imageDir = jp.imageOutputDir.resolve(jp.imageName)
+			val imageDir = when (os) {
+				OperatingSystem.MAC_OS -> jp.imageOutputDir.resolve(jp.imageName + ".app").resolve("Contents")
+				else -> jp.imageOutputDir.resolve(jp.imageName)
+			}
 			copy {
 				from(
 					projectDir.resolve("readme.md"),
@@ -118,15 +127,39 @@ runtime {
 		"jdk.unsupported"
 	))
 
+	fun checkJpackage(path: Path) {
+		if (!Files.exists(path)) {
+			throw NoSuchElementException("""
+				|jpackage was not found at the path given: $path
+				|Make sure JDK 14 (or higher) is installed and that systemProp.jpackage.home path points to its home directory.
+			""".trimMargin())
+		}
+	}
+
 	jpackage {
 
 		jpackageHome = System.getProperty("jpackage.home")
+			?: throw NoSuchElementException("""
+				|add a systemProp.jpackage.home = /path/to/jdk14 to gradle.properties.
+				|Requires JDK 14 or higher to be installed.
+			""".trimMargin())
 		imageName = "Osprey"
 		installerName = imageName
 
-		when (val os = OperatingSystem.current()) {
+		when (os) {
+
+			OperatingSystem.MAC_OS -> {
+
+				checkJpackage(Paths.get(jpackageHome).resolve("bin").resolve("jpackage"))
+
+				installerType = "dmg"
+				jvmArgs = listOf("-XstartOnFirstThread")
+			}
 
 			OperatingSystem.WINDOWS -> {
+
+				checkJpackage(Paths.get(jpackageHome).resolve("bin").resolve("jpackage.exe"))
+
 				installerType = "msi"
 				installerOptions = listOf("--win-per-user-install", "--win-dir-chooser", "--win-menu", "--win-shortcut")
 				// useful for debugging launcher issues
