@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.io
 
 import edu.duke.cs.molscope.molecule.*
+import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 
 
 /**
@@ -36,13 +37,14 @@ open class ChainIdGeneratorAZ : ChainIdGenerator {
 
 /**
  * Generates single-residue chains for non-polymer molecules.
+ * Useful for small molecules.
  */
 class ChainGeneratorSingleResidue(val idGenerator: ChainIdGenerator) : ChainGenerator {
 
 	override fun setUsedIds(ids: Collection<String>) =
 		idGenerator.setUsedIds(ids)
 
-	override fun generateChain(nonPolymerMol: Molecule, polymerAtoms: List<Atom>) =
+	override fun generateChain(nonPolymerMol: Molecule, polymerMol: Polymer, polymerAtoms: List<Atom>) =
 		Polymer.Chain(idGenerator.generateId()).apply {
 			residues.add(Polymer.Residue(
 				"1",
@@ -50,4 +52,48 @@ class ChainGeneratorSingleResidue(val idGenerator: ChainIdGenerator) : ChainGene
 				polymerAtoms
 			))
 		}
+}
+
+
+/**
+ * Generates a chain with one residue for each group of bonded atoms in the molecule.
+ * Useful for small molecules and solvents, as long as we have bonds.
+ */
+class ChainGeneratorBondedGroup(val idGenerator: ChainIdGenerator) : ChainGenerator {
+
+	override fun setUsedIds(ids: Collection<String>) =
+		idGenerator.setUsedIds(ids)
+
+	override fun generateChain(nonPolymerMol: Molecule, polymerMol: Polymer, polymerAtoms: List<Atom>) =
+		Polymer.Chain(idGenerator.generateId()).apply {
+
+			var resNum = 1
+
+			// get the connected components in the bond graph
+			for (component in polymerMol.bonds.connectedComponents(polymerAtoms)) {
+
+				residues.add(Polymer.Residue(
+					(resNum++).toString(),
+					nonPolymerMol.type ?: "SML",
+					component.toList()
+				))
+			}
+		}
+}
+
+
+class ChainGeneratorByMolType(val idGenerator: ChainIdGenerator) : ChainGenerator {
+
+	override fun setUsedIds(ids: Collection<String>) =
+		idGenerator.setUsedIds(ids)
+
+	override fun generateChain(nonPolymerMol: Molecule, polymerMol: Polymer, polymerAtoms: List<Atom>): Polymer.Chain {
+
+		val gen = when (nonPolymerMol.type?.let { MoleculeType[it] }) {
+			MoleculeType.Solvent -> ChainGeneratorBondedGroup(idGenerator)
+			else -> ChainGeneratorSingleResidue(idGenerator)
+		}
+
+		return gen.generateChain(nonPolymerMol, polymerMol, polymerAtoms)
+	}
 }

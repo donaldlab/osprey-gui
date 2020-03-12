@@ -1,13 +1,14 @@
 package edu.duke.cs.ospreygui.io
 
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Element
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.osprey.structure.OMOLIO
+import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
+import edu.duke.cs.ospreygui.forcefield.amber.partition
 import io.kotlintest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotlintest.matchers.types.shouldBeInstanceOf
 import io.kotlintest.shouldBe
+import io.kotlintest.shouldThrow
 
 
 class TestMolIO : SharedSpec({
@@ -237,6 +238,56 @@ class TestMolIO : SharedSpec({
 		}
 		test("benzamidine") {
 			roundtrip(benzamidine)
+		}
+	}
+
+	group("PDB export") {
+
+		test("1cc8") {
+			Molecule.fromPDB(OspreyGui.getResourceAsString("1cc8.pdb"))
+				.shouldBeInstanceOf<Polymer> { mol ->
+
+					// the raw PDB file has just one chain
+					mol.chains.size shouldBe 1
+
+					mol.toPDB(throwOnNonChainPolymerAtoms = true)
+				}
+		}
+
+		test("1cc8, partitioned, combined") {
+
+			val mols = Molecule.fromPDB(OspreyGui.getResourceAsString("1cc8.pdb"))
+				.partition(combineSolvent = false)
+				.map { (_, mol) -> mol }
+
+			// should have protein, Hg, two Benzamidines, and 117 waters
+			mols.size shouldBe 1 + 1 + 2 + 117
+
+			shouldThrow<IllegalArgumentException> {
+				mols.combine("combined").first
+					.toPDB(throwOnNonChainPolymerAtoms = true)
+			}
+		}
+
+		test("1cc8, partitioned combined solvent, combined with chains") {
+
+			val mols = Molecule.fromPDB(OspreyGui.getResourceAsString("1cc8.pdb"))
+				.partition(combineSolvent = true)
+				.map { (_, mol) -> mol }
+
+			// should have protein, Hg, two Benzamidines, and combined solvent
+			mols.size shouldBe 1 + 1 + 2 + 1
+
+			val chainIdGen = ChainIdGeneratorAZ()
+			val chainGen = ChainGeneratorByMolType(chainIdGen)
+			mols.combine("combined", chainIdGen, chainGen).first
+				.shouldBeInstanceOf<Polymer> { mol ->
+
+					mol.chains.size shouldBe 5
+					mol.chains.map { it.residues.size }.sorted() shouldBe listOf(1, 1, 1, 72, 117)
+
+					mol.toPDB(throwOnNonChainPolymerAtoms = true)
+				}
 		}
 	}
 })

@@ -309,20 +309,15 @@ fun Molecule.partitionAndAtomMap(combineSolvent: Boolean = true): Pair<List<Pair
 			.takeIf { it.isNotEmpty() }
 			?.let { solventMols ->
 
-				// combine all the solvent molecules into a single chain in a polymer
+				// combine all the solvent molecules into a "molecule"
 				val name = solventMols
 					.map { it.name }
 					.toSet()
 					.sorted()
 					.joinToString(", ")
-				val combinedSolvent = Polymer(name)
-				val solventChain = Polymer.Chain("A").also { combinedSolvent.chains.add(it) }
+				val combinedSolvent = Molecule(name, solventMols.first().type)
 				solventMols.forEachIndexed { i, solventMol ->
 					combinedSolvent.atoms.addAll(solventMol.atoms)
-					val resType = (solventMol as? Polymer)
-						?.type
-						?: "SOL"
-					solventChain.residues.add(Polymer.Residue((i + 1).toString(), resType, solventMol.atoms))
 				}
 
 				mols = mols

@@ -1,9 +1,6 @@
 package edu.duke.cs.ospreygui.io
 
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.Element
-import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.osprey.structure.Molecule as OspreyMolecule
 import edu.duke.cs.osprey.structure.Atom as OspreyAtom
 import edu.duke.cs.osprey.structure.Residue as OspreyResidue
@@ -15,8 +12,19 @@ import kotlin.math.min
 /**
  * Save the molecule to PDB format.
  */
-fun Molecule.toPDB(): String {
-	return PDBIO.write(toOspreyMol())
+fun Molecule.toPDB(
+	/**
+	 * If a Polymer contains atoms not in a chain, they will not be copied into the Osprey molecule.
+	 * If true, throw an error when this happens.
+	 * If false, print a warning to stderr.
+	 *
+	 * To avoid this issue, combine() your molecules with a ChainGenerator to generate chains for non-chain atoms.
+	 */
+	throwOnNonChainPolymerAtoms: Boolean = false
+	// TODO: once we're sure all the existing code doesn't have this issue,
+	//  set this default to true to prevent future code from re-creating this issue
+): String {
+	return PDBIO.write(toOspreyMol(throwOnNonChainPolymerAtoms))
 }
 
 
@@ -98,7 +106,18 @@ fun OspreyMolecule.toMolecule(name: String? = null): Molecule {
 /**
  * Convert a Molscope molecule to an OSPREY molecule.
  */
-fun Molecule.toOspreyMol(): OspreyMolecule {
+fun Molecule.toOspreyMol(
+	/**
+	 * If a Polymer contains atoms not in a chain, they will not be copied into the Osprey molecule.
+	 * If true, throw an error when this happens.
+	 * If false, print a warning to stderr.
+	 *
+	 * To avoid this issue, combine() your molecules with a ChainGenerator to generate chains for non-chain atoms.
+	 */
+	throwOnNonChainPolymerAtoms: Boolean = false
+	// TODO: once we're sure all the existing code doesn't have this issue,
+	//  set this default to true to prevent future code from re-creating this issue
+): OspreyMolecule {
 
 	val mol = this
 	val omol = OspreyMolecule()
@@ -125,6 +144,8 @@ fun Molecule.toOspreyMol(): OspreyMolecule {
 	when (mol) {
 		is Polymer -> {
 
+			val atomsCopied = Atom.identitySet()
+
 			// put the atoms in multiple residues
 			for (chain in mol.chains) {
 				for (res in chain.residues) {
@@ -138,6 +159,20 @@ fun Molecule.toOspreyMol(): OspreyMolecule {
 					}
 
 					omol.residues.add(OspreyResidue(atoms, coords, fullName(chain.id, res.id, res.type), omol))
+
+					atomsCopied.addAll(res.atoms)
+				}
+			}
+
+			// warn about any non-chain atoms in the polymer
+			val missingAtoms = atoms.size - atomsCopied.size
+			if (missingAtoms > 0) {
+				val msg = "Polymer has $missingAtoms atoms that were not in chains" +
+					", and not copied to the Osprey molecule."
+				if (throwOnNonChainPolymerAtoms) {
+					throw IllegalArgumentException(msg)
+				} else {
+					System.err.println("WARNING: $msg")
 				}
 			}
 		}

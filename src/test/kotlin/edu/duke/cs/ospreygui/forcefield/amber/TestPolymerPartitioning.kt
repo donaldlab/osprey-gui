@@ -92,15 +92,9 @@ class TestPolymerPartitioning : SharedSpec({
 
 			val solvent = solvents.first().second
 
-			// all the solvent molecules should be in a single chain in a polymer
-			solvent.shouldBeTypeOf<Polymer> { polymer ->
-				polymer.chains.size shouldBe 1
-				polymer.chains.first().apply {
-					residues.size shouldBe 117
-					residues.forEachIndexed { i, res ->
-						res.id shouldBe (i + 1).toString()
-					}
-				}
+			// all the solvent molecules should be in a single "molecule"
+			solvent.shouldBeTypeOf<Molecule> { mol ->
+				mol.atoms.size shouldBe 117
 			}
 		}
 
@@ -139,6 +133,40 @@ class TestPolymerPartitioning : SharedSpec({
 					}
 
 					atoms.size shouldBe 567 + 1 + 9 + 9
+				}
+		}
+
+		test("partition all, combine") {
+			mol.partition(combineSolvent = false)
+				.map { (_, mol) -> mol }
+				.combine("combined").first
+				.run {
+
+					this as Polymer
+
+					// should have just one chain, from the protein
+					chains.size shouldBe 1
+					chains.map { it.id }.toSet() shouldBe setOf("A")
+
+					// but we should still have all of the atoms
+					atoms.size shouldBe 567 + 117 + 1 + 9 + 9
+				}
+		}
+
+		test("partition all, combined solvent, combine") {
+			mol.partition(combineSolvent = true)
+				.map { (_, mol) -> mol }
+				.combine("combined").first
+				.run {
+
+					this as Polymer
+
+					// should have just one chain, from the protein
+					chains.size shouldBe 1
+					chains.map { it.id }.toSet() shouldBe setOf("A")
+
+					// but we should still have all of the atoms
+					atoms.size shouldBe 567 + 117 + 1 + 9 + 9
 				}
 		}
 	}
