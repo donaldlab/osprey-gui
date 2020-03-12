@@ -97,3 +97,15 @@ class ChainGeneratorByMolType(val idGenerator: ChainIdGenerator) : ChainGenerato
 		return gen.generateChain(nonPolymerMol, polymerMol, polymerAtoms)
 	}
 }
+
+
+/**
+ * A wrapper for Molecule.combine() that tries to intelligently
+ * generate polymer chains for non-polymer molecules to satisfy
+ * the limitations of the PDB file format.
+ */
+fun Collection<Molecule>.combineForPDB(name: String): Pair<Molecule,AtomMap> {
+	val chainIdGen = ChainIdGeneratorAZ()
+	val chainGen = ChainGeneratorByMolType(chainIdGen)
+	return combine(name, chainIdGen, chainGen)
+}

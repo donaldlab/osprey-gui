@@ -12,6 +12,7 @@ import edu.duke.cs.molscope.molecule.combine
 import edu.duke.cs.molscope.molecule.filter
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.OspreyService
+import edu.duke.cs.ospreygui.io.combineForPDB
 import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.io.toVector3d
 import edu.duke.cs.ospreygui.view.ProbeView
@@ -58,8 +59,10 @@ class ClashViewer : SlideFeature {
 				window("Clashes##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
 					if (button("Refresh")) {
-						unloadClashes()
-						loadClashes(molViews)
+						slidewin.showExceptions {
+							unloadClashes()
+							loadClashes(molViews)
+						}
 					}
 
 					// show the counts, with toggles to show/hide
@@ -100,7 +103,7 @@ class ClashViewer : SlideFeature {
 				// grab just the selected part of the molecule
 				view.selector.filter(view.mol)
 			}
-			.combine("combined").first
+			.combineForPDB("combined").first
 			.toPDB()
 
 		// run probe
