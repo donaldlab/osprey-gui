@@ -12,6 +12,7 @@ import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
+import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.prep.MoleculePrep
@@ -31,7 +32,7 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 
 	private val inclusionChecks = prep.partition
 		.map { (_, mol) -> mol }
-		.associateWith { Ref.of(true) }
+		.associateIdentity { mol -> mol to Ref.of(true) }
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Filter")) {
@@ -115,8 +116,7 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 								text("${mol.atoms.size} atoms")
 							}
 							MoleculeType.Solvent -> {
-								mol as Polymer
-								text("${mol.chains.first().residues.size} molecules")
+								text("${mol.atoms.size} atoms")
 							}
 							else -> Unit
 						}
