@@ -3,7 +3,6 @@ package edu.duke.cs.ospreygui.features.slide
 import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.tools.ByteFlags
 import cuchaz.kludge.tools.IntFlags
-import cuchaz.kludge.tools.Ref
 import cuchaz.kludge.tools.toFloat
 import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.*
@@ -12,7 +11,6 @@ import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
-import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.prep.MoleculePrep
@@ -29,10 +27,6 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 	private var highlightedAtom: Atom? = null
 	private var highlightedMol: Molecule? = null
 	private val renderEffects = IdentityHashMap<MoleculeRenderView,MoleculeRenderEffects.Writer>()
-
-	private val inclusionChecks = prep.partition
-		.map { (_, mol) -> mol }
-		.associateIdentity { mol -> mol to Ref.of(true) }
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Filter")) {
@@ -122,9 +116,8 @@ class FilterTool(val prep: MoleculePrep) : SlideFeature {
 						}
 
 						// checkbox to include the molecule in the prep or not
-						val pInclude = inclusionChecks.getValue(mol)
-						if (checkbox("Include##${System.identityHashCode(mol)}", pInclude)) {
-							prep.setIncluded(mol, pInclude.value, slide)
+						checkbox("Include##${System.identityHashCode(mol)}", prep.isIncluded(mol))?.let { isChecked ->
+							prep.setIncluded(mol, isChecked, slide)
 						}
 
 						unindent(10f)

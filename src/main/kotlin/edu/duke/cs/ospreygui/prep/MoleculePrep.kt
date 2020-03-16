@@ -30,12 +30,16 @@ class MoleculePrep(
 	// TODO: persist the name in OMOL somehow?
 	var name = mols.firstOrNull()?.name ?: "Prep"
 
-	// include all molecules by default
+	// include all molecules by default, except solvent
 	private val isIncluded = IdentityHashMap<Molecule,Boolean>()
 		.apply {
 			partition
-				.map { (_, mol) -> mol }
-				.forEach { mol -> this[mol] = true }
+				.map { (type, mol) ->
+					this[mol] = when(type) {
+						MoleculeType.Solvent -> false
+						else -> true
+					}
+				}
 		}
 
 	fun isIncluded(mol: Molecule) =
