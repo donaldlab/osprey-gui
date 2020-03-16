@@ -8,10 +8,10 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.ospreygui.io.UserSettings
 import edu.duke.cs.ospreygui.io.toOMOL
 import edu.duke.cs.ospreygui.io.write
 import java.nio.file.Path
-import java.nio.file.Paths
 
 
 class SaveOMOL(val getter: () -> List<Molecule>) : SlideFeature {
@@ -23,12 +23,11 @@ class SaveOMOL(val getter: () -> List<Molecule>) : SlideFeature {
 	}
 
 	val filterList = FilterList(listOf(extension))
-	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Save OMOL")) {
-			FileDialog.saveFile(filterList, dir)?.let { path ->
-				dir = path.parent
+			FileDialog.saveFile(filterList, UserSettings.openSaveDir)?.let { path ->
+				UserSettings.openSaveDir = path.parent
 				save(slide, slidewin, path)
 			}
 		}

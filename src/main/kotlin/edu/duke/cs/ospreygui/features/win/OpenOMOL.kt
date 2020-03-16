@@ -7,11 +7,11 @@ import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.WindowFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.ospreygui.io.UserSettings
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.io.read
 import edu.duke.cs.ospreygui.prep.MoleculePrep
 import java.nio.file.Path
-import java.nio.file.Paths
 
 
 class OpenOMOL : WindowFeature {
@@ -19,12 +19,11 @@ class OpenOMOL : WindowFeature {
 	override val id = FeatureId("open.omol")
 
 	val filterList = FilterList(listOf("omol"))
-	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, win: WindowCommands) = imgui.run {
 		if (menuItem("Open OMOL")) {
-			FileDialog.openFile(filterList, dir)?.let { path ->
-				dir = path.parent
+			FileDialog.openFile(filterList, UserSettings.openSaveDir)?.let { path ->
+				UserSettings.openSaveDir = path.parent
 				open(win, path)
 			}
 		}

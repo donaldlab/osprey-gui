@@ -17,36 +17,37 @@ object UserSettings {
 		val port: Int = 8080
 	)
 
-	val serviceProviders = ArrayList<ServiceProvider>()
-	var serviceProvider = null as ServiceProvider?
+	// init settings with defaults
+
+	val serviceProviders = mutableListOf(
+		ServiceProvider("darius.istmein.de")
+	)
+	var serviceProvider: ServiceProvider = serviceProviders.first()
 		set(value) {
-			if (value != null && value !in serviceProviders) {
+			if (value !in serviceProviders) {
 				serviceProviders.add(value)
 			}
 			field = value
+			save()
+		}
+
+	var openSaveDir = Paths.get(System.getProperty("user.home"))
+		set(value) {
+			field = value
+			save()
 		}
 
 	init {
 		// try to load values on first use
-		load()
+		if (file.exists) {
+			load()
+		} else {
+			// no file? just save the defaults
+			save()
+		}
 	}
 
 	private fun load() {
-
-		// no file? use defaults
-		if (!file.exists) {
-
-			// set default service providers
-			serviceProviders.clear()
-			serviceProviders.add(
-				ServiceProvider("darius.istmein.de")
-			)
-			serviceProvider = serviceProviders[0]
-
-			save()
-
-			return
-		}
 
 		// don't let errors here crash the whole program
 		try {
@@ -69,7 +70,15 @@ object UserSettings {
 				}
 			}
 			doc.getInt("serviceProvider")?.let { index ->
-				serviceProvider = serviceProviders.getOrNull(index)
+				serviceProviders.getOrNull(index)?.let { serviceProvider = it }
+			}
+
+			// load the open/save dir
+			doc.getString("openSaveDir")?.let { pathname ->
+				val path = Paths.get(pathname)
+				if (Files.isDirectory(path)) {
+					openSaveDir = path
+				}
 			}
 
 		} catch (t: Throwable) {
@@ -103,6 +112,9 @@ object UserSettings {
 			?.let {
 				write("serviceProvider = %d\n", it)
 			}
+
+		// write the open/save dir
+		write("openSaveDir = %s\n", openSaveDir.toAbsolutePath().toString().quote())
 
 		Files.createDirectories(file.parent)
 		buf.toString().write(file)

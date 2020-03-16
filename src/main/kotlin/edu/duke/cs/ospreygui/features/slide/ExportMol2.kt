@@ -9,12 +9,8 @@ import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.combine
-import edu.duke.cs.ospreygui.io.ChainGeneratorSingleResidue
-import edu.duke.cs.ospreygui.io.ChainIdGeneratorAZ
-import edu.duke.cs.ospreygui.io.toMol2
-import edu.duke.cs.ospreygui.io.write
+import edu.duke.cs.ospreygui.io.*
 import java.nio.file.Path
-import java.nio.file.Paths
 
 
 class ExportMol2(val getter: () -> Pair<List<Molecule>,String>) : SlideFeature {
@@ -26,12 +22,11 @@ class ExportMol2(val getter: () -> Pair<List<Molecule>,String>) : SlideFeature {
 	}
 
 	val filterList = FilterList(listOf(extension))
-	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Export Mol2")) {
-			FileDialog.saveFile(filterList, dir)?.let { path ->
-				dir = path.parent
+			FileDialog.saveFile(filterList, UserSettings.openSaveDir)?.let { path ->
+				UserSettings.openSaveDir = path.parent
 				save(slide, slidewin, path)
 			}
 		}

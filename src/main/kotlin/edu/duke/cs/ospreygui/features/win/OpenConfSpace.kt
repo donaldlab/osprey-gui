@@ -10,7 +10,6 @@ import edu.duke.cs.ospreygui.io.*
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.ConfSpacePrep
 import java.nio.file.Path
-import java.nio.file.Paths
 
 
 class OpenConfSpace : WindowFeature {
@@ -18,12 +17,11 @@ class OpenConfSpace : WindowFeature {
 	override val id = FeatureId("open.confspace")
 
 	val filterList = FilterList(listOf("confspace"))
-	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, win: WindowCommands) = imgui.run {
 		if (menuItem("Open Conformation Space")) {
-			FileDialog.openFile(filterList, dir)?.let { path ->
-				dir = path.parent
+			FileDialog.openFile(filterList, UserSettings.openSaveDir)?.let { path ->
+				UserSettings.openSaveDir = path.parent
 				open(win, path)
 			}
 		}

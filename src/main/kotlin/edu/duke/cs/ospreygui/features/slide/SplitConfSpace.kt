@@ -13,11 +13,11 @@ import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.gui.enabledIf
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
+import edu.duke.cs.ospreygui.io.UserSettings
 import edu.duke.cs.ospreygui.io.toToml
 import edu.duke.cs.ospreygui.io.write
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import java.nio.file.Path
-import java.nio.file.Paths
 
 
 /**
@@ -36,7 +36,6 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	val nameBuf = Commands.TextBuffer(1024)
 
 	val filterList = FilterList(listOf(extension))
-	var dir = Paths.get("").toAbsolutePath()
 
 	class MolInfo(val mol: Molecule, val type: MoleculeType, index: Int) {
 		val label = "$type: $mol###mol$index"
@@ -105,8 +104,8 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 					}
 					enabledIf(selectedMols.isNotEmpty()) {
 						if (button("Save $selmsg###save")) {
-							FileDialog.saveFile(filterList, dir)?.let { path ->
-								dir = path.parent
+							FileDialog.saveFile(filterList, UserSettings.openSaveDir)?.let { path ->
+								UserSettings.openSaveDir = path.parent
 								save(slidewin, path, selectedMols, nameBuf.text)
 							}
 						}

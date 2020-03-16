@@ -21,12 +21,12 @@ import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.amber.AmberForcefieldParams
 import edu.duke.cs.ospreygui.forcefield.eef1.EEF1ForcefieldParams
+import edu.duke.cs.ospreygui.io.UserSettings
 import edu.duke.cs.ospreygui.io.toBytes
 import edu.duke.cs.ospreygui.io.write
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import java.math.BigInteger
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.text.NumberFormat
 import java.util.*
 
@@ -56,7 +56,6 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	private val winState = WindowState()
 	private val pCompressed = Ref.of(true)
 
-	private var saveDir: Path = Paths.get("").toAbsolutePath()
 	private var progress: CompilerProgress? = null
 	private var extraInfoBuf: Commands.TextBuffer = Commands.TextBuffer(1024)
 
@@ -427,7 +426,8 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 				}
 
 			val filterList = FilterList(listOf(currentExtension))
-			FileDialog.saveFile(filterList, saveDir)?.let { chosenPath ->
+			FileDialog.saveFile(filterList, UserSettings.openSaveDir)?.let { chosenPath ->
+				UserSettings.openSaveDir = chosenPath.parent
 
 				// decide if we should add an extension or not
 				val filename = chosenPath.fileName.toString()

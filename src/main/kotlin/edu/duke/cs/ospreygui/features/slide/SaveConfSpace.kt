@@ -7,11 +7,11 @@ import edu.duke.cs.molscope.Slide
 import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
+import edu.duke.cs.ospreygui.io.UserSettings
 import edu.duke.cs.ospreygui.io.toToml
 import edu.duke.cs.ospreygui.io.write
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import java.nio.file.Path
-import java.nio.file.Paths
 
 
 class SaveConfSpace(val confSpace: ConfSpace) : SlideFeature {
@@ -23,12 +23,11 @@ class SaveConfSpace(val confSpace: ConfSpace) : SlideFeature {
 	}
 
 	val filterList = FilterList(listOf(extension))
-	var dir = Paths.get("").toAbsolutePath()
 
 	override fun menu(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 		if (menuItem("Save Conformation Space")) {
-			FileDialog.saveFile(filterList, dir)?.let { path ->
-				dir = path.parent
+			FileDialog.saveFile(filterList, UserSettings.openSaveDir)?.let { path ->
+				UserSettings.openSaveDir = path.parent
 				save(slidewin, path)
 			}
 		}

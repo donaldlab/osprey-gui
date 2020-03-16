@@ -6,9 +6,9 @@ import cuchaz.kludge.window.FilterList
 import edu.duke.cs.molscope.gui.Alert
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.io.UserSettings
 import edu.duke.cs.ospreygui.io.read
 import edu.duke.cs.ospreygui.prep.ConfSpace
-import java.nio.file.Paths
 
 
 /**
@@ -44,7 +44,6 @@ object ConfLibs {
 
 class ConfLibPicker(val confSpace: ConfSpace) {
 
-	private var libDir = Paths.get("").toAbsolutePath()
 	private val conflibFilter = FilterList(listOf("conflib"))
 
 	private val alert = Alert()
@@ -102,9 +101,9 @@ class ConfLibPicker(val confSpace: ConfSpace) {
 	private fun addLibFromFile() {
 		FileDialog.openFiles(
 			conflibFilter,
-			defaultPath = libDir
+			defaultPath = UserSettings.openSaveDir
 		)?.let { paths ->
-			paths.firstOrNull()?.parent?.let { libDir = it }
+			paths.firstOrNull()?.parent?.let { UserSettings.openSaveDir = it }
 			for (path in paths) {
 				addLib(path.read())
 			}
