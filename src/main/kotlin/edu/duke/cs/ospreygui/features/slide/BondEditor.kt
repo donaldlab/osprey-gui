@@ -119,10 +119,10 @@ class BondEditor : SlideFeature {
 						if (selection != null) {
 
 							columns(2)
-							for (info in selection.nearbyAtoms) {
+							for ((index, info) in selection.nearbyAtoms.withIndex()) {
 
 								// show a checkbox to toggle the bond on/off
-								val isCheckHovered = renderBondCheck(imgui, info)
+								val isCheckHovered = renderBondCheck(imgui, info, index)
 								nextColumn()
 								renderBondLabel(imgui, info)
 								nextColumn()
@@ -178,15 +178,15 @@ class BondEditor : SlideFeature {
 			}
 
 			selection?.let { selection ->
-				if (selection.atom != atom) {
+				if (selection.atom !== atom) {
 
 					// get the atom info (reuse a nearby atom if possible)
 					val info = selection.nearbyAtoms
-						.find { it.atom == atom }
+						.find { it.atom === atom }
 						?: selection.AtomInfo(atom)
 
 					// show a checkbox to toggle the bond on/off
-					renderBondCheck(this, info)
+					renderBondCheck(this, info, 0)
 					sameLine()
 					renderBondLabel(this, info)
 				}
@@ -194,10 +194,10 @@ class BondEditor : SlideFeature {
 		}
 	}
 
-	private fun renderBondCheck(imgui: Commands, info: Selection.AtomInfo): Boolean = imgui.run {
+	private fun renderBondCheck(imgui: Commands, info: Selection.AtomInfo, index: Int): Boolean = imgui.run {
 
 		// add a checkbox to toggle the bond
-		if (checkbox(info.atom.name, info.pBonded)) {
+		if (checkbox("${info.atom.name}##atom$index", info.pBonded)) {
 			info.updateBond()
 		}
 		return isItemHovered()
@@ -292,9 +292,16 @@ private class Selection(val view: MoleculeRenderView, val atom: Atom, val maxDis
 
 	val nearbyAtoms = mol.atoms.toTree().nearest(atom).asSequence()
 		.takeWhile { (_, distSq) -> distSq <= maxDistSq }
-		.filter { (nearbyAtom, _) -> atom != nearbyAtom }
+		.filter { (nearbyAtom, _) -> atom !== nearbyAtom }
+		.toMutableList().apply {
+			// add bonded atoms, regardless of distance, so it's easier to break bad bonds
+			for (bondedAtom in mol.bonds.bondedAtoms(atom)) {
+				add(bondedAtom to atom.pos.distanceSquared(bondedAtom.pos))
+			}
+		}
 		.map { (nearbyAtom, distSq) -> AtomInfo(nearbyAtom, distSq.sqrt()) }
 		.toList()
+		.sortedBy { it.dist }
 }
 
 private val hoverEffect = RenderEffect(
