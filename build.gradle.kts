@@ -13,7 +13,7 @@ plugins {
 
 
 group = "edu.duke.cs"
-version = "0.1"
+version = "0.2"
 
 val os = OperatingSystem.current()
 
