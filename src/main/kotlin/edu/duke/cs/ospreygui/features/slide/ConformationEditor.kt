@@ -17,7 +17,6 @@ import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import java.math.BigInteger
 import java.text.NumberFormat
-import java.util.*
 import kotlin.collections.ArrayList
 
 
@@ -90,7 +89,7 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 			val pos = DesignPosition("$prefix$num", "none", mol)
 			positions.add(pos)
 
-			val posInfo = PosInfo(pos)
+			val posInfo = PosInfo(pos, posInfos.size)
 			posInfos.add(posInfo)
 			return posInfo
 		}
@@ -103,25 +102,26 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 		}
 	}
 
-	inner class PosInfo(val pos: DesignPosition) {
+	inner class PosInfo(val pos: DesignPosition, val index: Int) {
 
+		val label = "${pos.name}###pos$index"
 		val posConfSpace get() = confSpace.positionConfSpaces.getOrMake(pos)
 		val isMutable get() = posConfSpace.isMutable()
 		val isFlexible get() = !isMutable
 	}
 
-	private val molInfos = IdentityHashMap<Molecule,MolInfo>()
+	private val molInfos = ArrayList<MolInfo>()
 
 	private fun resetInfos() {
 
 		molInfos.clear()
 
 		for ((moltype, mol) in confSpace.mols) {
-			molInfos.getOrPut(mol) { MolInfo(mol, moltype) }.apply {
-				confSpace.designPositionsByMol[mol]?.forEach { pos ->
-					posInfos.add(PosInfo(pos))
+			molInfos.add(MolInfo(mol, moltype).apply {
+				confSpace.designPositionsByMol[mol]?.forEachIndexed { index, pos ->
+					posInfos.add(PosInfo(pos, index))
 				}
-			}
+			})
 		}
 	}
 
@@ -139,7 +139,7 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 			numConfs = BigInteger.ZERO
 		} else {
 			numConfs = BigInteger.ONE
-			for (molInfo in molInfos.values) {
+			for (molInfo in molInfos) {
 				molInfo.updateCounts()
 				numConfs *= molInfo.numConfs
 			}
@@ -168,7 +168,7 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 
 					tabBar("tabs") {
 
-						for (molInfo in molInfos.values) {
+						for (molInfo in molInfos) {
 							tabItem(molInfo.label) {
 
 								withId("mutable") {
@@ -203,7 +203,7 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 										columns(2)
 										for (posInfo in molInfo.posInfos.filter { it.isFlexible }) {
 
-											if (selectable(posInfo.pos.name, selectedPosInfo === posInfo)) {
+											if (selectable(posInfo.label, selectedPosInfo === posInfo)) {
 												selectedPosInfo = posInfo
 											}
 											nextColumn()
@@ -221,6 +221,7 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 											molInfo,
 											molInfo.makeNewPosition(),
 											onClose = {
+												resetInfos()
 												updateCounts()
 												posEditor = null
 											}
@@ -244,6 +245,7 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 												molInfo,
 												selectedPosInfo,
 												onClose = {
+													resetInfos()
 													updateCounts()
 													posEditor = null
 												}

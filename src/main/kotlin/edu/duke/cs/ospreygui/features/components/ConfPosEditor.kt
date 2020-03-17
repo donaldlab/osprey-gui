@@ -134,7 +134,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 			whenOpen = {
 
 				// draw the window
-				window("Edit ${posInfo.pos.name} conformations##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
+				window("Edit ${posInfo.pos.name} conformations###${slide.name}_confPosEditor_${posInfo.label}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
 					// if we need to reset the tab selection, make the flags for the first tab
 					fun makeFlags() =
