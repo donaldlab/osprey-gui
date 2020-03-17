@@ -202,8 +202,8 @@ class ProtonationEditor : SlideFeature {
 						findResidue(heavyAtom)?.atoms?.add(hAtom)
 					}
 				}
-				view.moleculeChanged()
 			}
+			view.moleculeChanged()
 		}
 	}
 
