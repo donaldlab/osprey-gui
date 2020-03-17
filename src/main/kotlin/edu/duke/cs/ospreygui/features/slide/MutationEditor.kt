@@ -66,7 +66,7 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 				whenOpen = {
 
 					// draw the window
-					window("Edit ${posInfo.pos.name} mutations##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
+					window("Edit ${posInfo.pos.name} mutations###${slide.name}_mutEditor_${posInfo.label}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
 						// if we need to reset the tab selection, make the flags for the first tab
 						fun makeFlags() =
@@ -117,6 +117,12 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 					// cleanup the pos editor
 					posEditor.closed()
 					mutEditor = null
+
+					// update the parent window
+					this@MutationEditor.run {
+						resetInfos()
+						updateSequenceCounts()
+					}
 				}
 			)
 		}
@@ -254,9 +260,9 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 	}
 	private var mutEditor: MutEditor? = null
 
-	private inner class PosInfo(val pos: DesignPosition, val moltype: MoleculeType) {
+	private inner class PosInfo(val pos: DesignPosition, val moltype: MoleculeType, val index: Int) {
 
-		val label = pos.name
+		val label = "${pos.name}###pos$index"
 		val numSequences = pos.confSpace.mutations.size
 	}
 
@@ -302,7 +308,7 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 			val pos = DesignPosition("$prefix$num", "none", mol)
 			positions.add(pos)
 
-			val posInfo = PosInfo(pos, molType)
+			val posInfo = PosInfo(pos, molType, posInfos.size)
 			posInfos.add(posInfo)
 			return posInfo
 		}
@@ -316,8 +322,8 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 		for ((moltype, mol) in confSpace.mols) {
 			MolInfo(moltype, mol).apply {
 				molInfos.add(this)
-				confSpace.designPositionsByMol[mol]?.forEach { pos ->
-					posInfos.add(PosInfo(pos, moltype))
+				confSpace.designPositionsByMol[mol]?.forEachIndexed { index, pos ->
+					posInfos.add(PosInfo(pos, moltype, index))
 				}
 			}
 		}

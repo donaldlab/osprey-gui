@@ -9,6 +9,7 @@ import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
+import edu.duke.cs.molscope.tools.toIdentitySet
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.toTomlKey
@@ -255,12 +256,32 @@ class DesignPositionEditor(
 		return null
 	}
 
-	private var selectedChain: Polymer.Chain? = null
-	private var selectedRes: Polymer.Residue? = null
+	private var selectedRes: Polymer.Residue? =
+		// try to guess the selected residue from the design position
+		(pos.mol as? Polymer)?.let { mol ->
+			pos.currentAtoms
+				.mapNotNull { mol.findResidue(it) }
+				.toIdentitySet()
+				.takeIf { it.size == 1 }
+				?.firstOrNull()
+		}
+
+	private var selectedChain: Polymer.Chain? =
+		// try to guess the selected chain from the selected residue
+		selectedRes?.let { res ->
+			val mol = pos.mol as Polymer
+			mol.chains.find { chain -> chain.residues.any { it === res } }
+		}
 
 	fun guiProtein(imgui: Commands, slidewin: SlideCommands, view: MoleculeRenderView) = imgui.run {
 
 		if (mol !is Polymer) return
+
+		// edit the name
+		nameBuf.text = pos.name
+		if (inputText("Name", nameBuf)) {
+			pos.name = nameBuf.text
+		}
 
 		// select an initial chain if needed
 		if (selectedChain == null) {
@@ -302,7 +323,7 @@ class DesignPositionEditor(
 		val numCols = selectedChain.residues.size.divideUp(residuesPerCol)
 		text("Residues:")
 		setNextWindowContentSize(numCols*100f, 0f)
-		child("residues", 500f, 480f, true, flags = IntFlags.of(Commands.BeginFlags.HorizontalScrollBar)) {
+		child("residues", 500f, 490f, true, flags = IntFlags.of(Commands.BeginFlags.HorizontalScrollBar)) {
 
 			columns(numCols, border = true) {
 				for (c in 0 until numCols) {
@@ -359,8 +380,9 @@ class DesignPositionEditor(
 
 		// edit the name
 		nameBuf.text = pos.name
-		inputText("Name", nameBuf)
-		pos.name = nameBuf.text
+		if (inputText("Name", nameBuf)) {
+			pos.name = nameBuf.text
+		}
 
 		spacing()
 
