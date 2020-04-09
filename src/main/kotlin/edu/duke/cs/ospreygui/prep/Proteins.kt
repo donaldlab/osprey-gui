@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.prep
 
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 
@@ -122,6 +123,15 @@ object Proteins {
 			}
 		}
 	}
+
+	fun isSSBonded(mol: Molecule, res: Polymer.Residue) =
+		res.atoms
+			.filter { it.element == Element.Sulfur }
+			.any { atom ->
+				mol.bonds
+					.bondedAtoms(atom)
+					.any { it.element == Element.Sulfur }
+			}
 }
 
 class NotAProteinException(val msg: String) : RuntimeException("Molecule is not a protein: $msg")

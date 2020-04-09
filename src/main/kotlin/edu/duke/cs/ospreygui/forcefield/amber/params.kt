@@ -135,7 +135,12 @@ fun Molecule.calcTypesAmber(
 		else -> {
 
 			val request = TypesRequest.MoleculeSettings(
-				pdb = dst.toPDB(),
+				pdb = dst.toPDB(
+					// amber will only see the disulfide bonds if we send
+					// CYX residues, SSBOND records, and CONECT records
+					translateSSasCYX = true,
+					includeSSBondConect = true
+				),
 				ffname = ffname.name
 			).toRequest()
 			val (src, srcMetadata) = Molecule.fromMol2WithMetadata(OspreyService.types(request).mol2)

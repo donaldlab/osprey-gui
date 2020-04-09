@@ -5,6 +5,7 @@ import edu.duke.cs.osprey.structure.Molecule as OspreyMolecule
 import edu.duke.cs.osprey.structure.Atom as OspreyAtom
 import edu.duke.cs.osprey.structure.Residue as OspreyResidue
 import edu.duke.cs.osprey.structure.PDBIO
+import edu.duke.cs.ospreygui.prep.Proteins
 import java.util.*
 import kotlin.math.min
 
@@ -20,11 +21,22 @@ fun Molecule.toPDB(
 	 *
 	 * To avoid this issue, combine() your molecules with a ChainGenerator to generate chains for non-chain atoms.
 	 */
-	throwOnNonChainPolymerAtoms: Boolean = false
+	throwOnNonChainPolymerAtoms: Boolean = false,
 	// TODO: once we're sure all the existing code doesn't have this issue,
 	//  set this default to true to prevent future code from re-creating this issue
+	translateSSasCYX: Boolean = false,
+	comment: String? = null,
+	energy: Double? = null,
+	includeTer: Boolean = false,
+	includeSSBondConect: Boolean = false
 ): String {
-	return PDBIO.write(toOspreyMol(throwOnNonChainPolymerAtoms))
+	return PDBIO.write(
+		toOspreyMol(throwOnNonChainPolymerAtoms, translateSSasCYX),
+		comment,
+		energy,
+		includeTer,
+		includeSSBondConect
+	)
 }
 
 
@@ -114,9 +126,10 @@ fun Molecule.toOspreyMol(
 	 *
 	 * To avoid this issue, combine() your molecules with a ChainGenerator to generate chains for non-chain atoms.
 	 */
-	throwOnNonChainPolymerAtoms: Boolean = false
+	throwOnNonChainPolymerAtoms: Boolean = false,
 	// TODO: once we're sure all the existing code doesn't have this issue,
 	//  set this default to true to prevent future code from re-creating this issue
+	translateSSasCYX: Boolean = false
 ): OspreyMolecule {
 
 	val mol = this
@@ -158,7 +171,14 @@ fun Molecule.toOspreyMol(
 						coords.add(oatomCoords)
 					}
 
-					omol.residues.add(OspreyResidue(atoms, coords, fullName(chain.id, res.id, res.type), omol))
+					// if desired, and if a disulfide bond is present, translate CYS residues to CYX residues
+					val resType = if (translateSSasCYX && res.type == "CYS" && Proteins.isSSBonded(mol, res)) {
+						"CYX"
+					} else {
+						res.type
+					}
+
+					omol.residues.add(OspreyResidue(atoms, coords, fullName(chain.id, res.id, resType), omol))
 
 					atomsCopied.addAll(res.atoms)
 				}
