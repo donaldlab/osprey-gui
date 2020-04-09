@@ -48,23 +48,25 @@ class MinimizerTool : SlideFeature {
 			onOpen = {
 				// clear any old mol infos
 				molInfos.clear()
+				for (view in molViews) {
+					molInfos[view.mol] = MolInfo(view)
+				}
 			},
 			whenOpen = {
 
 				// draw the window
 				window("Minimize##${slide.name}", winState.pOpen, IntFlags.of(Commands.BeginFlags.AlwaysAutoResize)) {
 
-					molViews
-						.forEach { view ->
+					for ((index, info) in molInfos.values.withIndex()) {
+						withId(index) {
 
-							val mol = view.mol
-							val info = molInfos.getOrPut(mol) { MolInfo(view) }
+							val mol = info.view.mol
 
 							// show the molecule type
-							checkbox("$mol##${System.identityHashCode(mol)}", info.pSelected)
+							checkbox("$mol", info.pSelected)
 
 							// show a context menu to center the camera on the molecule
-							popupContextItem("centerCamera${System.identityHashCode(mol)}") {
+							popupContextItem("centerCamera") {
 
 								if (button("Center Camera")) {
 
@@ -106,6 +108,7 @@ class MinimizerTool : SlideFeature {
 							spacing()
 							spacing()
 						}
+					}
 
 					val job = job
 					if (job == null) {
