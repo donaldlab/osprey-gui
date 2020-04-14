@@ -1,6 +1,7 @@
 package edu.duke.cs.ospreygui.forcefield
 
 import edu.duke.cs.molscope.molecule.*
+import edu.duke.cs.osprey.tools.HashCalculator
 import java.util.*
 
 
@@ -72,12 +73,32 @@ interface ForcefieldParams {
 	companion object {
 
 		fun forEachPair(atomsByMola: Map<Molecule,List<Atom>>, atomsByMolb: Map<Molecule,List<Atom>>, func: FfparamsPairFunc) {
+
+			// track molecule pairs, regardless of order
+			class MolPair(val a: Molecule, val b: Molecule) {
+				override fun hashCode() = HashCalculator.combineHashesCommutative(
+					System.identityHashCode(a),
+					System.identityHashCode(b)
+				)
+				override fun equals(other: Any?): Boolean = other is MolPair && (
+					(this.a === other.a && this.b === other.b)
+					|| (this.a === other.b && this.b === other.a)
+				)
+			}
+			val molPairs = HashSet<MolPair>()
+
 			for ((mola, atomsa) in atomsByMola) {
 				for ((molb, atomsb) in atomsByMolb) {
-					if (mola === molb) {
-						forEachPairIntramol(mola, atomsa, atomsb, func)
-					} else {
-						forEachPairIntermol(mola, atomsa, molb, atomsb, func)
+
+					// make sure we only visit each pair of molecules once though
+					val wasAdded = molPairs.add(MolPair(mola, molb))
+					if (wasAdded) {
+
+						if (mola === molb) {
+							forEachPairIntramol(mola, atomsa, atomsb, func)
+						} else {
+							forEachPairIntermol(mola, atomsa, molb, atomsb, func)
+						}
 					}
 				}
 			}
