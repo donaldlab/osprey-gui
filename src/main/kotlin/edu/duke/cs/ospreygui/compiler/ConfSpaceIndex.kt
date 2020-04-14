@@ -67,6 +67,7 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 			fragments
 				.flatMap { fragInfo ->
 					posConfSpace.confs.getByFragment(fragInfo.frag)
+						.sortedBy { space -> space.conf.id }
 						.map { space -> fragInfo to space }
 				}
 				.mapIndexed { i, (fragInfo, space) ->
@@ -136,16 +137,21 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 		}
 	}
 
-	// choose an order for the design positions and assign indices
-	val positions =
-		confSpace
-			.designPositionsByMol
-			.flatMap { (_, positions) -> positions }
-			.mapNotNull { pos -> confSpace.positionConfSpaces[pos]?.let { pos to it } }
-			.mapIndexed { i, (pos, posConfSpace) -> PosInfo(pos, posConfSpace, i) }
-
-	// collect all the molecules
+	// choose an order for the molecules
 	val mols =
 		confSpace.mols
 			.map { (_, mol) -> mol }
+			.sortedBy { it.name }
+
+	// choose an order for the design positions and assign indices
+	val positions =
+		mols
+			.mapNotNull { mol ->
+				confSpace.designPositionsByMol[mol]
+					?.mapNotNull { pos ->
+						confSpace.positionConfSpaces[pos]?.let { pos to it }
+					}
+			}
+			.flatten()
+			.mapIndexed { i, (pos, posConfSpace) -> PosInfo(pos, posConfSpace, i) }
 }

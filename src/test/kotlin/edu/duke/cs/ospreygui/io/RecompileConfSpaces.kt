@@ -12,7 +12,7 @@ import java.nio.file.Paths
  * Just a simple tool to easily recompile all the conf spaces
  * in Osprey's test suite and examples to the new version of the compiled conf space format.
  */
-fun main() {
+fun main() = withService {
 
 	val extension = ".confspace"
 	val ospreyDir = Paths.get("../osprey3")
