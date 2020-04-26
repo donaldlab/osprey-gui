@@ -3,6 +3,7 @@
 
 *A cross-platform GUI for OSPREY 3.*
 
+Builds for the GUI can be downloaded from our automatic build server [here](https://dev.azure.com/donaldlab/osprey/_build?definitionId=1&_a=summary).
 
 ## Building
 

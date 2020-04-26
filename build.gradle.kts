@@ -30,6 +30,7 @@ dependencies {
 	implementation("edu.duke.cs:molscope")
 	implementation("edu.duke.cs:osprey3")
 	implementation("edu.duke.cs:osprey-service")
+	implementation("cuchaz:kludge")
 
 	val ktorVersion = "1.3.0"
 	implementation("io.ktor:ktor-client-cio:$ktorVersion")
@@ -39,7 +40,7 @@ dependencies {
 }
 
 configure<JavaPluginConvention> {
-	sourceCompatibility = JavaVersion.VERSION_1_8
+	sourceCompatibility = JavaVersion.VERSION_14
 }
 
 tasks.withType<KotlinCompile> {
