@@ -11,9 +11,12 @@ plugins {
 	id("org.beryx.runtime") version "1.8.0"
 }
 
+val major = "0"
+val minor = "2"
+val patch = findProperty("buildId") ?: "0"
+version = "$major.$minor.$patch"
 
 group = "edu.duke.cs"
-version = "0.2"
 
 val os = OperatingSystem.current()
 
