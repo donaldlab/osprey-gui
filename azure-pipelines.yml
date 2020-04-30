@@ -95,7 +95,21 @@ steps:
       }
 
       export JAVA_HOME=$(standardize_path "$(javaHome)")
-      ./$(gradleWrapper) -Dmolscope.path=`standardize_path "$(Build.SourcesDirectory)/molscope"` -Dosprey.path=`standardize_path "$(Build.SourcesDirectory)/OSPREY3"` -Dospreyservice.path=`standardize_path "$(Build.SourcesDirectory)/osprey-service"` -Dkludge.path=`standardize_path "$(Build.SourcesDirectory)/kludge"` -Djpackage.home=`standardize_path "$(javaHome)"` jpackage
+      molscope_path=`standardize_path "$(Build.SourcesDirectory)/molscope"`
+      osprey_path=`standardize_path "$(Build.SourcesDirectory)/OSPREY3"`
+      ospreyservice_path=`standardize_path "$(Build.SourcesDirectory)/osprey-service"`
+      kludge_path=`standardize_path "$(Build.SourcesDirectory)/kludge"`
+      jpackage_home=`standardize_path "$(javaHome)"`
+
+      ./$(gradleWrapper) \
+          -Dmolscope.path=$molscope_path \
+          -Dosprey.path=$osprey_path \
+          -Dospreyservice.path=$ospreyservice_path \
+          -Dkludge.path=$kludge_path \
+          -Djpackage.home=$jpackage_home \
+          -PbuildId=$(Build.BuildId) \
+          jpackage
+
     workingDirectory: 'osprey-gui'
   displayName: Run gradlew jpackage
 
