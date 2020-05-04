@@ -3,16 +3,16 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>/</loc>
+    <loc>https://donaldlab.github.io/osprey-gui/</loc>
     <xhtml:link
                 rel="alternate"
                 hreflang="no"
-                href="/no/"
+                href="https://donaldlab.github.io/osprey-gui/no/"
                 />
     <xhtml:link
                 rel="alternate"
                 hreflang="en"
-                href="/"
+                href="https://donaldlab.github.io/osprey-gui/"
                 />
   </url>
   
