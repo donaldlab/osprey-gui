@@ -1,14 +1,50 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-	
-	<sitemap>
-	   	<loc>https://donaldlab.github.io/osprey-gui/no/sitemap.xml</loc>
-		
-	</sitemap>
-	
-	<sitemap>
-	   	<loc>https://donaldlab.github.io/osprey-gui/en/sitemap.xml</loc>
-		
-	</sitemap>
-	
-</sitemapindex>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/docs/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/blog/news/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/blog/releases/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/blog/2018/10/06/easy-documentation-with-docsy/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/blog/2018/10/06/the-second-blog-post/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/blog/2018/01/04/another-great-release/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/about/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+  <url>
+    <loc>https://donaldlab.github.io/osprey-gui/blog/</loc>
+    <lastmod>2020-05-14T16:59:30-04:00</lastmod>
+  </url>
+  
+</urlset>

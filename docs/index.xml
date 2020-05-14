@@ -1,0 +1,17 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>OSPREY – Documentation</title>
+    <link>https://donaldlab.github.io/osprey-gui/docs/</link>
+    <description>Recent content in Documentation on OSPREY</description>
+    <generator>Hugo -- gohugo.io</generator>
+    
+	  <atom:link href="https://donaldlab.github.io/osprey-gui/docs/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+      
+        
+      
+    
+    
+  </channel>
+</rss>
