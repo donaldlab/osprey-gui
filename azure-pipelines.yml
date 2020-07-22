@@ -30,18 +30,18 @@ jobs:
         jdkName: openjdk-14.0.1_linux-x64_bin.tar.gz
         javaHome: $(Build.BinariesDirectory)/java/jdk-14.0.1
         gradleWrapper: gradlew
-      mac:
-        imageName: macos-latest
-        openJdkUrl: https://download.java.net/java/GA/jdk14.0.1/664493ef4a6946b186ff29eb326336a2/7/GPL/
-        jdkName: openjdk-14.0.1_osx-x64_bin.tar.gz
-        javaHome: $(Build.BinariesDirectory)/java/jdk-14.0.1.jdk/Contents/Home/
-        gradleWrapper: gradlew
-      windows:
-        imageName: windows-latest
-        openJdkUrl: https://download.java.net/java/GA/jdk14.0.1/664493ef4a6946b186ff29eb326336a2/7/GPL/
-        jdkName: openjdk-14.0.1_windows-x64_bin.zip
-        javaHome: $(Build.BinariesDirectory)/java/jdk-14.0.1
-        gradleWrapper: gradlew.bat
+      # mac:
+      #   imageName: macos-latest
+      #   openJdkUrl: https://download.java.net/java/GA/jdk14.0.1/664493ef4a6946b186ff29eb326336a2/7/GPL/
+      #   jdkName: openjdk-14.0.1_osx-x64_bin.tar.gz
+      #   javaHome: $(Build.BinariesDirectory)/java/jdk-14.0.1.jdk/Contents/Home/
+      #   gradleWrapper: gradlew
+      # windows:
+      #   imageName: windows-latest
+      #   openJdkUrl: https://download.java.net/java/GA/jdk14.0.1/664493ef4a6946b186ff29eb326336a2/7/GPL/
+      #   jdkName: openjdk-14.0.1_windows-x64_bin.zip
+      #   javaHome: $(Build.BinariesDirectory)/java/jdk-14.0.1
+      #   gradleWrapper: gradlew.bat
 
   pool:
     vmImage: $(imageName)
@@ -108,7 +108,14 @@ jobs:
             -PbuildId=$(Build.BuildId) \
             jpackage
 
-        version=`./$(gradleWrapper) --quiet versionString | tr -d '\n'`
+        version=`./$(gradleWrapper) \
+            -Dmolscope.path=$molscope_path \
+            -Dosprey.path=$osprey_path \
+            -Dospreyservice.path=$ospreyservice_path \
+            -Dkludge.path=$kludge_path \
+            -Djpackage.home=$jpackage_home \
+            -PbuildId=$(Build.BuildId) \
+            --quiet versionString | tr -d '\n'`
         echo "##vso[task.setvariable variable=version;isOutput=true;]${version}"
 
       workingDirectory: 'osprey-gui'
