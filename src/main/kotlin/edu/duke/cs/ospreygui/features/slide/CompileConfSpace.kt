@@ -354,8 +354,10 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 				if (this.sequence < sequence) {
 					this.sequence = sequence
 
-					// yup, tell the renderer
-					view.moleculeChanged()
+                    // TODO: This is commented out because there are race conditions
+                    // between the renderer and the compiler which cause the app to crash. Either
+                    // fix the race conditions, or do not update UI during compilation.
+					// view.moleculeChanged()
 				}
 			}
 		}
