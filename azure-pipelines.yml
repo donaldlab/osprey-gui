@@ -21,11 +21,6 @@ trigger:
 - master
 
 jobs:
-- job: "ExportVersionString"
-  pool:
-    vmImage: ubuntu-latest
-  steps:
-  
 - job: Assemble
   strategy:
     matrix:
