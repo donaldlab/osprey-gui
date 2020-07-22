@@ -116,10 +116,12 @@ jobs:
             -Djpackage.home=$jpackage_home \
             -PbuildId=$(Build.BuildId) \
             --quiet versionString | tr -d '\n'`
+
         echo "##vso[task.setvariable variable=version;isOutput=true;]${version}"
 
       workingDirectory: 'osprey-gui'
     displayName: Run gradlew jpackage
+    name: PackageAndVersion
 
   - task: CopyFiles@2
     inputs:
@@ -142,6 +144,8 @@ jobs:
   pool:
     vmImage: ubuntu-latest
   dependsOn: Assemble
+  variables: 
+    version: $[ dependencies.Assemble.outputs['PackageAndVersion.version'] ]
 #  condition: ne(variables['Build.Reason'], 'PullRequest')
   steps:
   - task: DownloadBuildArtifacts@0
@@ -158,7 +162,7 @@ jobs:
       target: '$(Build.SourceVersion)'
       tagSource: 'userSpecifiedTag'
       tag: '$(version)'
-      assets: '$(System.ArtifactsDirectory)/*'
+      assets: '$(System.ArtifactsDirectory)/**/*sprey*'
       isDraft: true
       changeLogCompareToRelease: 'lastFullRelease'
       changeLogType: 'commitBased'
