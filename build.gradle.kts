@@ -72,6 +72,13 @@ val isDev = object {
 
 tasks {
 
+    // just output a version string
+	register("versionString") {
+	    doLast {
+	        println(version)
+	    }
+	}
+
 	// tell gradle to write down the version number where the app can read it
 	processResources {
 
