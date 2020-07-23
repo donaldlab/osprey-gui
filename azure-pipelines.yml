@@ -146,7 +146,7 @@ jobs:
   dependsOn: Assemble
   variables: 
     version: $[ dependencies.Assemble.outputs['linux.PackageAndVersion.version'] ]
-#  condition: ne(variables['Build.Reason'], 'PullRequest')
+  condition: ne(variables['Build.Reason'], 'PullRequest')
   steps:
   - task: DownloadBuildArtifacts@0
     inputs:
