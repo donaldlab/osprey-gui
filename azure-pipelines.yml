@@ -145,7 +145,7 @@ jobs:
     vmImage: ubuntu-latest
   dependsOn: Assemble
   variables: 
-    version: $[ dependencies.Assemble.outputs['PackageAndVersion.version'] ]
+    version: $[ dependencies.Assemble.outputs['linux.PackageAndVersion.version'] ]
 #  condition: ne(variables['Build.Reason'], 'PullRequest')
   steps:
   - task: DownloadBuildArtifacts@0
