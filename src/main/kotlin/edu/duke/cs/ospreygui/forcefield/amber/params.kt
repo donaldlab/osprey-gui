@@ -139,7 +139,9 @@ fun Molecule.calcTypesAmber(
 					// amber will only see the disulfide bonds if we send
 					// CYX residues, SSBOND records, and CONECT records
 					translateSSasCYX = true,
-					includeSSBondConect = true
+					includeSSBondConect = true,
+					// amber also needs histidine protonation state explicitly described
+					translateHIStoEDP = true
 				),
 				ffname = ffname.name
 			).toRequest()

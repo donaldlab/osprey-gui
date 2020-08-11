@@ -28,10 +28,11 @@ fun Molecule.toPDB(
 	comment: String? = null,
 	energy: Double? = null,
 	includeTer: Boolean = false,
-	includeSSBondConect: Boolean = false
+	includeSSBondConect: Boolean = false,
+	translateHIStoEDP: Boolean = false
 ): String {
 	return PDBIO.write(
-		toOspreyMol(throwOnNonChainPolymerAtoms, translateSSasCYX),
+		toOspreyMol(throwOnNonChainPolymerAtoms, translateSSasCYX, translateHIStoEDP),
 		comment,
 		energy,
 		includeTer,
@@ -129,7 +130,12 @@ fun Molecule.toOspreyMol(
 	throwOnNonChainPolymerAtoms: Boolean = false,
 	// TODO: once we're sure all the existing code doesn't have this issue,
 	//  set this default to true to prevent future code from re-creating this issue
-	translateSSasCYX: Boolean = false
+	translateSSasCYX: Boolean = false,
+	/**
+	 * Amber can't read Histidine residues unless they're named based on their protonation state.
+	 * If true, rename HIS residues to HIE, HID, or HIP depending on the protonation state
+	 */
+	translateHIStoEDP: Boolean = false
 ): OspreyMolecule {
 
 	val mol = this
@@ -174,6 +180,26 @@ fun Molecule.toOspreyMol(
 					// if desired, and if a disulfide bond is present, translate CYS residues to CYX residues
 					val resType = if (translateSSasCYX && res.type == "CYS" && Proteins.isSSBonded(mol, res)) {
 						"CYX"
+
+					// if desired, translate HIS residues to describe the protonation state
+					} else if (translateHIStoEDP && res.type == "HIS") {
+
+						// determine the protonation state:
+						// HIE has HE2
+						// HID has HD1
+						// HIP has both
+						val hasHe2 = res.atoms.any { it.name.toLowerCase() == "he2" }
+						val hasHd1 = res.atoms.any { it.name.toLowerCase() == "hd1" }
+						if (hasHe2 && hasHd1) {
+							"HIP"
+						} else if (hasHe2) {
+							"HIE"
+						} else if (hasHd1) {
+							"HID"
+						} else {
+							throw IllegalArgumentException("Unable to determine Histidine protonation state, no HE2 or HD1")
+						}
+
 					} else {
 						res.type
 					}
