@@ -22,7 +22,7 @@ val os = OperatingSystem.current()
 
 
 repositories {
-	jcenter()
+	mavenCentral()
 }
 
 dependencies {
@@ -32,7 +32,7 @@ dependencies {
 	implementation("ch.qos.logback:logback-classic:1.2.3")
 	implementation("edu.duke.cs:molscope")
 	implementation("edu.duke.cs:osprey3")
-	implementation("edu.duke.cs:osprey-service")
+	implementation("edu.duke.cs:ospreyservice:0.2")
 
 	val ktorVersion = "1.3.0"
 	implementation("io.ktor:ktor-client-cio:$ktorVersion")
