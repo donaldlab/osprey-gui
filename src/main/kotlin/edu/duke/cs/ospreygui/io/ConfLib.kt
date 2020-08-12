@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.io
 import cuchaz.kludge.tools.x
 import cuchaz.kludge.tools.y
 import cuchaz.kludge.tools.z
+import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.tools.identityHashSet
 import org.joml.Vector3d
@@ -225,6 +226,17 @@ class ConfLib(
 		companion object {
 			// defined so we can extend it
 		}
+
+		interface Resolver {
+
+			fun resolve(p: AtomPointer): Atom?
+
+			fun resolveOrThrow(p: AtomPointer) =
+				resolve(p) ?: throw NoAtomException(p)
+		}
+
+		class NoAtomException(val p: AtomPointer)
+			: RuntimeException("can't find atom from pointer: $p")
 	}
 
 	data class AnchorAtomPointer(

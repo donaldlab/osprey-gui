@@ -12,7 +12,6 @@ import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.osprey.tools.LZMA2
 import edu.duke.cs.ospreygui.compiler.*
 import edu.duke.cs.ospreygui.features.components.Icon
@@ -110,9 +109,6 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 
 	override fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
-		// update any pending molecule views
-		molsWatcher?.checkAll()
-
 		winState.render(
 			whenOpen = {
 
@@ -144,7 +140,7 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 						// no compile running already,
 						// show a button to start the compilation
 						if (button("Compile")) {
-							compile(slide)
+							compile()
 						}
 
 					} else {
@@ -338,56 +334,8 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		}
 	}
 
-
-	private class MoleculesWatcher(slide: Slide.Locked) {
-
-		class Watcher(val view: MoleculeRenderView, sync: Any) {
-
-			val locker = MoleculeLocker.Locker(view.mol, sync)
-
-			private var sequence = 0
-
-			fun check() {
-
-				// did the sequence number update?
-				val sequence = locker.sequence.get()
-				if (this.sequence < sequence) {
-					this.sequence = sequence
-
-                    // TODO: This is commented out because there are race conditions
-                    // between the renderer and the compiler which cause the app to crash. Either
-                    // fix the race conditions, or do not update UI during compilation.
-					// view.moleculeChanged()
-				}
-			}
-		}
-
-		// make a watcher for each molecule render view.
-		// and make the compiler synchronize on the unlocked slide,
-		// since that's what the slide locking mechanism uses
-		val watchers = slide.views
-			.filterIsInstance<MoleculeRenderView>()
-			.map { view -> Watcher(view, slide.unlocked) }
-
-		fun checkAll() {
-			for (watcher in watchers) {
-				watcher.check()
-			}
-		}
-	}
-	private var molsWatcher: MoleculesWatcher? = null
-
-	private fun compile(slide: Slide.Locked) {
-
-		// make a molecules watcher so we can see when the compiler updates the molecules
-		val molsWatcher = MoleculesWatcher(slide)
-		this.molsWatcher = molsWatcher
-
-		// make a molecule locker so we can keep the compiler thread
-		// from racing the window thread when it modifies the molecules
-		val molLocker = MoleculeLocker(molsWatcher.watchers.map { it.locker })
-
-		progress = compiler.compile(molLocker)
+	private fun compile() {
+		progress = compiler.compile()
 	}
 
 	private fun guiSuccess(imgui: Commands, slidewin: SlideCommands, reportInfo: ReportInfo, compiled: CompiledConfSpace) = imgui.run {

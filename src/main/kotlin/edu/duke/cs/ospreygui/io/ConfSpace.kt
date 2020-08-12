@@ -5,6 +5,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.ospreygui.forcefield.amber.findTypeOrThrow
 import edu.duke.cs.ospreygui.motions.DihedralAngle
 import edu.duke.cs.ospreygui.motions.TranslationRotation
+import edu.duke.cs.ospreygui.prep.Anchor
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.tools.UnsupportedClassException
@@ -87,7 +88,7 @@ fun ConfSpace.toToml(): String {
 
 			// write the atoms
 			write("atoms = [ %s ]\n",
-				pos.currentAtoms
+				pos.sourceAtoms
 					.map { it.index() }
 					.joinToString(", ")
 			)
@@ -99,8 +100,8 @@ fun ConfSpace.toToml(): String {
 				write("anchors = [\n")
 				for (anchor in group) {
 					val type = when (anchor) {
-						is DesignPosition.Anchor.Single -> "single"
-						is DesignPosition.Anchor.Double -> "double"
+						is Anchor.Single -> "single"
+						is Anchor.Double -> "double"
 					}
 					write("\t{ type = %s, atoms = [ %s ] },\n",
 						type.quote(),
@@ -263,7 +264,7 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 					// read atoms
 					val atomsArray = posTable.getArrayOrThrow("atoms", posPos)
 					for (i in 0 until atomsArray.size()) {
-						currentAtoms.add(getAtom(atomsArray.getInt(i), posPos))
+						sourceAtoms.add(getAtom(atomsArray.getInt(i), posPos))
 					}
 
 					// read the pos conf space
@@ -345,7 +346,7 @@ fun ConfSpace.Companion.fromToml(toml: String): ConfSpace {
 						val anchorGroupPos = anchorGroupsTable.inputPositionOf(anchorGroupKey)
 						val anchorArray = anchorGroupTable.getArrayOrThrow("anchors", anchorGroupPos)
 
-						anchorGroups.add(ArrayList<DesignPosition.Anchor>().apply {
+						anchorGroups.add(ArrayList<Anchor>().apply {
 
 							for (i in 0 until anchorArray.size()) {
 								val anchorTable = anchorArray.getTable(i)

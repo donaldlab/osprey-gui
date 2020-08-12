@@ -1,5 +1,7 @@
 package edu.duke.cs.ospreygui.motions
 
+import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.prep.DesignPosition
 
 
@@ -13,6 +15,6 @@ interface ConfMotion {
 	 */
 	interface Description {
 		fun copyTo(pos: DesignPosition): Description
-		fun make(): ConfMotion
+		fun make(mol: Molecule, atomResolver: ConfLib.AtomPointer.Resolver): ConfMotion
 	}
 }

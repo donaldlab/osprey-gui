@@ -124,37 +124,14 @@ class SplitConfSpace(val confSpace: ConfSpace) : SlideFeature {
 		}
 		val pathWithExt = path.parent.resolve(filename)
 
-		// backup the current design position conformations
-		val positions = confSpace.positions()
-		val backups = positions.map { it.makeFragment("backup", "backup") }
-		try {
-
-			// put the conf space back into wild-type mode for saving
-			for (pos in positions) {
-				val posConfSpace = confSpace.positionConfSpaces[pos] ?: continue
-				val wtFrag = posConfSpace.wildTypeFragment
-				if (wtFrag != null) {
-					val wtConf = wtFrag.confs.values.firstOrNull() ?: continue
-					pos.setConf(wtFrag, wtConf)
-				}
+		// split the conf space using the selected molecules and save it
+		confSpace
+			.copy(mols)
+			.apply {
+				name = newName
 			}
-
-			// split the conf space using the selected molecules and save it
-			confSpace
-				.copy(mols)
-				.apply {
-					name = newName
-				}
-				.toToml()
-				.write(pathWithExt)
-
-		} finally {
-
-			// restore the backups
-			for ((pos, backup) in positions.zip(backups)) {
-				pos.setConf(backup, backup.confs.values.first())
-			}
-		}
+			.toToml()
+			.write(pathWithExt)
 
 		// TODO: feedback to the user that the save worked?
 	}

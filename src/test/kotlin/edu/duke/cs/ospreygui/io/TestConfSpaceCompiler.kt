@@ -5,7 +5,7 @@ import cuchaz.kludge.tools.toDegrees
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.identityHashMapOf
-import edu.duke.cs.molscope.tools.identityHashSet
+import edu.duke.cs.molscope.tools.toIdentitySet
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.absolutely
@@ -13,9 +13,6 @@ import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.amber.Amber96Params
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.forcefield.eef1.EEF1ForcefieldParams
-import edu.duke.cs.ospreygui.prep.ConfSpace
-import edu.duke.cs.ospreygui.prep.DesignPosition
-import edu.duke.cs.ospreygui.prep.Proteins
 import edu.duke.cs.ospreygui.relatively
 import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.types.shouldBeTypeOf
@@ -26,6 +23,7 @@ import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
 import edu.duke.cs.osprey.energy.compiled.PosInterGen
 import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
 import edu.duke.cs.ospreygui.motions.DihedralAngle
+import edu.duke.cs.ospreygui.prep.*
 import io.kotlintest.matchers.numerics.shouldBeGreaterThan
 import io.kotlintest.shouldBe
 
@@ -92,26 +90,23 @@ class TestConfSpaceCompiler : SharedSpec({
 	@Suppress("unused")
 	fun ConfSpace.dumpEnergies(vararg assignments: Pair<DesignPosition,String>) {
 
-		backupPositions(*assignments.map { (pos, _) -> pos }.toTypedArray()) {
+		// make the assignments
+		val assigned = Assignments(assignments.map { (pos, id) ->
+			val (fragId, confId) = id.split(":")
+			val posConfSpace = positionConfSpaces[pos]!!
+			val confConfSpace = posConfSpace.confs.find { it.frag.id == fragId && it.conf.id == confId }!!
+			PosAssignment(pos, confConfSpace.frag, confConfSpace.conf)
+		})
 
-			// set the conformations
-			for ((pos, id) in assignments) {
-				val (fragId, confId) = id.split(":")
-				val posConfSpace = positionConfSpaces[pos]!!
-				val confConfSpace = posConfSpace.confs.find { it.frag.id == fragId && it.conf.id == confId }!!
-				pos.setConf(confConfSpace.frag, confConfSpace.conf)
-			}
+		// get the molecule from the positions, hope there's only 1
+		val mol = assigned.assignmentInfos.values
+			.map { it.mol }
+			.toIdentitySet()
+			.takeIf { it.size == 1 }
+			?.first()
+			?: throw Error("positions are in different molecules")
 
-			// get the molecule from the positions
-			val mol = assignments
-				.map { (pos, _) -> pos.mol }
-				.toCollection(identityHashSet())
-				.takeIf { it.size == 1 }
-				?.first()
-				?: throw Error("positions are in different molecules")
-
-			mol.dumpEnergies()
-		}
+		mol.dumpEnergies()
 	}
 
 	fun ConfSpace.compile(): CompiledConfSpace = withService {

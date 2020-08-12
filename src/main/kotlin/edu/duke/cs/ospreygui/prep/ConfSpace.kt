@@ -208,34 +208,12 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 		mols
 			.associateIdentity { (_, mol) ->
 				val posAtoms = (designPositionsByMol[mol]
-					?.flatMap { it.currentAtoms }
+					?.flatMap { it.sourceAtoms }
 					?: emptyList())
 					.toIdentitySet()
 				mol to mol.atoms
 					.filter { it !in posAtoms }
 			}
-
-	/**
-	 * Automatically undoes any conformational changes to the given design positions
-	 * after executing the supplied function.
-	 */
-	inline fun <R> backupPositions(vararg positions: DesignPosition, block: () -> R): R {
-
-		// save the original conformations
-		val backupFrags = positions
-			.toList()
-			.associateIdentity { pos -> pos to pos.makeFragment("backup", "backup") }
-
-		try {
-			return block()
-		} finally {
-
-			// restore the original conformations
-			for ((pos, backupFrag) in backupFrags) {
-				pos.setConf(backupFrag, backupFrag.confs.values.first())
-			}
-		}
-	}
 
 	/**
 	 * Makes a copy of the selected molecules along with all their
@@ -288,13 +266,13 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 					newPos.anchorGroups.addAll(oldPos.anchorGroups.map { oldAnchors ->
 						oldAnchors
 							.map { oldAnchor ->
-								oldAnchor.copyToPos(newPos, oldToNew)
+								oldAnchor.copyToMol(newMol, oldToNew)
 							}
 							.toMutableList()
 					})
 
 					// copy the current atoms
-					newPos.currentAtoms.addAll(oldPos.currentAtoms.map { atom ->
+					newPos.sourceAtoms.addAll(oldPos.sourceAtoms.map { atom ->
 						oldToNew.getBOrThrow(atom)
 					})
 

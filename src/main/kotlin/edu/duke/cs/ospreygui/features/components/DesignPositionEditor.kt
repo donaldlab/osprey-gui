@@ -14,6 +14,7 @@ import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.toTomlKey
 import edu.duke.cs.ospreygui.motions.DihedralAngle
+import edu.duke.cs.ospreygui.prep.Anchor
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
 import edu.duke.cs.ospreygui.prep.Proteins
@@ -44,30 +45,30 @@ class DesignPositionEditor(
 	private fun toggleCurrentAtom(atom: Atom, view: MoleculeRenderView) {
 
 		// is the atom already selected?
-		val isSelected = pos.currentAtoms.any { it === atom }
+		val isSelected = pos.sourceAtoms.any { it === atom }
 		if (isSelected) {
 
 			// atom already selected, so deselect it
-			pos.currentAtoms.removeIf { it === atom }
+			pos.sourceAtoms.removeIf { it === atom }
 
 			// toggle the bonded hydrogens if needed
 			if (autoSelectHydrogens.value) {
 				val hAtoms = mol.bonds.bondedAtoms(atom)
 					.filter { it.element == Element.Hydrogen }
 					.toIdentitySet()
-				pos.currentAtoms.removeIf { it in hAtoms }
+				pos.sourceAtoms.removeIf { it in hAtoms }
 			}
 
 		} else {
 
 			// atom not selected yet, so select it
-			pos.currentAtoms.add(atom)
+			pos.sourceAtoms.add(atom)
 
 			// toggle the bonded hydrogens if needed
 			if (autoSelectHydrogens.value) {
 				mol.bonds.bondedAtoms(atom)
 					.filter { it.element == Element.Hydrogen }
-					.forEach { h -> pos.currentAtoms.add(h) }
+					.forEach { h -> pos.sourceAtoms.add(h) }
 			}
 		}
 
@@ -76,7 +77,7 @@ class DesignPositionEditor(
 
 	private fun removeCurrentAtoms(atoms: Set<Atom>, view: MoleculeRenderView) {
 
-		pos.currentAtoms.removeIf { it in atoms }
+		pos.sourceAtoms.removeIf { it in atoms }
 
 		resetPosConfSpace()
 	}
@@ -87,7 +88,7 @@ class DesignPositionEditor(
 	}
 
 	private inner class AnchorInfo(
-		val anchor: DesignPosition.Anchor
+		val anchor: Anchor
 	) {
 
 		val anchorAtoms = ArrayList<AnchorAtom>()
@@ -97,12 +98,12 @@ class DesignPositionEditor(
 	}
 
 	private inner class AnchorGroupInfo(
-		val anchors: MutableList<DesignPosition.Anchor>
+		val anchors: MutableList<Anchor>
 	) {
 
 		val anchorInfos = ArrayList<AnchorInfo>()
 
-		fun replaceAnchor(old: DesignPosition.Anchor, new: DesignPosition.Anchor) {
+		fun replaceAnchor(old: Anchor, new: Anchor) {
 			anchors[anchors.indexOf(old)] = new
 		}
 	}
@@ -227,7 +228,7 @@ class DesignPositionEditor(
 		}
 
 		// make infos for the current atoms
-		for (atom in pos.currentAtoms) {
+		for (atom in pos.sourceAtoms) {
 			val info = CurrentAtom(atom, atom.label())
 			currentAtoms.add(info)
 			renderEffects?.set(atom, selectedEffect)
@@ -259,7 +260,7 @@ class DesignPositionEditor(
 	private var selectedRes: Polymer.Residue? =
 		// try to guess the selected residue from the design position
 		(pos.mol as? Polymer)?.let { mol ->
-			pos.currentAtoms
+			pos.sourceAtoms
 				.mapNotNull { mol.findResidue(it) }
 				.toIdentitySet()
 				.takeIf { it.size == 1 }
@@ -451,7 +452,7 @@ class DesignPositionEditor(
 							}
 						}
 
-						fun anchorRadioButton(name: String, atom: Atom, anchorUpdater: (Atom) -> DesignPosition.Anchor) {
+						fun anchorRadioButton(name: String, atom: Atom, anchorUpdater: (Atom) -> Anchor) {
 							val atomInfo = anchorInfo.findAtomInfo(atom)
 							if (atomInfo == null) {
 								text("$name: (error)")
@@ -494,7 +495,7 @@ class DesignPositionEditor(
 						}
 
 						when (anchorInfo.anchor) {
-							is DesignPosition.Anchor.Single -> {
+							is Anchor.Single -> {
 								text("Single Anchor")
 								sameLine()
 								infoTip("""
@@ -518,7 +519,7 @@ class DesignPositionEditor(
 									anchorInfo.anchor.copy(c = pickedAtom)
 								}
 							}
-							is DesignPosition.Anchor.Double -> {
+							is Anchor.Double -> {
 								text("Double Anchor")
 								sameLine()
 								infoTip("""

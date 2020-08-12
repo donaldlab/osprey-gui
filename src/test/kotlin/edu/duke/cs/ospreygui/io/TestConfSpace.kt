@@ -115,8 +115,8 @@ fun makeTestConfSpace(): ConfSpace {
 				)
 			))
 
-			// add the current atom
-			currentAtoms.add(smallmol.atoms.findOrThrow("H10"))
+			// add the source atom
+			sourceAtoms.add(smallmol.atoms.findOrThrow("H10"))
 		}
 		designPositionsByMol[smallmol] = mutableListOf(pos3)
 
@@ -279,7 +279,7 @@ class TestConfSpace : SharedSpec({
 
 			// check the atoms
 			// re-do the sets to drop the indentity comparisons in favor of value comparisons
-			obsPos.currentAtoms.toSet() shouldBe expPos.currentAtoms.toSet()
+			obsPos.sourceAtoms.toSet() shouldBe expPos.sourceAtoms.toSet()
 
 			// check the position conf spaces
 			val obsPosConfSpace = obs.positionConfSpaces[obsPos]!!

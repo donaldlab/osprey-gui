@@ -57,7 +57,7 @@ object Proteins {
 			.map { it.atom }
 
 		// clear previous info
-		currentAtoms.clear()
+		sourceAtoms.clear()
 		anchorGroups.clear()
 
 		if (prevC != null) {
@@ -65,7 +65,7 @@ object Proteins {
 			// not N-terminal residue
 			val bbAtoms = Atom.identitySetOf(resN, resCA, resC, prevC)
 
-			currentAtoms.apply {
+			sourceAtoms.apply {
 
 				// add all the non-backbone atoms connected to the anchor atoms
 				addAll(resCA.getConnectedAtoms(bbAtoms))
@@ -104,7 +104,7 @@ object Proteins {
 			// N-terminal residue
 			val bbAtoms = Atom.identitySetOf(resN, resCA, resC)
 
-			currentAtoms.apply {
+			sourceAtoms.apply {
 
 				// add all the non-backbone atoms connected to the anchor atoms
 				addAll(resCA.getConnectedAtoms(bbAtoms))

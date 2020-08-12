@@ -2,8 +2,10 @@ package edu.duke.cs.ospreygui.compiler
 
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.prep.Assignments
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
+import edu.duke.cs.ospreygui.prep.PosAssignment
 
 
 /**
@@ -32,20 +34,20 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 		/**
 		 * Append the conf atoms to the fixed atoms for this design position,
 		 * in a consistent order.
+		 *
+		 * Only return atoms from the assigned molecule.
 		 */
-		fun orderAtoms(fixedAtoms: List<FixedAtoms.DynamicInfo>): List<Atom> {
+		fun orderAtoms(fixedAtoms: List<FixedAtoms.DynamicInfo>, assignmentInfo: Assignments.AssignmentInfo): List<Atom> {
 			return ArrayList<Atom>().apply {
 
 				// add the fixed atoms in the existing order
 				for (atomInfo in fixedAtoms) {
-					add(atomInfo.atom)
+					add(assignmentInfo.maps.atoms.getBOrThrow(atomInfo.atom))
 				}
 
 				// add the conformation atoms in the existing order
 				for (atomInfo in frag.atoms) {
-
-					// find the corresponding atom at the design position
-					add(posInfo.pos.atomResolverOrThrow.resolveOrThrow(atomInfo))
+					add(assignmentInfo.confSwitcher.atomResolverOrThrow.resolveOrThrow(atomInfo))
 				}
 			}
 		}
@@ -76,63 +78,36 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 
 		/**
 		 * Iterates over the conformations in the position conf space,
-		 * setting each conformation to the design position in turn.
-		 *
-		 * Makes sure to get a lock on the molecule first before modifying it.
+		 * returning assignments for each conformation in turn
 		 */
-		fun forEachConf(molLocker: MoleculeLocker, block: (ConfInfo) -> Unit) {
+		fun forEachConf(block: (Assignments.AssignmentInfo, ConfInfo) -> Unit) {
 
-			// backup the original conformation
-			val backupFrag = pos.makeFragment("backup", "backup")
+			for (confInfo in confs) {
 
-			try {
+				// make the assignments
+				val assignment = PosAssignment(pos, confInfo.fragInfo.frag, confInfo.conf)
+				val assignmentInfo = Assignments(assignment).assignmentInfos.getValue(assignment)
 
-				for (confInfo in confs) {
-					molLocker.lock(pos.mol) {
-						pos.setConf(confInfo.fragInfo.frag, confInfo.conf)
-					}
-					block(confInfo)
-				}
-
-			} finally {
-
-				// restore the original conformation
-				molLocker.lock(pos.mol) {
-					pos.setConf(backupFrag, backupFrag.confs.values.first())
-				}
+				block(assignmentInfo, confInfo)
 			}
 		}
 
 		/**
-		 * Iterates over the fragments in the position conf space, setting an
-		 * arbitrary conformation of each fragment to the design position in turn.
-		 *
-		 * Makes sure to get a lock on the molecule first before modifying it.
+		 * Iterates over the fragments in the position conf space,
+		 * returning assignments for an arbitrary conformation of each fragment in turn.
 		 */
-		fun forEachFrag(molLocker: MoleculeLocker, block: (FragInfo, ConfInfo) -> Unit) {
+		fun forEachFrag(block: (Assignments.AssignmentInfo, ConfInfo) -> Unit) {
 
-			// backup the original conformation
-			val backupFrag = pos.makeFragment("backup", "backup")
+			for (fragInfo in fragments) {
 
-			try {
+				// choose an arbitrary conformation from the fragment
+				val confInfo = confs.first { it.fragInfo === fragInfo }
 
-				for (fragInfo in fragments) {
+				// make the assignment
+				val assignment = PosAssignment(pos, fragInfo.frag, confInfo.conf)
+				val assignmentInfo = Assignments(assignment).assignmentInfos.getValue(assignment)
 
-					// pick an arbitrary conformation from the fragment
-					val confInfo = confs.first { it.fragInfo === fragInfo }
-
-					molLocker.lock(pos.mol) {
-						pos.setConf(fragInfo.frag, confInfo.conf)
-					}
-					block(fragInfo, confInfo)
-				}
-
-			} finally {
-
-				// restore the original conformation
-				molLocker.lock(pos.mol) {
-					pos.setConf(backupFrag, backupFrag.confs.values.first())
-				}
+				block(assignmentInfo, confInfo)
 			}
 		}
 	}
@@ -154,4 +129,31 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 			}
 			.flatten()
 			.mapIndexed { i, (pos, posConfSpace) -> PosInfo(pos, posConfSpace, i) }
+}
+
+
+fun Pair<ConfSpaceIndex.PosInfo,ConfSpaceIndex.PosInfo>.forEachFrag(block: (Assignments.AssignmentInfo, ConfSpaceIndex.ConfInfo, Assignments.AssignmentInfo, ConfSpaceIndex.ConfInfo) -> Unit) {
+
+	val (posInfo1, posInfo2) = this
+
+	for (fragInfo1 in posInfo1.fragments) {
+
+		// choose an arbitrary conformation from the fragment
+		val confInfo1 = posInfo1.confs.first { it.fragInfo === fragInfo1 }
+
+		for (fragInfo2 in posInfo2.fragments) {
+
+			// choose an arbitrary conformation from the fragment
+			val confInfo2 = posInfo2.confs.first { it.fragInfo === fragInfo2 }
+
+			// make the assignments
+			val assignment1 = PosAssignment(posInfo1.pos, fragInfo1.frag, confInfo1.conf)
+			val assignment2 = PosAssignment(posInfo2.pos, fragInfo2.frag, confInfo2.conf)
+			val assignments = Assignments(assignment1, assignment2)
+			val assignmentInfo1 = assignments.assignmentInfos.getValue(assignment1)
+			val assignmentInfo2 = assignments.assignmentInfos.getValue(assignment2)
+
+			block(assignmentInfo1, confInfo1, assignmentInfo2, confInfo2)
+		}
+	}
 }

@@ -60,13 +60,13 @@ class DihedralAngle(
 				maxDegrees
 			)
 
-		override fun make() =
+		override fun make(mol: Molecule, atomResolver: ConfLib.AtomPointer.Resolver) =
 			DihedralAngle(
-				pos.mol,
-				pos.atomResolverOrThrow.resolveOrThrow(motion.a),
-				pos.atomResolverOrThrow.resolveOrThrow(motion.b),
-				pos.atomResolverOrThrow.resolveOrThrow(motion.c),
-				pos.atomResolverOrThrow.resolveOrThrow(motion.d)
+				mol,
+				atomResolver.resolveOrThrow(motion.a),
+				atomResolver.resolveOrThrow(motion.b),
+				atomResolver.resolveOrThrow(motion.c),
+				atomResolver.resolveOrThrow(motion.d)
 			)
 
 		companion object {
