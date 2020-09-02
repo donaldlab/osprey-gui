@@ -1,25 +1,39 @@
 package edu.duke.cs.ospreygui.features.components
 
 import cuchaz.kludge.imgui.Commands
+import cuchaz.kludge.tools.ByteFlags
 import cuchaz.kludge.tools.Ref
 import cuchaz.kludge.tools.toRadians
+import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.molscope.molecule.MoleculeMaps
+import edu.duke.cs.molscope.render.RenderEffect
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.motions.TranslationRotation
 import edu.duke.cs.ospreygui.tools.nextFloatIn
 import kotlin.random.Random
 
 
-class TranslationRotationViewer(
+class TranslationRotationViewer private constructor(
 	val transRot: TranslationRotation,
 	val maxTranslationDist: Float,
-	val maxRotationDegrees: Float
+	val maxRotationDegrees: Float,
+	val view: MoleculeRenderView,
+	val mapsToCopy: MoleculeMaps
 ) : MotionViewer {
 
-	constructor(desc: TranslationRotation.MolDescription) : this(
-		desc.make(),
-		desc.maxTranslationDist.toFloat(),
-		desc.maxRotationDegrees.toFloat()
-	)
+	companion object {
+
+		fun make(desc: TranslationRotation.MolDescription, molCopy: Molecule, molMaps: MoleculeMaps, view: MoleculeRenderView): TranslationRotationViewer {
+			return TranslationRotationViewer(
+				desc.copyTo(molCopy, molMaps.atoms).make(),
+				desc.maxTranslationDist.toFloat(),
+				desc.maxRotationDegrees.toFloat(),
+				view,
+				molMaps
+			)
+		}
+	}
 
 	private val pPsi = Ref.of(0.0f)
 	private val pTheta = Ref.of(0.0f)
@@ -35,6 +49,14 @@ class TranslationRotationViewer(
 
 	override val label = "Translation and Rotation of ${transRot.mol}"
 
+	private var renderEffects = view.renderEffects.writer().apply {
+
+		// show all the translatable atoms
+		for (atom in transRot.mol.atoms) {
+			this[atom] = selectedEffect
+		}
+	}
+
 	private fun updateMol(view: MoleculeRenderView) {
 		transRot.set(
 			pPsi.value.toDouble().toRadians(),
@@ -47,7 +69,7 @@ class TranslationRotationViewer(
 		view.moleculeChanged()
 	}
 
-	override fun gui(imgui: Commands, view: MoleculeRenderView) = imgui.run {
+	override fun gui(imgui: Commands) = imgui.run {
 
 		text("Tait-Bryan Rotation:")
 		if (sliderFloat("Psi (X)", pPsi, rmin, rmax, "%.3f")) {
@@ -72,7 +94,7 @@ class TranslationRotationViewer(
 		}
 	}
 
-	override fun jiggle(rand: Random, view: MoleculeRenderView) {
+	override fun jiggle(rand: Random) {
 
 		pPsi.value = rand.nextFloatIn(rmin, rmax)
 		pTheta.value = rand.nextFloatIn(rmin, rmax)
@@ -85,8 +107,16 @@ class TranslationRotationViewer(
 		updateMol(view)
 	}
 
-	override fun reset(view: MoleculeRenderView) {
-		transRot.reset()
-		view.moleculeChanged()
+	override fun reset() {
+
+		// remove any render effects
+		renderEffects.close()
 	}
+
+	override fun mapAtomToOriginalMol(atom: Atom): Atom = mapsToCopy.atoms.getAOrThrow(atom)
 }
+
+private val selectedEffect = RenderEffect(
+	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Outset),
+	0u, 255u, 0u
+)

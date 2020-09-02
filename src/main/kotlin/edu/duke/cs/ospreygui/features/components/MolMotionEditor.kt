@@ -1,7 +1,6 @@
 package edu.duke.cs.ospreygui.features.components
 
 import cuchaz.kludge.imgui.Commands
-import cuchaz.kludge.tools.ByteFlags
 import cuchaz.kludge.tools.IntFlags
 import cuchaz.kludge.tools.Ref
 import edu.duke.cs.molscope.Slide
@@ -11,7 +10,7 @@ import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.gui.enabledIf
 import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.render.RenderEffect
+import edu.duke.cs.molscope.view.MoleculeRenderStack
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.slide.ConformationEditor
 import edu.duke.cs.ospreygui.motions.DihedralAngle
@@ -42,11 +41,13 @@ class MolMotionEditor(
 
 	private var info: MotionInfo? = null
 	private var viewer: MotionViewer? = null
+	private var stackedMol: MoleculeRenderStack.StackedMol? = null
+
 
 	private fun Slide.Locked.findView() =
 		views
 			.filterIsInstance<MoleculeRenderView>()
-			.find { it.mol === molInfo.mol }
+			.find { it.molStack.originalMol === molInfo.mol }
 			?: throw Error("can't edit molecule motion, molecule has no render view")
 
 	fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
@@ -60,7 +61,7 @@ class MolMotionEditor(
 				when (desc) {
 
 					// make info for an existing motion
-					is DihedralAngle.MolDescription -> resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor, slidewin, view))
+					is DihedralAngle.MolDescription -> resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor))
 					is TranslationRotation.MolDescription -> resetInfo(view, MotionInfo.TranslationRotationInfo(this@MolMotionEditor))
 
 					// by default, make a new translation/rotation motion and its info
@@ -81,7 +82,7 @@ class MolMotionEditor(
 
 					enabledIf(molInfo.mol.atoms.size >= 4) {
 						if (radioButton("Dihedral Angle", desc is DihedralAngle.MolDescription)) {
-							resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor, slidewin, view)).initDefault(view)
+							resetInfo(view, MotionInfo.DihedralAngleInfo(this@MolMotionEditor)).initDefault(view)
 						}
 					}
 
@@ -111,7 +112,7 @@ class MolMotionEditor(
 
 						text("Try it out:")
 						indent(20f)
-						viewer.gui(imgui, view)
+						viewer.gui(imgui)
 						unindent(20f)
 					}
 				}
@@ -119,11 +120,12 @@ class MolMotionEditor(
 			onClose = {
 
 				// cleanup
-				val view = slide.findView()
-				viewer?.reset(view)
+				viewer?.reset()
 				viewer = null
 				info?.close()
 				info = null
+				stackedMol?.pop()
+				stackedMol = null
 
 				onClose()
 			}
@@ -163,16 +165,24 @@ class MolMotionEditor(
 	private fun resetViewer(view: MoleculeRenderView) {
 
 		// cleanup the old viewer, if needed
-		this.viewer?.reset(view)
+		viewer?.reset()
+		stackedMol?.pop()
 
-		// start the new one
+		// make a copy of the molecule so the viewer can modify it
+		val (molCopy, molMaps) = molInfo.mol.copyWithMaps()
+		stackedMol = view.molStack.push(molCopy)
+
+		// start the new viewer
 		val desc = desc
-		this.viewer = when(desc) {
-			is DihedralAngle.MolDescription -> DihedralAngleViewer(desc)
-			is TranslationRotation.MolDescription -> TranslationRotationViewer(desc)
+		viewer = when(desc) {
+			is DihedralAngle.MolDescription -> DihedralAngleViewer.make(desc, molCopy, molMaps, view)
+			is TranslationRotation.MolDescription -> TranslationRotationViewer.make(desc, molCopy, molMaps, view)
 			else -> null
 		}
 	}
+
+	private fun mapAtomToOriginalMol(atom: Atom) =
+		viewer?.mapAtomToOriginalMol(atom) ?: atom
 
 	private sealed class MotionInfo : AutoCloseable {
 
@@ -183,37 +193,13 @@ class MolMotionEditor(
 			// nothing to cleanup by default
 		}
 
-		class DihedralAngleInfo(val editor: MolMotionEditor, slidewin: SlideCommands, view: MoleculeRenderView) : MotionInfo() {
+		class DihedralAngleInfo(val editor: MolMotionEditor) : MotionInfo() {
 
 			companion object {
 				const val defaultRadiusDegrees = 9.0
 			}
 
 			private val desc get() = editor.desc as? DihedralAngle.MolDescription
-
-			// init effects
-			private val hoverEffects = slidewin.hoverEffects.writer()
-			private val renderEffects = view.renderEffects.writer()
-
-			init {
-				resetEffects()
-			}
-
-			private fun resetEffects() {
-				renderEffects.clear()
-				desc?.let { desc ->
-					renderEffects[desc.a] = selectedEffect
-					renderEffects[desc.b] = selectedEffect
-					renderEffects[desc.c] = selectedEffect
-					renderEffects[desc.d] = selectedEffect
-				}
-			}
-
-			// cleanup effects
-			override fun close() {
-				hoverEffects.close()
-				renderEffects.close()
-			}
 
 			override fun initDefault(view: MoleculeRenderView) {
 
@@ -231,8 +217,6 @@ class MolMotionEditor(
 					initialDegrees - defaultRadiusDegrees,
 					initialDegrees + defaultRadiusDegrees
 				))
-
-				resetEffects()
 			}
 
 			private enum class AtomSel {
@@ -280,9 +264,12 @@ class MolMotionEditor(
 
 				// are we hovering over an atom?
 				val hoverAtom: Atom? =
-					slidewin.mouseTarget
+					(slidewin.mouseTarget
 						?.takeIf { it.view === view }
-						?.target as? Atom
+						?.target as? Atom)
+						// this atom can be from the viewer's copy of the molecule
+						// so translate the atom to the original molecule
+						?.let { editor.mapAtomToOriginalMol(it) }
 
 				// if we clicked an atom, update the motion
 				if (hoverAtom != null && clickTracker.clicked(slidewin)) {
@@ -302,7 +289,6 @@ class MolMotionEditor(
 					}
 					editor.resetMotion(view, newdesc)
 					currentAtom = currentAtom.next()
-					resetEffects()
 				}
 			}
 		}
@@ -342,12 +328,3 @@ class MolMotionEditor(
 		}
 	}
 }
-
-private val hoverEffect = RenderEffect(
-	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
-	255u, 255u, 255u
-)
-private val selectedEffect = RenderEffect(
-	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
-	0u, 255u, 0u
-)

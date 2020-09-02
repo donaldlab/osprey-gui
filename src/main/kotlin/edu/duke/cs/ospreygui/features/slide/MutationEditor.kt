@@ -10,14 +10,18 @@ import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.molscope.render.HoverEffects
+import edu.duke.cs.molscope.render.MoleculeRenderEffects
 import edu.duke.cs.molscope.render.RenderEffect
+import edu.duke.cs.molscope.view.MoleculeRenderStack
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.components.ConfLibPicker
 import edu.duke.cs.ospreygui.features.components.DesignPositionEditor
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
+import edu.duke.cs.ospreygui.prep.Assignments
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.DesignPosition
+import edu.duke.cs.ospreygui.prep.PosAssignment
 import java.math.BigInteger
 import java.text.NumberFormat
 import kotlin.collections.ArrayList
@@ -43,11 +47,14 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 		var resetTabSelection = true
 		var hoverEffects = null as HoverEffects.Writer?
 
+		var stackedMol: MoleculeRenderStack.StackedMol? = null
+		var selectionEffects = null as MoleculeRenderEffects.Writer?
+
 		fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
 			val view = slide.views
 				.filterIsInstance<MoleculeRenderView>()
-				.find { it.mol == mol }
+				.find { it.molStack.originalMol == mol }
 				?: throw Error("can't init design position, molecule has no render view")
 
 			winState.render(
@@ -107,6 +114,12 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 					// cleanup effects
 					hoverEffects?.close()
 					hoverEffects = null
+
+					// remove any molecule and effects render overrides
+					stackedMol?.pop()
+					stackedMol = null
+					selectionEffects?.close()
+					selectionEffects = null
 
 					// deactivate the mutations tab if it's open
 					if (mutationsTabState.wasActive) {
@@ -244,18 +257,44 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 
 		private fun deactivateMutationsTab(view: MoleculeRenderView) {
 
-			// restore the wildtype if needed
-			pos.confSpace.wildTypeFragment?.let { setConf(view, it, it.confs.values.first()) }
+			// remove any molecule and effects render overrides
+			stackedMol?.pop()
+			stackedMol = null
+			selectionEffects?.close()
+			selectionEffects = null
+
+			// reset the pos editor to re-draw the render effects
+			posEditor.resetInfos()
 
 			selectedSeqInfo = null
 		}
 
 		private fun setConf(view: MoleculeRenderView, frag: ConfLib.Fragment, conf: ConfLib.Conf) {
 
-			pos.setConf(frag, conf)
+			// make the assignment
+			val posAssignment = PosAssignment(posInfo.pos, frag, conf)
+			val assignmentInfo = Assignments(posAssignment).assignmentInfos.getValue(posAssignment)
+			val mol = assignmentInfo.mol
 
-			posEditor.resetInfos()
-			view.moleculeChanged()
+			// override the molecule render view with the new molecule
+			stackedMol?.replace(mol)
+				?: run {
+					stackedMol = view.molStack.push(mol)
+				}
+
+			if (selectionEffects == null) {
+				selectionEffects = view.renderEffects.writer()
+			}
+
+			// add render effects to match the position editor's style
+			assignmentInfo.confSwitcher.anchorMatch?.posAnchors?.forEach { anchor ->
+				for (atom in anchor.anchorAtoms) {
+					selectionEffects?.set(atom, DesignPositionEditor.anchorEffect)
+				}
+			}
+			for (atom in assignmentInfo.confSwitcher.currentAtoms) {
+				selectionEffects?.set(atom, DesignPositionEditor.selectedEffect)
+			}
 		}
 	}
 	private var mutEditor: MutEditor? = null

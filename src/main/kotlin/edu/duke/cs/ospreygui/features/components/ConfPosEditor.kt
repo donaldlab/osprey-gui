@@ -8,13 +8,17 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.columns
 import edu.duke.cs.molscope.gui.features.WindowState
 import edu.duke.cs.molscope.gui.infoTip
+import edu.duke.cs.molscope.render.MoleculeRenderEffects
+import edu.duke.cs.molscope.view.MoleculeRenderStack
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.features.slide.ConformationEditor.MolInfo
 import edu.duke.cs.ospreygui.features.slide.ConformationEditor.PosInfo
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.motions.DihedralAngle
+import edu.duke.cs.ospreygui.prep.Assignments
 import edu.duke.cs.ospreygui.prep.ConfSpace
+import edu.duke.cs.ospreygui.prep.PosAssignment
 import kotlin.random.asKotlinRandom
 
 
@@ -27,7 +31,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 	private val discreteTabState = Commands.TabState()
 	private val continuousTabState = Commands.TabState()
 	private val conflibPicker = ConfLibPicker(confSpace).apply {
-		onAdd = { resetInfos() }
+		onAdd = { activateDiscreteTab() }
 	}
 
 	private val pDihedralRadiusDegrees = Ref.of(
@@ -115,14 +119,16 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 	private val motionInfos = ArrayList<MotionInfo>()
 	private val pJiggle = Ref.of(false)
 
-	@Suppress("RemoveRedundantQualifierName") // this qualifier is not redundant. IntelliJ is wrong. ;_;
 	private val rand = java.util.Random().asKotlinRandom()
+
+	private var stackedMol: MoleculeRenderStack.StackedMol? = null
+	private var renderEffects = null as MoleculeRenderEffects.Writer?
 
 	fun gui(imgui: Commands, slide: Slide.Locked, slidewin: SlideCommands) = imgui.run {
 
 		val view = slide.views
 			.filterIsInstance<MoleculeRenderView>()
-			.find { it.mol == molInfo.mol }
+			.find { it.molStack.originalMol == molInfo.mol }
 			?: throw Error("can't init design position, molecule has no render view")
 
 		winState.render(
@@ -198,6 +204,12 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 					continuousTabState.wasActive = false
 					deactivateContinuousTab(view)
 				}
+
+				// remove any molecule and effects render overrides
+				stackedMol?.pop()
+				stackedMol = null
+				renderEffects?.close()
+				renderEffects = null
 
 				// cleanup the pos editor
 				posEditor.closed()
@@ -306,16 +318,39 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 
 	private fun deactivateDiscreteTab(view: MoleculeRenderView) {
 
-		// restore the wildtype if needed
-		posInfo.posConfSpace.wildTypeFragment?.let { setConf(view, it, it.confs.values.first()) }
+		// remove any molecule and effects render overrides
+		stackedMol?.pop()
+		stackedMol = null
+		renderEffects?.close()
+		renderEffects = null
+
+		// reset the pos editor to re-draw the render effects
+		posEditor.resetInfos()
 	}
 
 	private fun setConf(view: MoleculeRenderView, frag: ConfLib.Fragment, conf: ConfLib.Conf) {
 
-		posInfo.pos.setConf(frag, conf)
+		// make the assignment
+		val posAssignment = PosAssignment(posInfo.pos, frag, conf)
+		val assignmentInfo = Assignments(posAssignment).assignmentInfos.getValue(posAssignment)
+		val mol = assignmentInfo.mol
 
-		posEditor.resetInfos()
-		view.moleculeChanged()
+		// override the molecule render view with the new molecule
+		stackedMol?.pop()
+		stackedMol = view.molStack.push(mol)
+		if (renderEffects == null) {
+			renderEffects = view.renderEffects.writer()
+		}
+
+		// add render effects to match the position editor's style
+		assignmentInfo.confSwitcher.anchorMatch?.posAnchors?.forEach { anchor ->
+			for (atom in anchor.anchorAtoms) {
+				renderEffects?.set(atom, DesignPositionEditor.anchorEffect)
+			}
+		}
+		for (atom in assignmentInfo.confSwitcher.currentAtoms) {
+			renderEffects?.set(atom, DesignPositionEditor.selectedEffect)
+		}
 	}
 
 	private fun selectConf(view: MoleculeRenderView, fragInfo: MutInfo.FragInfo, confInfo: MutInfo.FragInfo.ConfInfo) {
@@ -325,7 +360,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 
 		setConf(view, fragInfo.frag, confInfo.conf)
 
-		resetMotionInfos()
+		resetMotionInfos(view)
 	}
 
 	private fun activateContinuousTab(view: MoleculeRenderView) {
@@ -351,11 +386,11 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 		} else {
 			selectedFragInfo = null
 			selectedConfInfo = null
-			resetMotionInfos()
+			resetMotionInfos(view)
 		}
 	}
 
-	private fun resetMotionInfos() {
+	private fun resetMotionInfos(view: MoleculeRenderView) {
 
 		motionInfos.clear()
 
@@ -364,13 +399,36 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 		val confInfo = selectedConfInfo ?: return
 		val space = confInfo.get() ?: return
 
+		// make an assignment with this conf, so we can modify coordinates without changing the original molecules
+		val assignment = PosAssignment(posInfo.pos, fragInfo.frag, confInfo.conf)
+		val assignmentInfo = Assignments(assignment).assignmentInfos.getValue(assignment)
+
+		// override the molecule render view with the new molecule
+		stackedMol?.pop()
+		stackedMol = view.molStack.push(assignmentInfo.mol)
+		if (renderEffects == null) {
+			renderEffects = view.renderEffects.writer()
+		}
+
+		// add render effects to match the position editor's style
+		assignmentInfo.confSwitcher.anchorMatch?.posAnchors?.forEach { anchor ->
+			for (atom in anchor.anchorAtoms) {
+				renderEffects?.set(atom, DesignPositionEditor.anchorEffect)
+			}
+		}
+		for (atom in assignmentInfo.confSwitcher.currentAtoms) {
+			renderEffects?.set(atom, DesignPositionEditor.selectedEffect)
+		}
+
 		for (motion in fragInfo.frag.motions) {
 			when (motion) {
 
 				is ConfLib.ContinuousMotion.DihedralAngle -> {
 					motionInfos.add(MotionInfo.DihedralInfo(
+						view,
 						motion,
 						posInfo,
+						assignmentInfo,
 						space,
 						posEditor.dihedralSettings.radiusDegrees
 					))
@@ -475,7 +533,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 
 				if (button("Reset ${confInfo.fragInfo.frag.name}/${confInfo.conf.name}")) {
 					confInfo.get()?.resetDihedralAngles()
-					resetMotionInfos()
+					resetMotionInfos(view)
 				}
 				sameLine()
 				infoTip("Resets dihedral angles for just this selected conformation.")
@@ -484,7 +542,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 					confInfo.fragInfo.confInfos
 						.mapNotNull { it.get() }
 						.forEach { it.resetDihedralAngles() }
-					resetMotionInfos()
+					resetMotionInfos(view)
 				}
 				sameLine()
 				infoTip("Resets dihedral angles for all conformations in this selected fragment.")
@@ -495,7 +553,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 						.flatMap { it.confInfos }
 						.mapNotNull { it.get() }
 						.forEach { it.resetDihedralAngles() }
-					resetMotionInfos()
+					resetMotionInfos(view)
 				}
 				sameLine()
 				infoTip("Resets dihedral angles for all conformations in this design position.")
@@ -521,7 +579,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 
 						withId(i) {
 							text(motionInfo.label)
-							motionInfo.gui(imgui, view)
+							motionInfo.gui(imgui)
 						}
 					}
 
@@ -541,7 +599,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 						""".trimMargin())
 
 					if (pJiggle.value) {
-						motionInfos.forEach { it.viewer?.jiggle(rand, view) }
+						motionInfos.forEach { it.viewer?.jiggle(rand) }
 					}
 
 				} else {
@@ -561,18 +619,24 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 
 		// cleanup
 		motionInfos.clear()
+		stackedMol?.pop()
+		stackedMol = null
+		renderEffects?.close()
+		renderEffects = null
 	}
 
 	private sealed class MotionInfo {
 
 		abstract val label: String
 		abstract val viewer: MotionViewer?
-		abstract fun gui(imgui: Commands, view: MoleculeRenderView)
+		abstract fun gui(imgui: Commands)
 
 
 		class DihedralInfo(
+			val view: MoleculeRenderView,
 			val motion: ConfLib.ContinuousMotion.DihedralAngle,
 			val posInfo: PosInfo,
+			val assignmentInfo: Assignments.AssignmentInfo,
 			val confConfSpace: ConfSpace.ConfConfSpace,
 			val defaultRadiusDegrees: Double
 		) : MotionInfo() {
@@ -583,7 +647,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 					.motions
 					.filterIsInstance<DihedralAngle.ConfDescription>()
 					.find { it.motion === motion }
-					?.let { DihedralAngleViewer(it) }
+					?.let { DihedralAngleViewer.make(it, assignmentInfo, view) }
 
 			override val label = run {
 				val match = posInfo.pos.findAnchorMatch(confConfSpace.frag)
@@ -593,7 +657,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 				"Dihedral Angle: ${atomNames.joinToString(", ")}"
 			}
 
-			override fun gui(imgui: Commands, view: MoleculeRenderView): Unit = imgui.run {
+			override fun gui(imgui: Commands): Unit = imgui.run {
 
 				// show a checkbox to enable/disable the dihedral angle
 				checkbox("Included", viewer != null)?.let { isChecked ->
@@ -609,7 +673,7 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 						confConfSpace.motions.add(desc)
 
 						// create the dihedral angle viewer
-						viewer = DihedralAngleViewer(desc)
+						viewer = DihedralAngleViewer.make(desc, assignmentInfo, view)
 
 					} else {
 
@@ -619,13 +683,13 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 						}
 
 						// cleanup/reset the viewer
-						viewer?.reset(view)
+						viewer?.reset()
 						viewer = null
 					}
 				}
 
 				// render the viewer if needed
-				viewer?.gui(imgui, view)
+				viewer?.gui(imgui)
 			}
 		}
 	}

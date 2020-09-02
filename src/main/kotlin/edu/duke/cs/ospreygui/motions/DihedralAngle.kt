@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.motions
 import cuchaz.kludge.tools.toDegrees
 import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.molecule.Atom
+import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.tools.normalizeMinusPIToPI
@@ -98,7 +99,7 @@ class DihedralAngle(
 	}
 
 	class MolDescription(
-		val mol: Molecule,
+		override val mol: Molecule,
 		val a: Atom,
 		val b: Atom,
 		val c: Atom,
@@ -117,14 +118,13 @@ class DihedralAngle(
 
 		val radiusDegrees get() = (maxDegrees - minDegrees)/2.0
 
-		override fun copyTo(mol: Molecule): MolDescription {
-			val map = this.mol.mapAtomsByValueTo(mol)
+		override fun copyTo(mol: Molecule, atomMap: AtomMap): MolDescription {
 			return MolDescription(
 				mol,
-				map.getBOrThrow(a),
-				map.getBOrThrow(b),
-				map.getBOrThrow(c),
-				map.getBOrThrow(d),
+				atomMap.getBOrThrow(a),
+				atomMap.getBOrThrow(b),
+				atomMap.getBOrThrow(c),
+				atomMap.getBOrThrow(d),
 				minDegrees,
 				maxDegrees
 			)

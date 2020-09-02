@@ -122,6 +122,7 @@ class DesignPositionEditor(
 	fun closed() {
 
 		renderEffects?.close()
+		renderEffects = null
 
 		anchorGroupInfos.clear()
 		currentAtoms.clear()
@@ -242,7 +243,7 @@ class DesignPositionEditor(
 			(target.view as? MoleculeRenderView)?.let { view ->
 
 				// make sure we're picking from the same molecule
-				if (view.mol == mol) {
+				if (view.molStack.originalMol == mol) {
 
 					(target.target as? Atom)?.let { atom ->
 
@@ -593,13 +594,16 @@ class DesignPositionEditor(
 			resetPosConfSpace()
 		}
 	}
-}
 
-private val selectedEffect = RenderEffect(
-	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
-	255u, 255u, 255u
-)
-private val anchorEffect = RenderEffect(
-	ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
-	0u, 255u, 0u
-)
+	companion object {
+
+		val selectedEffect = RenderEffect(
+			ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
+			255u, 255u, 255u
+		)
+		val anchorEffect = RenderEffect(
+			ByteFlags.of(RenderEffect.Flags.Highlight, RenderEffect.Flags.Inset, RenderEffect.Flags.Outset),
+			0u, 255u, 0u
+		)
+	}
+}

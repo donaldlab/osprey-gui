@@ -90,7 +90,7 @@ class MoleculeNavigator : SlideFeature {
 				slidewin.mouseTarget?.let {
 					val target = it.target
 					val view = it.view as? MoleculeRenderView ?: return@let
-					val mol = view.mol
+					val mol = view.currentMol
 					when (target) {
 						is Atom -> {
 							if (slideHovers.atom !== target) {
@@ -114,7 +114,7 @@ class MoleculeNavigator : SlideFeature {
 
 					for ((moli, view) in views.withIndex()) {
 
-						val mol = view.mol
+						val mol = view.currentMol
 						val type = molTypes.getOrPut(mol) { mol.findTypeOrThrow() }
 
 						withId(moli) {
@@ -451,7 +451,7 @@ class MoleculeNavigator : SlideFeature {
 
 		// get the atom, if any
 		val view = target.view as? MoleculeRenderView ?: return
-		val mol = view.mol
+		val mol = view.currentMol
 		val atom = target.target as? Atom ?: return
 
 		contextMenu.add {
@@ -486,7 +486,7 @@ class MoleculeNavigator : SlideFeature {
 
 		for (view in views) {
 
-			val residues = focusedResidues[view.mol]
+			val residues = focusedResidues[view.currentMol]
 			if (residues == null) {
 
 				// no residue definitions? revert back to default

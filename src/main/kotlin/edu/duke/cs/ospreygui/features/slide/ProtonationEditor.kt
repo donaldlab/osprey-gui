@@ -187,15 +187,17 @@ class ProtonationEditor : SlideFeature {
 
 	private fun clearAll(views: List<MoleculeRenderView>) {
 		for (view in views) {
-			view.mol.deprotonate()
+			val mol = view.molStack.originalMol
+			mol.deprotonate()
 			view.moleculeChanged()
 		}
 	}
 
 	private fun autoProtonate(views: List<MoleculeRenderView>) {
 		for (view in views) {
-			for ((heavyAtom, hAtom) in view.mol.inferProtonation()) {
-				view.mol.apply {
+			val mol = view.molStack.originalMol
+			for ((heavyAtom, hAtom) in mol.inferProtonation()) {
+				mol.apply {
 					atoms.add(hAtom)
 					bonds.add(heavyAtom, hAtom)
 					if (this is Polymer) {
@@ -209,11 +211,13 @@ class ProtonationEditor : SlideFeature {
 
 	private inner class Selection(val view: MoleculeRenderView, val atom: Atom) {
 
+		val mol = view.molStack.originalMol
+
 		// get the protonations
-		val protonations = view.mol.protonations(atom)
+		val protonations = mol.protonations(atom)
 
 		var current: Protonation? = run {
-			val bondedAtoms = view.mol.bonds.bondedAtoms(atom)
+			val bondedAtoms = mol.bonds.bondedAtoms(atom)
 			val numHeavy = bondedAtoms.count { it.element != Element.Hydrogen }
 			val numH = bondedAtoms.count { it.element == Element.Hydrogen }
 			protonations
@@ -237,7 +241,7 @@ class ProtonationEditor : SlideFeature {
 
 			// pick the hydrogen atom to define the dihedral angle
 			private fun pickHydrogen() =
-				view.mol.bonds.bondedAtoms(atom)
+				mol.bonds.bondedAtoms(atom)
 					.filter { it.element == Element.Hydrogen }
 					.minBy { it.toInt() }
 
@@ -295,7 +299,7 @@ class ProtonationEditor : SlideFeature {
 				)
 
 				// rotate all the hydrogens
-				view.mol.bonds.bondedAtoms(atom)
+				mol.bonds.bondedAtoms(atom)
 					.filter { it.element == Element.Hydrogen }
 					.forEach { h ->
 						val coords = h.pos.toArray()
@@ -312,12 +316,12 @@ class ProtonationEditor : SlideFeature {
 		// then the hydrogens are rotatable
 		val rotator: Rotator? = run {
 
-			val bondedHeavies = view.mol.bonds.bondedAtoms(atom)
+			val bondedHeavies = mol.bonds.bondedAtoms(atom)
 				.filter { it.element != Element.Hydrogen }
 			if (bondedHeavies.size == 1) {
 				val bondedHeavy = bondedHeavies.first()
 
-				val rotationHeavies = view.mol.bonds.bondedAtoms(bondedHeavy)
+				val rotationHeavies = mol.bonds.bondedAtoms(bondedHeavy)
 					.filter { it.element != Element.Hydrogen && it != atom }
 				if (rotationHeavies.isNotEmpty()) {
 					return@run Rotator(bondedHeavy, rotationHeavies)
@@ -341,9 +345,9 @@ class ProtonationEditor : SlideFeature {
 
 			// update the molecule
 			if (protonation != null) {
-				view.mol.protonate(atom, protonation)
+				mol.protonate(atom, protonation)
 			} else {
-				view.mol.deprotonate(atom)
+				mol.deprotonate(atom)
 			}
 			view.moleculeChanged()
 

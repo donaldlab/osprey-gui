@@ -101,7 +101,7 @@ class ClashViewer : SlideFeature {
 		// combine all the molecules into one PDB
 		val pdb = views.map { view ->
 				// grab just the selected part of the molecule
-				view.selector.filter(view.mol)
+				view.selector.filter(view.currentMol)
 			}
 			.combineForPDB("combined").first
 			.toPDB()

@@ -24,7 +24,8 @@ class MinimizerTool : SlideFeature {
 	private val winState = WindowState()
 
 	private class MolInfo(val view: MoleculeRenderView) {
-		val minInfo = MinimizerInfo(view.mol)
+		val mol = view.molStack.originalMol
+		val minInfo = MinimizerInfo(mol)
 		val pSelected = Ref.of(true)
 	}
 
@@ -49,7 +50,7 @@ class MinimizerTool : SlideFeature {
 				// clear any old mol infos
 				molInfos.clear()
 				for (view in molViews) {
-					molInfos[view.mol] = MolInfo(view)
+					molInfos[view.molStack.originalMol] = MolInfo(view)
 				}
 			},
 			whenOpen = {
@@ -60,7 +61,7 @@ class MinimizerTool : SlideFeature {
 					for ((index, info) in molInfos.values.withIndex()) {
 						withId(index) {
 
-							val mol = info.view.mol
+							val mol = info.mol
 
 							// show the molecule type
 							checkbox("$mol", info.pSelected)

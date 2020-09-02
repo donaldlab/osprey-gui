@@ -50,7 +50,7 @@ class MoleculePrep(
 		this.isIncluded[mol] = isIncluded
 
 		// update the views
-		val existingView = slide.views.find { it is MoleculeRenderView && it.mol == mol }
+		val existingView = slide.views.find { it is MoleculeRenderView && it.molStack.originalMol == mol }
 		if (isIncluded) {
 			if (existingView == null) {
 				slide.views.add(BallAndStick(mol))

@@ -32,6 +32,9 @@ class ConfSwitcher(
 	var conf: ConfLib.Conf? = null
 		private set
 
+	var anchorMatch: DesignPosition.AnchorMatch? = null
+		private set
+
 	var atomResolver: ConfLib.AtomPointer.Resolver? = null
 		private set
 
@@ -55,6 +58,7 @@ class ConfSwitcher(
 		val anchorMatch = pos.findAnchorMatch(frag)
 			?.copyToMol(mol, maps.atoms)
 			?: throw DesignPosition.IncompatibleAnchorsException(pos, frag)
+		this.anchorMatch = anchorMatch
 
 		// remove the existing atoms
 		for (atom in currentAtoms) {

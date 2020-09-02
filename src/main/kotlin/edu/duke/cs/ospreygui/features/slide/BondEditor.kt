@@ -246,15 +246,16 @@ class BondEditor : SlideFeature {
 
 	private fun clearBonds(views: List<MoleculeRenderView>) {
 		for (view in views) {
-			view.mol.bonds.clear()
+			view.molStack.originalMol.bonds.clear()
 			view.moleculeChanged()
 		}
 	}
 
 	private fun guessBonds(views: List<MoleculeRenderView>) {
 		for (view in views) {
-			for ((a1, a2) in view.mol.inferBondsAmber()) {
-				view.mol.bonds.add(a1, a2)
+			val mol = view.molStack.originalMol
+			for ((a1, a2) in mol.inferBondsAmber()) {
+				mol.bonds.add(a1, a2)
 			}
 			view.moleculeChanged()
 		}
@@ -264,7 +265,7 @@ class BondEditor : SlideFeature {
 
 private class Selection(val view: MoleculeRenderView, val atom: Atom, val maxDistSq: Double) {
 
-	val mol get() = view.mol
+	val mol get() = view.molStack.originalMol
 	val bondGuesser = BondGuesser()
 
 	inner class AtomInfo(val atom: Atom, val dist: Double) {
@@ -274,7 +275,7 @@ private class Selection(val view: MoleculeRenderView, val atom: Atom, val maxDis
 			this@Selection.atom.pos.distance(atom.pos)
 		)
 
-		val pBonded = Ref.of(view.mol.bonds.isBonded(this@Selection.atom, atom))
+		val pBonded = Ref.of(mol.bonds.isBonded(this@Selection.atom, atom))
 
 		val covalentRange = atom.covalentRange(this@Selection.atom, bondGuesser)
 

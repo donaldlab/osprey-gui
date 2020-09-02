@@ -1,5 +1,6 @@
 package edu.duke.cs.ospreygui.motions
 
+import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
 import org.joml.Quaterniond
 import org.joml.Vector3d
@@ -8,12 +9,12 @@ import org.joml.Vector3d
 class TranslationRotation(val mol: Molecule): MolMotion {
 
 	data class MolDescription(
-		val mol: Molecule,
+		override val mol: Molecule,
 		val maxTranslationDist: Double,
 		val maxRotationDegrees: Double
 	) : MolMotion.Description {
 
-		override fun copyTo(mol: Molecule) =
+		override fun copyTo(mol: Molecule, atomMap: AtomMap) =
 			MolDescription(mol, maxTranslationDist, maxRotationDegrees)
 
 		override fun make() = TranslationRotation(mol)

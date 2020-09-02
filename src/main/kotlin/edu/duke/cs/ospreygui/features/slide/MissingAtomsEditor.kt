@@ -132,15 +132,16 @@ class MissingAtomsEditor : SlideFeature {
 
 		for (view in views) {
 
-			for ((atom, res) in view.mol.inferMissingAtomsAmber()) {
+			val mol = view.molStack.originalMol
+			for ((atom, res) in mol.inferMissingAtomsAmber()) {
 
 				// add the atoms to the molecule
-				view.mol.atoms.add(atom)
+				mol.atoms.add(atom)
 				res?.atoms?.add(atom)
 
 				// make a friendly description for the location
 				val resId = res?.id
-				val chainId = (view.mol as Polymer).chains.find { res in it.residues }?.id
+				val chainId = (mol as Polymer).chains.find { res in it.residues }?.id
 				val location = if (resId != null && chainId != null) {
 					"$chainId$resId"
 				} else {
@@ -148,7 +149,7 @@ class MissingAtomsEditor : SlideFeature {
 				}
 
 				// add them to the internal state too, so we can see what was added
-				add(AddedAtom(view.mol, res, atom, location))
+				add(AddedAtom(mol, res, atom, location))
 			}
 
 			view.moleculeChanged()
@@ -157,7 +158,7 @@ class MissingAtomsEditor : SlideFeature {
 
 	private fun updateAtom(views: List<MoleculeRenderView>, addedAtom: AddedAtom) {
 
-		val view = views.find { it.mol == addedAtom.mol } ?: return
+		val view = views.find { it.molStack.originalMol == addedAtom.mol } ?: return
 
 		// add or remove the atom
 		addedAtom.run {
@@ -186,7 +187,7 @@ class MissingAtomsEditor : SlideFeature {
 		addedAtoms
 			.map { it.mol }
 			.toSet()
-			.mapNotNull { mol -> views.find { it.mol == mol } }
+			.mapNotNull { mol -> views.find { it.molStack.originalMol == mol } }
 			.forEach { it.moleculeChanged() }
 	}
 }
