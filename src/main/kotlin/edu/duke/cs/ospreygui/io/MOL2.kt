@@ -73,6 +73,8 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 			}
 		}
 	}
+	fun Atom.getResidue() =
+		residuesByAtom[this] ?: throw NoSuchElementException("No residue found for atom $this in $mol")
 
 	// get all the atom indices (1-based)
 	val indicesByAtom = IdentityHashMap<Atom,Int>()
@@ -95,18 +97,38 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 	write("\n")
 	write("\n")
 
+	val types = metadata?.atomTypes
+	fun Atom.getType() =
+		if (types != null) {
+			types[this] ?: throw NoSuchElementException("No atom type found for atom $this @ ${residuesByAtom[this]} in $mol")
+		} else {
+			// no types explicitly defined for this molecule, so probably that means no one cares what we write here
+			// but we have to write something, so just use the atom element
+			element.symbol
+		}
+
+	val charges = metadata?.atomCharges
+	fun Atom.getCharge() =
+		if (charges != null) {
+			charges[this] ?: throw NoSuchElementException("No charge found for atom $this @ ${residuesByAtom[this]} in $mol")
+		} else {
+			// no charges explicitly defined for this molecule, so probably that means no one cares what we write here
+			// but we have to write something, so just use an arbitrary value
+			Mol2Metadata.defaultCharge
+		}
+
 	// write the atom section
 	write("@<TRIPOS>ATOM\n")
 	for (atom in atoms) {
-		val res = residuesByAtom.getValue(atom)
+		val res = atom.getResidue()
 		write("  %d %s %.6f %.6f %.6f %s %s %s %s\n".format(
 			indicesByAtom[atom],
 			atom.name,
 			atom.pos.x, atom.pos.y, atom.pos.z,
-			metadata?.atomTypes?.getValue(atom) ?: atom.element.symbol,
+			atom.getType(),
 			resIds[res],
 			res.type,
-			metadata?.atomCharges?.getValue(atom) ?: Mol2Metadata.defaultCharge
+			atom.getCharge()
 		))
 	}
 

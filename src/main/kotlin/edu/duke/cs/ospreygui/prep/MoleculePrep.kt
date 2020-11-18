@@ -98,6 +98,7 @@ class MoleculePrep(
 			}
 			s.features.menu("Prepare") {
 				add(FilterTool(this@MoleculePrep))
+				add(DuplicateAtomsEditor())
 				add(MissingAtomsEditor())
 				add(BondEditor())
 				add(ProtonationEditor())

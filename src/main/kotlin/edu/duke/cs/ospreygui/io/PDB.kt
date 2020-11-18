@@ -1,5 +1,6 @@
 package edu.duke.cs.ospreygui.io
 
+import cuchaz.kludge.tools.toString
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.osprey.structure.Molecule as OspreyMolecule
 import edu.duke.cs.osprey.structure.Atom as OspreyAtom
@@ -68,7 +69,7 @@ fun OspreyMolecule.toMolecule(name: String? = null): Molecule {
 	for (ores in omol.residues) {
 		for (oatom in ores.atoms) {
 			val atom = Atom(
-				Element.get(oatom.elementNumber),
+				Element[oatom.elementNumber],
 				oatom.name,
 				oatom.coords[0],
 				oatom.coords[1],
@@ -213,10 +214,26 @@ fun Molecule.toOspreyMol(
 			// warn about any non-chain atoms in the polymer
 			val missingAtoms = atoms.size - atomsCopied.size
 			if (missingAtoms > 0) {
-				val msg = "Polymer has $missingAtoms atoms that were not in chains" +
-					", and not copied to the Osprey molecule."
+
+				val msg = StringBuilder()
+				msg.append("Polymer has $missingAtoms atoms that were not in chains")
+				msg.append(", and not copied to the Osprey molecule.")
+
+				// find the missing atoms
+				val chainAtoms = Atom.identitySet()
+				for (chain in mol.chains) {
+					for (res in chain.residues) {
+						chainAtoms.addAll(res.atoms)
+					}
+				}
+				for (atom in mol.atoms) {
+					if (atom !in chainAtoms) {
+						msg.append("\n\t$atom @ ${atom.pos.toString(6)}")
+					}
+				}
+
 				if (throwOnNonChainPolymerAtoms) {
-					throw IllegalArgumentException(msg)
+					throw IllegalArgumentException(msg.toString())
 				} else {
 					System.err.println("WARNING: $msg")
 				}

@@ -141,7 +141,9 @@ fun Molecule.calcTypesAmber(
 					translateSSasCYX = true,
 					includeSSBondConect = true,
 					// amber also needs histidine protonation state explicitly described
-					translateHIStoEDP = true
+					translateHIStoEDP = true,
+					// these errors will cause downstream problems, so fail loudly and early
+					throwOnNonChainPolymerAtoms = true
 				),
 				ffname = ffname.name
 			).toRequest()
