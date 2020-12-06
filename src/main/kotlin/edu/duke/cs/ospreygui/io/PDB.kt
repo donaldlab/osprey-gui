@@ -93,20 +93,44 @@ fun OspreyMolecule.toMolecule(name: String? = null): Molecule {
 
 	if (mol is Polymer) {
 
+		// find a unique chain id we can use
+		val availableChainId = lazy {
+
+			val chainIds = omol.residues
+				.map { it.chainId }
+				.toSet()
+				.filter { !it.isWhitespace() }
+
+			('A'..'Z')
+				.firstOrNull { it !in chainIds }
+				?.toString()
+				?: throw NoSuchElementException("can't find a unique chain ID, IDs already in use: ${chainIds.sorted().joinToString(",")}")
+		}
+
+		// empty chain IDs should be replaced with something readable
+		fun Char.translateChainId(): String =
+			if (isWhitespace()) {
+				availableChainId.value
+			} else {
+				toString()
+			}
+
 		// convert the residues
 		for (res in omol.residues) {
 
+			val ochainId = res.chainId.translateChainId()
+
 			// get/make the chain
 			val chain = mol.chains
-				.find { it.id == res.chainId.toString() }
+				.find { it.id == ochainId }
 				?: run {
-					Polymer.Chain(res.chainId.toString()).apply {
+					Polymer.Chain(ochainId).apply {
 						mol.chains.add(this)
 					}
 				}
 
 			chain.residues.add(Polymer.Residue(
-				res.pdbResNumber.substring(1),
+				res.fullName.substring(5).trim(),
 				res.type,
 				res.atoms.map { atomMap[it]!! }
 			))
