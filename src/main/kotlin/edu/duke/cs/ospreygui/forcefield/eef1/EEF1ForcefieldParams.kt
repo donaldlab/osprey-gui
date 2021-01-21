@@ -1,12 +1,13 @@
 package edu.duke.cs.ospreygui.forcefield.eef1
 
 import cuchaz.kludge.tools.sqrt
-import edu.duke.cs.molscope.molecule.Atom
-import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
+import edu.duke.cs.ospreygui.forcefield.AtomIndex
 import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.ForcefieldParams
-import java.util.*
+import edu.duke.cs.ospreygui.tools.ArrayMap
+import edu.duke.cs.ospreygui.tools.CombineCollisionException
+import edu.duke.cs.ospreygui.tools.combineMaps
 import kotlin.math.PI
 import kotlin.math.exp
 
@@ -34,11 +35,15 @@ class EEF1ForcefieldParams : ForcefieldParams {
 	var scale = 0.5
 
 
-	class AtomParams(
-		atom: Atom,
+	inner class AtomParams(
 		val type: EEF1.AtomType
-	) : ForcefieldParams.AtomParams(atom) {
+	) : ForcefieldParams.AtomParams {
 
+		override fun internalEnergy(): Double? {
+			return scale*type.dGref
+		}
+
+		override fun toString() = "$type"
 
 		override fun hashCode() =
 			type.hashCode()
@@ -46,46 +51,33 @@ class EEF1ForcefieldParams : ForcefieldParams {
 		override fun equals(other: Any?) =
 			other is AtomParams
 				&& this.type == other.type
-
-		override fun toString() =
-			"type=$type"
 	}
 
-	class MolParams(
-		mol: Molecule
-	) : ForcefieldParams.MolParams(mol) {
+	class AtomsParams : ForcefieldParams.AtomsParams {
 
-		val atomsParams = IdentityHashMap<Atom,AtomParams>()
+		val atomsParams = ArrayMap<AtomParams>()
 
-		override fun get(atom: Atom) =
-			atomsParams[atom]
+		override fun get(atomi: Int) = atomsParams[atomi]
 	}
 
-	override fun parameterize(mol: Molecule, netCharge: Int?) =
-		MolParams(mol).apply {
+	override fun parameterizeAtoms(mol: Molecule, atomIndex: AtomIndex, netCharge: Int?) =
+		AtomsParams().apply {
 			for (atom in mol.atoms) {
 				val type = atom.atomTypeEEF1(mol) ?: continue
-				atomsParams[atom] = AtomParams(atom, type)
+				val atomi = atomIndex.getOrThrow(atom)
+				atomsParams[atomi] = AtomParams(type)
 			}
 		}
 
 
-	override fun internalEnergy(molParams: ForcefieldParams.MolParams, atom: Atom): Double? {
-
-		molParams as MolParams
-
-		val type = molParams.atomsParams[atom]?.type ?: return null
-		return scale*type.dGref
-	}
-
-	inner class PairParams(
+	inner class AtomPairParams(
 		val vdwRadiusa: Double,
 		val lambdaa: Double,
 		val vdwRadiusb: Double,
 		val lambdab: Double,
 		val alpha1: Double,
 		val alpha2: Double
-	) : ForcefieldParams.ParamsList {
+	) : ForcefieldParams.AtomPairParams {
 
 		constructor (a: EEF1.AtomType, b: EEF1.AtomType) : this(
 			a.vdwRadius,
@@ -105,7 +97,7 @@ class EEF1ForcefieldParams : ForcefieldParams {
 			alpha2
 		)
 
-		fun calcEnergy(r: Double): Double {
+		override fun calcEnergy(r: Double): Double {
 			return if (r <= cutoff) {
 				val Xij = (r - vdwRadiusa)/lambdaa
 				val Xji = (r - vdwRadiusb)/lambdab
@@ -117,50 +109,54 @@ class EEF1ForcefieldParams : ForcefieldParams {
 		}
 	}
 
-	override fun pairParams(molaParams: ForcefieldParams.MolParams, atoma: Atom, molbParams: ForcefieldParams.MolParams, atomb: Atom, dist: Int?): PairParams? {
+	inner class AtomPairsParams(
+		val molsParams: Map<Int,AtomsParams>
+	) : ForcefieldParams.AtomPairsParams {
 
-		// EEF1 only has interactions between atoms at least 1-4 bonded (ie >= 3 bonds away)
-		// so skip the params if we're less than 3 bonds away
-		if (dist != null && dist < 3) {
-			return null
+		override fun get(moli1: Int, atomi1: Int, moli2: Int, atomi2: Int, dist: Int?): AtomPairParams? {
+
+			// EEF1 only has interactions between atoms at least 1-4 bonded (ie >= 3 bonds away)
+			// so skip the params if we're less than 3 bonds away
+			if (dist != null && dist < 3) {
+				return null
+			}
+
+			val params1 = molsParams[moli1]?.get(atomi1) ?: return null
+			val params2 = molsParams[moli2]?.get(atomi2) ?: return null
+			return AtomPairParams(params1.type, params2.type)
 		}
-
-		molaParams as MolParams
-		molbParams as MolParams
-
-		val atype = molaParams.atomsParams[atoma]?.type ?: return null
-		val btype = molbParams.atomsParams[atomb]?.type ?: return null
-		return PairParams(atype, btype)
 	}
 
-	override fun calcEnergy(atomsByMols: Map<Molecule,List<Atom>>, molParamsByMols: Map<Molecule,ForcefieldParams.MolParams>, molToParams: Map<Molecule,AtomMap>?): Double {
+	override fun parameterizeAtomPairs(infos: List<ForcefieldParams.MolInfo>) : AtomPairsParams {
 
-		var energy = 0.0
-
-		// add the internal energies
-		for ((mol, atoms) in atomsByMols) {
-			val molParams = molParamsByMols.getValue(mol)
-			for (atom in atoms) {
-				val patom = molToParams?.getValue(mol)?.getBOrThrow(atom) ?: atom
-				val internalEnergy = internalEnergy(molParams, patom) ?: continue
-				energy += internalEnergy
+		return AtomPairsParams(ArrayMap<AtomsParams>().apply {
+			for (info in infos) {
+				this[info.moli] = info.atomsParams as AtomsParams
 			}
+		})
+	}
+
+	override fun combineAtomsParams(info1: ForcefieldParams.AtomsInfo, info2: ForcefieldParams.AtomsInfo): ForcefieldParams.AtomsParams {
+
+		info1.atomsParams as AtomsParams
+		info2.atomsParams as AtomsParams
+
+		val combined = AtomsParams()
+
+		try {
+			combineMaps(
+				info1.atomsParams.atomsParams, info1.preferredAtomIndices, info1.ignoredAtomIndices,
+				info2.atomsParams.atomsParams, info2.preferredAtomIndices, info2.ignoredAtomIndices,
+				into = combined.atomsParams
+			)
+		} catch (ex: CombineCollisionException) {
+			throw IllegalArgumentException("""
+				|two EEF1 atoms params disagree on atom params for atom ${ex.key}:
+				|	${ex.val1}
+				|	${ex.val2}
+			""".trimMargin())
 		}
 
-		// add the pair energies
-		ForcefieldParams.forEachPair(atomsByMols, atomsByMols) { mola, atoma, molb, atomb, dist ->
-
-			// map the atoms to the params molecules
-			val molaParams = molParamsByMols.getValue(mola)
-			val patoma = molToParams?.getValue(mola)?.getBOrThrow(atoma) ?: atoma
-			val molbParams = molParamsByMols.getValue(molb)
-			val patomb = molToParams?.getValue(molb)?.getBOrThrow(atomb) ?: atomb
-
-			pairParams(molaParams, patoma, molbParams, patomb, dist)?.let { params ->
-				energy += params.calcEnergy(atoma.pos.distance(atomb.pos))
-			}
-		}
-
-		return energy
+		return combined
 	}
 }

@@ -26,11 +26,11 @@ class DihedralAngleViewer private constructor(
 
 		fun make(desc: DihedralAngle.ConfDescription, assignmentInfo: Assignments.AssignmentInfo, view: MoleculeRenderView): DihedralAngleViewer {
 			return DihedralAngleViewer(
-				desc.make(assignmentInfo.mol, assignmentInfo.confSwitcher.atomResolverOrThrow),
+				desc.make(assignmentInfo.molInfo.assignedMol, assignmentInfo.confSwitcher.atomResolverOrThrow),
 				desc.minDegrees.toFloat(),
 				desc.maxDegrees.toFloat(),
 				view,
-				assignmentInfo.confSwitcher.maps
+				assignmentInfo.confSwitcher.molInfo.maps
 			)
 		}
 

@@ -1,14 +1,14 @@
 package edu.duke.cs.ospreygui.forcefield.eef1
 
 import edu.duke.cs.molscope.molecule.Molecule
-import edu.duke.cs.molscope.tools.identityHashMapOf
 import edu.duke.cs.osprey.confspace.ParametricMolecule
 import edu.duke.cs.osprey.confspace.Strand
 import edu.duke.cs.osprey.energy.EnergyCalculator
 import edu.duke.cs.osprey.energy.ResidueInteractions
-import edu.duke.cs.osprey.energy.forcefield.ForcefieldParams
+import edu.duke.cs.osprey.energy.forcefield.ForcefieldParams as OldFFParams
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
+import edu.duke.cs.ospreygui.forcefield.*
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.io.toOspreyMol
 import io.kotlintest.matchers.doubles.plusOrMinus
@@ -27,12 +27,16 @@ class TestEnergy : SharedSpec({
 			// use the full scale for testing
 			scale = 1.0
 		}
-		val molParams = eef1Params.parameterize(this, null)
+		val atomIndex = AtomIndex(this.atoms)
+		val atomsParams = eef1Params.parameterizeAtoms(this, atomIndex, null)
+		val atomPairsParams = eef1Params.parameterizeAtomPairs(listOf(
+			ForcefieldParams.MolInfo(0, this, atomsParams, atomIndex)
+		))
 
-		return eef1Params.calcEnergy(
-			identityHashMapOf(this to atoms),
-			identityHashMapOf(this to molParams)
-		)
+		// calculate the energy
+		return ForcefieldCalculator.calc(atomPairsParams, listOf(
+			ForcefieldCalculator.MolInfo(0, this, this.atoms, atomIndex, atomsParams)
+		))
 	}
 
 	fun readMol(name: String) =
@@ -69,8 +73,8 @@ class TestEnergy : SharedSpec({
 
 			// calculate the amber + EEF1 energy
 			val combinedEnergy = run {
-				val ffparams = ForcefieldParams().apply {
-					solvationForcefield = ForcefieldParams.SolvationForcefield.EEF1
+				val ffparams = OldFFParams().apply {
+					solvationForcefield = OldFFParams.SolvationForcefield.EEF1
 					solvScale = 1.0
 				}
 				EnergyCalculator.Builder(ffparams).build().use { ecalc ->
@@ -80,7 +84,7 @@ class TestEnergy : SharedSpec({
 
 			// calculate the amber energy
 			val amberEnergy = run {
-				val ffparams = ForcefieldParams().apply {
+				val ffparams = OldFFParams().apply {
 					solvationForcefield = null
 				}
 				EnergyCalculator.Builder(ffparams).build().use { ecalc ->

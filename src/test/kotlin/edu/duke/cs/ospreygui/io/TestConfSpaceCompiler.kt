@@ -4,27 +4,26 @@ import cuchaz.kludge.tools.abs
 import cuchaz.kludge.tools.toDegrees
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
-import edu.duke.cs.molscope.tools.identityHashMapOf
 import edu.duke.cs.molscope.tools.toIdentitySet
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
 import edu.duke.cs.ospreygui.absolutely
-import edu.duke.cs.ospreygui.forcefield.Forcefield
 import edu.duke.cs.ospreygui.forcefield.amber.Amber96Params
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.forcefield.eef1.EEF1ForcefieldParams
 import edu.duke.cs.ospreygui.relatively
-import io.kotlintest.matchers.doubles.shouldBeLessThan
-import io.kotlintest.matchers.types.shouldBeTypeOf
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
 import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
 import edu.duke.cs.osprey.confspace.compiled.motions.DihedralAngle as CompiledDihedralAngle
 import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
 import edu.duke.cs.osprey.energy.compiled.PosInterGen
 import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
+import edu.duke.cs.ospreygui.forcefield.*
 import edu.duke.cs.ospreygui.motions.DihedralAngle
 import edu.duke.cs.ospreygui.prep.*
+import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.numerics.shouldBeGreaterThan
+import io.kotlintest.matchers.types.shouldBeTypeOf
 import io.kotlintest.shouldBe
 
 
@@ -50,26 +49,40 @@ class TestConfSpaceCompiler : SharedSpec({
 	/** Used to compute the expected energies for conformations */
 	@Suppress("unused")
 	fun Molecule.calcAmber96Energy(): Double {
+
+		// parameterize the molecule
 		val amberParams = Amber96Params()
-		val molParams = amberParams.parameterize(this, null)
-		return amberParams.calcEnergy(
-			identityHashMapOf(this to atoms),
-			identityHashMapOf(this to molParams)
-		)
+		val atomIndex = AtomIndex(this.atoms)
+		val atomsParams = amberParams.parameterizeAtoms(this, atomIndex, null)
+		val atomPairsParams = amberParams.parameterizeAtomPairs(listOf(
+			ForcefieldParams.MolInfo(0, this, atomsParams, atomIndex)
+		))
+
+		// calculate the energy
+		return ForcefieldCalculator.calc(atomPairsParams, listOf(
+			ForcefieldCalculator.MolInfo(0, this, this.atoms, atomIndex, atomsParams)
+		))
 	}
 
 	/** Used to compute the expected energies for conformations */
 	@Suppress("unused")
 	fun Molecule.calcEEF1Energy(): Double {
+
+		// parameterize the molecule
 		val eef1Params = EEF1ForcefieldParams().apply {
 			// use the full scale for testing
 			scale = 1.0
 		}
-		val molParams = eef1Params.parameterize(this, null)
-		return eef1Params.calcEnergy(
-			identityHashMapOf(this to atoms),
-			identityHashMapOf(this to molParams)
-		)
+		val atomIndex = AtomIndex(this.atoms)
+		val atomsParams = eef1Params.parameterizeAtoms(this, atomIndex, null)
+		val atomPairsParams = eef1Params.parameterizeAtomPairs(listOf(
+			ForcefieldParams.MolInfo(0, this, atomsParams, atomIndex)
+		))
+
+		// calculate the energy
+		return ForcefieldCalculator.calc(atomPairsParams, listOf(
+			ForcefieldCalculator.MolInfo(0, this, this.atoms, atomIndex, atomsParams)
+		))
 	}
 
 	/** Used to compute the expected energies for conformations */
@@ -91,7 +104,7 @@ class TestConfSpaceCompiler : SharedSpec({
 	fun ConfSpace.dumpEnergies(vararg assignments: Pair<DesignPosition,String>) {
 
 		// make the assignments
-		val assigned = Assignments(assignments.map { (pos, id) ->
+		val assigned = assign(assignments.map { (pos, id) ->
 			val (fragId, confId) = id.split(":")
 			val posConfSpace = positionConfSpaces[pos]!!
 			val confConfSpace = posConfSpace.confs.find { it.frag.id == fragId && it.conf.id == confId }!!
@@ -100,7 +113,7 @@ class TestConfSpaceCompiler : SharedSpec({
 
 		// get the molecule from the positions, hope there's only 1
 		val mol = assigned.assignmentInfos.values
-			.map { it.mol }
+			.map { it.molInfo.assignedMol }
 			.toIdentitySet()
 			.takeIf { it.size == 1 }
 			?.first()
@@ -126,7 +139,7 @@ class TestConfSpaceCompiler : SharedSpec({
 				waitForFinish()
 				report!!.run {
 					compiled?.toBytes()
-						?: error?.let { throw it }
+						?: error?.let { throw Error("compilation failed", it) }
 						?: throw Error("no compiled")
 				}
 			}

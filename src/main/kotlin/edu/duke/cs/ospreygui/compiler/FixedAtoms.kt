@@ -3,7 +3,7 @@ package edu.duke.cs.ospreygui.compiler
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
-import edu.duke.cs.molscope.tools.associateIdentity
+import edu.duke.cs.ospreygui.prep.Assignments
 import java.util.*
 
 
@@ -29,33 +29,25 @@ import java.util.*
  * in the compiled conf space.
  */
 class FixedAtoms(
-	confSpaceIndex: ConfSpaceIndex,
-	fixedAtoms: Map<Molecule,List<Atom>>
+	confSpaceIndex: ConfSpaceIndex
 ) {
 
+	val mols = confSpaceIndex.mols
+
 	// give the fixed atoms mutable collections, so we can move atoms out
-	private val fixedAtoms: MutableMap<Molecule,MutableList<Atom>> =
-		fixedAtoms.entries.associateIdentity { (mol, atoms) ->
-			mol to atoms.toMutableList()
-		}
+	private val fixedAtomsByMol: List<MutableList<Atom>> =
+		confSpaceIndex.fixedAtoms.map { it.toMutableList() }
 
-	fun fixed(mol: Molecule): List<Atom> =
-		fixedAtoms[mol]
-			?: throw NoSuchElementException("no fixed atoms for molecule: $mol")
-
-	fun removeFixed(mol: Molecule, atom: Atom) {
-		val atoms = fixedAtoms[mol]
-			?: throw NoSuchElementException("no fixed atoms for molecule: $mol")
-		val wasRemoved = atoms.remove(atom)
-		if (!wasRemoved) {
-			throw NoSuchElementException("no fixed atom found for ${atom.fixedName(mol)}")
-		}
-	}
+	fun fixed(moli: Int): List<Atom> = fixedAtomsByMol[moli]
 
 
 	data class StaticInfo(
+		val moli: Int,
 		val mol: Molecule,
 		val atom: Atom,
+		/**
+		 * Indexed over the whole conf space
+		 */
 		val index: Int,
 		/**
 		 * Uniquely describes the atom among all the atoms in the wild-type molecules,
@@ -66,13 +58,25 @@ class FixedAtoms(
 
 	private val staticInfos = ArrayList<StaticInfo>()
 	private val staticLookup = IdentityHashMap<Atom,StaticInfo>()
-	private val _staticAtomsByMol = IdentityHashMap<Molecule,MutableList<Atom>>()
+	private val _staticAtomsByMol = mols.map { ArrayList<Atom>() }
 
 	val statics: List<StaticInfo> get() = staticInfos
-	val staticAtomsByMol: Map<Molecule,List<Atom>> get() = _staticAtomsByMol
+	val staticAtomsByMol: List<List<Atom>> get() = _staticAtomsByMol
 
 	fun getStatic(atom: Atom): StaticInfo =
 		staticLookup[atom] ?: throw NoSuchElementException("atom $atom is not a static atom")
+
+	/**
+	 * Returns the static atoms in the indexed order.
+	 *
+	 * Only return atoms from the assigned molecules.
+	 */
+	fun staticAtomsByMol(assignments: Assignments): List<List<Atom>> =
+		mols.indices.map { moli ->
+			staticAtomsByMol[moli].map { atom ->
+				assignments.molInfos[moli].getAssignedAtomOrThrow(atom)
+			}
+		}
 
 	/**
 	 * Remove all dyanmic atoms from the fixed atoms.
@@ -80,7 +84,8 @@ class FixedAtoms(
 	 * The fixed atoms list will be empty afterwards.
 	 */
 	fun updateStatic() {
-		for ((mol, atoms) in fixedAtoms) {
+		for ((moli, atoms) in fixedAtomsByMol.withIndex()) {
+			val mol = mols[moli]
 			for (atom in atoms) {
 
 				// skip dynamic atoms
@@ -97,18 +102,19 @@ class FixedAtoms(
 				val index = staticInfos.size
 
 				// make the info
-				val info = StaticInfo(mol, atom, index, atom.fixedName(mol))
+				val info = StaticInfo(moli, mol, atom, index, atom.fixedName(mol))
 				staticInfos.add(info)
 				staticLookup[atom] = info
-				_staticAtomsByMol.getOrPut(mol) { ArrayList() }.add(atom)
+				_staticAtomsByMol[moli].add(atom)
 			}
+			atoms.clear()
 		}
-		fixedAtoms.clear()
 	}
 
 
 	data class DynamicInfo(
 		val atom: Atom,
+		/** indexed over the design position */
 		val index: Int,
 		/** the first fragment to claim this atom at this design position */
 		val fragInfo: ConfSpaceIndex.FragInfo

@@ -291,6 +291,7 @@ class AmberTopology(
 	fun atomIndices(resIndex: Int) =
 		firstAtomIndex(resIndex) until lastAtomLimit(resIndex)
 
+	val numAtoms get() = pointers[0]
 	val numAtomTypes get() = pointers[1]
 
 	data class MappedAtom(
@@ -485,23 +486,29 @@ class AmberTopology(
 		private fun index(atom: Atom) = molToTop[atom]
 			?: throw NoSuchElementException("atom $atom is not in the topology")
 
+		fun atom(i: Int) = topToMol[i]?.atom
+
+		val numAtoms: Int get() = this@AmberTopology.numAtoms
+
 		fun atomType(atom: Atom) = atomTypes[index(atom)]
 
-		fun charge(atom: Atom) = charges[index(atom)]
+		fun charge(index: Int) = charges[index]
+		fun charge(atom: Atom) = charge(index(atom))
 
 		/**
 		 * Returns the electrostatic scaling divisor for the atom pair.
 		 * Assumes the atoms are already 1-4 bonded!
 		 */
-		fun chargeDivisor14(atoma: Atom, atomb: Atom): Double {
-			val i = getDihedralIndex(index(atoma), index(atomb)) ?: return 1.2
+		fun chargeDivisor14(indexa: Int, indexb: Int): Double {
+			val i = getDihedralIndex(indexa, indexb) ?: return 1.2
 			return esScaleFactors[i]
 		}
+		fun chargeDivisor14(atoma: Atom, atomb: Atom) = chargeDivisor14(index(atoma), index(atomb))
 
-		fun nonbondIndex(atoma: Atom, atomb: Atom): Int {
+		fun nonbondIndex(indexa: Int, indexb: Int): Int {
 			// ICO(NTYPES*(IAC(i)-1)+IAC(j)) for i < j
-			var i = index(atoma)
-			var j = index(atomb)
+			var i = indexa
+			var j = indexb
 			if (i == j) {
 				throw IllegalArgumentException("must have different atoms to get nonbonded index")
 			} else if (i > j) {
@@ -516,21 +523,23 @@ class AmberTopology(
 			// Maybe because amber was based mostly on fortran?
 			return nonbondedParmIndices[numAtomTypes*(iaci - 1) + iacj - 1] - 1
 		}
+		fun nonbondIndex(atoma: Atom, atomb: Atom) = nonbondIndex(index(atoma), index(atomb))
 
-		fun vdw(atoma: Atom, atomb: Atom): Pair<Double,Double> =
-			nonbondIndex(atoma, atomb).let { i ->
+		fun vdw(indexa: Int, indexb: Int): Pair<Double,Double> =
+			nonbondIndex(indexa, indexb).let { i ->
 				lennardJonesACoeff[i] to lennardJonesBCoeff[i]
 			}
+		fun vdw(atoma: Atom, atomb: Atom) = vdw(index(atoma), index(atomb))
 
 		/**
 		 * Returns the van der Waals scaling divisor for the atom pair.
 		 * Assumes the atoms are already 1-4 bonded!
 		 */
-		fun vdwDivisor14(atoma: Atom, atomb: Atom): Double {
-			val i = getDihedralIndex(index(atoma), index(atomb)) ?: return 2.0
+		fun vdwDivisor14(indexa: Int, indexb: Int): Double {
+			val i = getDihedralIndex(indexa, indexb) ?: return 2.0
 			return vdwScaleFactors[i]
 		}
-
+		fun vdwDivisor14(atoma: Atom, atomb: Atom) = vdwDivisor14(index(atoma), index(atomb))
 	}
 }
 

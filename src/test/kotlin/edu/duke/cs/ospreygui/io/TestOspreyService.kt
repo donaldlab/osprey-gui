@@ -181,7 +181,7 @@ class TestOspreyService : SharedSpec({
 					ForcefieldParamsRequest.MolInfo(
 						OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"),
 						MoleculeType.Protein.defaultForcefieldNameOrThrow.name,
-						null
+						emptyList()
 					)
 				))
 			}
@@ -193,7 +193,7 @@ class TestOspreyService : SharedSpec({
 					ForcefieldParamsRequest.MolInfo(
 						OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"),
 						MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow.name,
-						OspreyGui.getResourceAsString("benzamidine.h.frcmod")
+						listOf(OspreyGui.getResourceAsString("benzamidine.h.frcmod"))
 					)
 				))
 			}
@@ -205,12 +205,12 @@ class TestOspreyService : SharedSpec({
 					ForcefieldParamsRequest.MolInfo(
 						OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"),
 						MoleculeType.Protein.defaultForcefieldNameOrThrow.name,
-						null
+						emptyList()
 					),
 					ForcefieldParamsRequest.MolInfo(
 						OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"),
 						MoleculeType.SmallMolecule.defaultForcefieldNameOrThrow.name,
-						OspreyGui.getResourceAsString("benzamidine.h.frcmod")
+						listOf(OspreyGui.getResourceAsString("benzamidine.h.frcmod"))
 					)
 				))
 			}

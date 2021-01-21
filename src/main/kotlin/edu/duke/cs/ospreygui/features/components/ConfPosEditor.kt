@@ -19,6 +19,7 @@ import edu.duke.cs.ospreygui.motions.DihedralAngle
 import edu.duke.cs.ospreygui.prep.Assignments
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.prep.PosAssignment
+import edu.duke.cs.ospreygui.prep.assign
 import kotlin.random.asKotlinRandom
 
 
@@ -332,8 +333,8 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 
 		// make the assignment
 		val posAssignment = PosAssignment(posInfo.pos, frag, conf)
-		val assignmentInfo = Assignments(posAssignment).assignmentInfos.getValue(posAssignment)
-		val mol = assignmentInfo.mol
+		val assignmentInfo = confSpace.assign(posAssignment).assignmentInfos.getValue(posAssignment)
+		val mol = assignmentInfo.molInfo.assignedMol
 
 		// override the molecule render view with the new molecule
 		stackedMol?.pop()
@@ -401,11 +402,11 @@ class ConfPosEditor(val confSpace: ConfSpace, val molInfo: MolInfo, val posInfo:
 
 		// make an assignment with this conf, so we can modify coordinates without changing the original molecules
 		val assignment = PosAssignment(posInfo.pos, fragInfo.frag, confInfo.conf)
-		val assignmentInfo = Assignments(assignment).assignmentInfos.getValue(assignment)
+		val assignmentInfo = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 		// override the molecule render view with the new molecule
 		stackedMol?.pop()
-		stackedMol = view.molStack.push(assignmentInfo.mol)
+		stackedMol = view.molStack.push(assignmentInfo.molInfo.assignedMol)
 		if (renderEffects == null) {
 			renderEffects = view.renderEffects.writer()
 		}

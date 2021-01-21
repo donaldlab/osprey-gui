@@ -25,7 +25,9 @@ class MinimizerTool : SlideFeature {
 
 	private class MolInfo(val view: MoleculeRenderView) {
 		val mol = view.molStack.originalMol
-		val minInfo = MinimizerInfo(mol)
+		// keep the heavy atoms from wandering, but let the hydrogens adjust freely
+		val restrainedAtoms = mol.atoms.filter { it.element != Element.Hydrogen }
+		val minInfo = MinimizerInfo(mol, restrainedAtoms)
 		val pSelected = Ref.of(true)
 	}
 
@@ -168,14 +170,9 @@ class MinimizerTool : SlideFeature {
 
 				try {
 
-					val minInfos = infos.map { it.minInfo }
-
-					// keep the heavy atoms from wandering, but let the hydrogens adjust freely
-					val restrainedAtoms = minInfos.flatMap { minInfo ->
-						minInfo.mol.atoms.filter { it.element != Element.Hydrogen }
-					}
-
-					minInfos.minimize(numSteps, restrainedAtoms)
+					infos
+						.map { it.minInfo }
+						.minimize(numSteps)
 
 				} catch (t: Throwable) {
 					throwable = t

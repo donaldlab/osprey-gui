@@ -3,7 +3,6 @@ package edu.duke.cs.ospreygui.prep
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.toIdentitySet
-import edu.duke.cs.molscope.tools.associateIdentity
 import edu.duke.cs.molscope.tools.identityHashSet
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
@@ -204,16 +203,14 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 	/**
 	 * Get all the atoms that aren't part of design positions.
 	 */
-	fun fixedAtoms(): Map<Molecule,List<Atom>> =
-		mols
-			.associateIdentity { (_, mol) ->
-				val posAtoms = (designPositionsByMol[mol]
-					?.flatMap { it.sourceAtoms }
-					?: emptyList())
-					.toIdentitySet()
-				mol to mol.atoms
-					.filter { it !in posAtoms }
-			}
+	fun fixedAtoms(mol: Molecule): List<Atom> {
+		val posAtoms = (designPositionsByMol[mol]
+			?.flatMap { it.sourceAtoms }
+			?: emptyList())
+			.toIdentitySet()
+		return mol.atoms
+			.filter { it !in posAtoms }
+	}
 
 	/**
 	 * Makes a copy of the selected molecules along with all their

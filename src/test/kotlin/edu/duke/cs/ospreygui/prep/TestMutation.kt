@@ -3,6 +3,7 @@ package edu.duke.cs.ospreygui.prep
 import edu.duke.cs.molscope.molecule.*
 import edu.duke.cs.ospreygui.OspreyGui
 import edu.duke.cs.ospreygui.SharedSpec
+import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
 import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.motions.DihedralAngle
@@ -81,8 +82,17 @@ class TestMutation : SharedSpec({
 
 		data class Instance(
 			val res: Polymer.Residue,
-			val pos: DesignPosition
-		)
+			val pos: DesignPosition,
+			val confSpace: ConfSpace
+		) {
+			constructor(res: Polymer.Residue, pos: DesignPosition) : this(
+				res,
+				pos,
+				ConfSpace(listOf(MoleculeType.Protein to pos.mol)).apply {
+					designPositionsByMol[pos.mol] = mutableListOf(pos)
+				}
+			)
+		}
 		fun ala2(): Instance {
 
 			// copy the molecule, so we don't destroy the original
@@ -182,13 +192,13 @@ class TestMutation : SharedSpec({
 		}
 
 		fun Assignments.AssignmentInfo.mapRes(res: Polymer.Residue) =
-			(maps as PolymerMaps).residues.getBOrThrow(res)
+			(molInfo.maps as PolymerMaps).residues.getBOrThrow(res)
 
 		// just spot-check a few amino acids
 
 		test("glycine->glycine") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			// find the glycine conformation in the library
 			val frag = conflib.fragments.getValue("GLY")
@@ -203,7 +213,7 @@ class TestMutation : SharedSpec({
 
 			// do eeeet!
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// does this look like glycine?
 			info.confSwitcher.type shouldBe "GLY"
@@ -218,12 +228,12 @@ class TestMutation : SharedSpec({
 				shouldHaveAtomNear("HA3", 6.167383, -1.604053, 7.287993)
 				shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("glycine->valine") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			val frag = conflib.fragments.getValue("VAL")
 			val conf = frag.confs.getValue("t")
@@ -237,7 +247,7 @@ class TestMutation : SharedSpec({
 
 			// do eeeet!
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// does this look like valine?
 			info.confSwitcher.type shouldBe "VAL"
@@ -261,12 +271,12 @@ class TestMutation : SharedSpec({
 				shouldHaveAtomNear("HG23", 4.558468, -3.099393, 7.152487)
 				shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("glycine->tryptophan") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			val frag = conflib.fragments.getValue("TRP")
 			val conf = frag.confs.getValue("t90")
@@ -280,7 +290,7 @@ class TestMutation : SharedSpec({
 
 			// do eeeet!
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// does this look like tryptophan?
 			info.confSwitcher.type shouldBe "TRP"
@@ -312,12 +322,12 @@ class TestMutation : SharedSpec({
 				shouldHaveAtomNear("HH2", 12.622241, -1.003771, 5.791199)
 				shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("glycine->proline") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			val frag = conflib.fragments.getValue("PRO")
 			val conf = frag.confs.getValue("up")
@@ -330,7 +340,7 @@ class TestMutation : SharedSpec({
 
 			// do eeeet!
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// does this look like proline?
 			// this part of the backbone has TOTALLY the wrong phi/psi conformation to support proline,
@@ -354,12 +364,12 @@ class TestMutation : SharedSpec({
 				shouldHaveAtomNear("HB2", 6.653983, -1.333461, 5.948938)
 				shouldHaveAtomNear("HD3", 4.019604, -0.850028, 5.452965)
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("glycine->proline->back") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			// record all the atom positions
 			val wtPositions = res.capturePositions()
@@ -379,7 +389,7 @@ class TestMutation : SharedSpec({
 			val frag = conflib.fragments.getValue("PRO")
 			val conf = frag.confs.getValue("up")
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// mutate back to wildtype
 			info.confSwitcher.setConf(wtFrag, wtConf)
@@ -393,18 +403,18 @@ class TestMutation : SharedSpec({
 					shouldHaveAtomNear(atomName, atomPos)
 				}
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("glycine->valine->serine") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			// mutate to valine
 			var frag = conflib.fragments.getValue("VAL")
 			var conf = frag.confs.getValue("t")
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// mutate to serine
 			frag = conflib.fragments.getValue("SER")
@@ -428,12 +438,12 @@ class TestMutation : SharedSpec({
 				shouldHaveAtomNear("HG", 7.706109, -2.447422, 8.418113)
 				shouldHaveAtomNear("H", 3.958053, -0.848456, 6.691013)
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("glycine->valine->back") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			// record all the atom positions
 			val wtPositions = res.capturePositions()
@@ -453,7 +463,7 @@ class TestMutation : SharedSpec({
 			val frag = conflib.fragments.getValue("VAL")
 			val conf = frag.confs.getValue("t")
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// mutate back to wildtype
 			info.confSwitcher.setConf(wtFrag, wtConf)
@@ -467,12 +477,12 @@ class TestMutation : SharedSpec({
 					shouldHaveAtomNear(atomName, atomPos)
 				}
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("proline->glycine") {
 
-			val (res, pos) = pro52()
+			val (res, pos, confSpace) = pro52()
 
 			// find the glycine conformation in the library
 			val frag = conflib.fragments.getValue("GLY")
@@ -487,7 +497,7 @@ class TestMutation : SharedSpec({
 
 			// do eeeet!
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// does this look like glycine?
 			info.confSwitcher.type shouldBe "GLY"
@@ -502,12 +512,12 @@ class TestMutation : SharedSpec({
 				shouldHaveAtomNear("HA3", 18.980680, 20.914459, 14.265382)
 				shouldHaveAtomNear("H", 18.497148, 19.433047, 16.140951)
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("proline->glycine->back") {
 
-			val (res, pos) = pro52()
+			val (res, pos, confSpace) = pro52()
 
 			// record all the atom positions
 			val wtPositions = res.capturePositions()
@@ -534,7 +544,7 @@ class TestMutation : SharedSpec({
 			val frag = conflib.fragments.getValue("GLY")
 			val conf = frag.confs.getValue("GLY")
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// mutate back to wildtype
 			info.confSwitcher.setConf(wtFrag, wtConf)
@@ -548,12 +558,12 @@ class TestMutation : SharedSpec({
 					shouldHaveAtomNear(atomName, atomPos)
 				}
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("Nala->glycine") {
 
-			val (res, pos) = ala2()
+			val (res, pos, confSpace) = ala2()
 
 			// find the glycine conformation in the library
 			val frag = conflib.fragments.getValue("GLYn")
@@ -567,7 +577,7 @@ class TestMutation : SharedSpec({
 
 			// do eeeet!
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// does this look like glycine?
 			info.confSwitcher.type shouldBe "GLY"
@@ -584,12 +594,12 @@ class TestMutation : SharedSpec({
 				shouldHaveAtomNear("HA2", 14.542628, 24.991303, 24.041222)
 				shouldHaveAtomNear("HA3", 13.526968, 25.811973, 25.233619)
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("Nala->glycine->back") {
 
-			val (res, pos) = ala2()
+			val (res, pos, confSpace) = ala2()
 
 			// record all the atom positions
 			val wtPositions = res.capturePositions()
@@ -608,7 +618,7 @@ class TestMutation : SharedSpec({
 			val frag = conflib.fragments.getValue("GLYn")
 			val conf = frag.confs.getValue("GLY")
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// mutate back to wildtype
 			info.confSwitcher.setConf(wtFrag, wtConf)
@@ -622,24 +632,24 @@ class TestMutation : SharedSpec({
 					shouldHaveAtomNear(atomName, atomPos)
 				}
 			}
-			info.mol.shouldBeConsistent()
+			info.molInfo.assignedMol.shouldBeConsistent()
 		}
 
 		test("glycine->valine chi1") {
 
-			val (res, pos) = gly17()
+			val (res, pos, confSpace) = gly17()
 
 			// mutate to valine
 			val frag = conflib.fragments.getValue("VAL")
 			val conf = frag.confs.getValue("t")
 			val assignment = PosAssignment(pos, frag, conf)
-			val info = Assignments(assignment).assignmentInfos.getValue(assignment)
+			val info = confSpace.assign(assignment).assignmentInfos.getValue(assignment)
 
 			// build the dihedral angle
 			val chi1 = frag.motions[0] as ConfLib.ContinuousMotion.DihedralAngle
 			DihedralAngle.ConfDescription(pos, chi1, conf, radiusDegrees = 9.0).run {
-				make(info.mol, info.confSwitcher.atomResolverOrThrow).run {
-					mol shouldBeSameInstanceAs info.mol
+				make(info.molInfo.assignedMol, info.confSwitcher.atomResolverOrThrow).run {
+					mol shouldBeSameInstanceAs info.molInfo.assignedMol
 					a.name shouldBe "N"
 					b.name shouldBe "CA"
 					c.name shouldBe "CB"

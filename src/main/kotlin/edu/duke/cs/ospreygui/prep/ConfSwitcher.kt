@@ -12,15 +12,13 @@ import java.util.*
  */
 class ConfSwitcher(
 	val pos: DesignPosition,
-	/** a copy of pos.mol */
-	val mol: Molecule,
-	val maps: MoleculeMaps
+	val molInfo: Assignments.MolInfo
 ) {
 
 	// initialize the current atoms to the source atoms at the design position
 	val currentAtoms =
 		pos.sourceAtoms
-			.map { maps.atoms.getBOrThrow(it) }
+			.map { molInfo.getAssignedAtomOrThrow(it) }
 			.toIdentitySet()
 
 	var type: String = pos.type
@@ -56,19 +54,19 @@ class ConfSwitcher(
 
 		// find the anchor match and copy it to our molecule
 		val anchorMatch = pos.findAnchorMatch(frag)
-			?.copyToMol(mol, maps.atoms)
+			?.copyToMol(molInfo.assignedMol, molInfo.maps.atoms)
 			?: throw DesignPosition.IncompatibleAnchorsException(pos, frag)
 		this.anchorMatch = anchorMatch
 
 		// remove the existing atoms
 		for (atom in currentAtoms) {
-			mol.atoms.remove(atom)
-			if (mol is Polymer) {
-				mol.findResidue(atom)?.atoms?.remove(atom)
+			molInfo.assignedMol.atoms.remove(atom)
+			if (molInfo.assignedMol is Polymer) {
+				molInfo.assignedMol.findResidue(atom)?.atoms?.remove(atom)
 			}
 
 			// update the atom map too
-			maps.atoms.removeB(atom)
+			molInfo.maps.atoms.removeB(atom)
 		}
 		currentAtoms.clear()
 
@@ -93,7 +91,7 @@ class ConfSwitcher(
 				atomsByInfo[atomInfo] = atom
 
 				// add it to the mol
-				mol.atoms.add(atom)
+				molInfo.assignedMol.atoms.add(atom)
 				res?.atoms?.add(atom)
 
 				// update the current atoms
@@ -105,7 +103,7 @@ class ConfSwitcher(
 		for (bond in frag.bonds) {
 			val atoma = atomsByInfo.getValue(bond.a)
 			val atomb = atomsByInfo.getValue(bond.b)
-			mol.bonds.add(atoma, atomb)
+			molInfo.assignedMol.bonds.add(atoma, atomb)
 		}
 
 		try {
@@ -115,7 +113,7 @@ class ConfSwitcher(
 				posAnchor.bondToAnchors(fragAnchor) { atomInfos, anchorAtom ->
 					for (bondedInfo in atomInfos) {
 						val atom = atomsByInfo.getValue(bondedInfo)
-						mol.bonds.add(anchorAtom, atom)
+						molInfo.assignedMol.bonds.add(anchorAtom, atom)
 					}
 				}
 

@@ -33,8 +33,8 @@ class TestMinimization : SharedSpec({
 				val mol = Molecule.fromMol2(OspreyGui.getResourceAsString("1cc8.protein.h.amber.mol2"))
 				val restrainedAtoms = mol.atoms.filter { it.element == Element.Carbon }
 
-				val info = MinimizerInfo(mol)
-				listOf(info).minimize(10, restrainedAtoms)
+				val info = MinimizerInfo(mol, restrainedAtoms)
+				listOf(info).minimize(10)
 
 				info.minimizedCoords!!.size shouldBe 1165
 			}
@@ -57,8 +57,8 @@ class TestMinimization : SharedSpec({
 
 				val mol = Molecule.fromMol2(OspreyGui.getResourceAsString("benzamidine.h.gaff2.mol2"))
 
-				val info = MinimizerInfo(mol)
-				listOf(info).minimize(10, mol.atoms)
+				val info = MinimizerInfo(mol, mol.atoms)
+				listOf(info).minimize(10)
 
 				info.minimizedCoords!!.size shouldBe 16
 			}

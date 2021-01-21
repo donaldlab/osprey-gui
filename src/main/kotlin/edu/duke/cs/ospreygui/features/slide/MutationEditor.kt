@@ -18,10 +18,7 @@ import edu.duke.cs.ospreygui.features.components.ConfLibPicker
 import edu.duke.cs.ospreygui.features.components.DesignPositionEditor
 import edu.duke.cs.ospreygui.forcefield.amber.MoleculeType
 import edu.duke.cs.ospreygui.io.ConfLib
-import edu.duke.cs.ospreygui.prep.Assignments
-import edu.duke.cs.ospreygui.prep.ConfSpace
-import edu.duke.cs.ospreygui.prep.DesignPosition
-import edu.duke.cs.ospreygui.prep.PosAssignment
+import edu.duke.cs.ospreygui.prep.*
 import java.math.BigInteger
 import java.text.NumberFormat
 import kotlin.collections.ArrayList
@@ -273,8 +270,8 @@ class MutationEditor(val confSpace: ConfSpace) : SlideFeature {
 
 			// make the assignment
 			val posAssignment = PosAssignment(posInfo.pos, frag, conf)
-			val assignmentInfo = Assignments(posAssignment).assignmentInfos.getValue(posAssignment)
-			val mol = assignmentInfo.mol
+			val assignmentInfo = confSpace.assign(posAssignment).assignmentInfos.getValue(posAssignment)
+			val mol = assignmentInfo.molInfo.assignedMol
 
 			// override the molecule render view with the new molecule
 			stackedMol?.replace(mol)

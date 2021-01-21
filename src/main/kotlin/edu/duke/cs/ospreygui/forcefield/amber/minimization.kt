@@ -4,6 +4,7 @@ import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.AtomMap
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.tools.assert
+import edu.duke.cs.ospreygui.forcefield.AtomIndex
 import edu.duke.cs.ospreygui.io.OspreyService
 import edu.duke.cs.ospreygui.io.toVector3d
 import edu.duke.cs.ospreyservice.services.MinimizeRequest
@@ -13,7 +14,10 @@ import kotlin.NoSuchElementException
 import kotlin.collections.ArrayList
 
 
-class MinimizerInfo(val mol: Molecule) {
+class MinimizerInfo(
+	val mol: Molecule,
+	val restrainedAtoms: List<Atom> = emptyList()
+) {
 
 	// sander minimizations are currently configured to use implicit solvent
 	// so make sure to filter out all the solvent molecules before minimizing
@@ -25,21 +29,23 @@ class MinimizerInfo(val mol: Molecule) {
 
 	val partition: List<Pair<MoleculeType,Molecule>>
 	val atomMap: AtomMap
-	init {
-		val (partition, atomMap) = mol.partitionAndAtomMap(combineSolvent = false)
-		this.partition = partition
-		this.atomMap = atomMap
-	}
-
-	val partitionWithoutSolvent =
-		partition.filter { (moltype, _) -> moltype != MoleculeType.Solvent }
-
 	/** in the original molecule, not the partition */
-	val minimizableAtoms =
-		partitionWithoutSolvent
+	val minimizableAtoms: List<Atom>
+	init {
+		// split up the molecule into the parts amber expects
+		val (partition, atomMap) = mol.partitionAndAtomMap(combineSolvent = false)
+
+		// remove the solvent
+		this.partition = partition.filter { (moltype, _) -> moltype != MoleculeType.Solvent }
+
+		this.atomMap = atomMap
+
+		// get the atoms in the original molecule that correspond to the non-solvent molecules
+		minimizableAtoms = this.partition
 			.flatMap { (_, mol) ->
 				mol.atoms.map { atomMap.getAOrThrow(it) }
 			}
+	}
 
 	var unminimizedCoords: List<Vector3d>? = null
 
@@ -56,10 +62,7 @@ class MinimizerInfo(val mol: Molecule) {
 	}
 }
 
-fun List<MinimizerInfo>.minimize(
-	numSteps: Int,
-	restrainedAtoms: List<Atom> = emptyList()
-) {
+fun List<MinimizerInfo>.minimize(numSteps: Int) {
 
 	// capture the original coords
 	for (info in this) {
@@ -67,30 +70,27 @@ fun List<MinimizerInfo>.minimize(
 	}
 
 	val infosByAtomIndex = ArrayList<Pair<IntRange,MinimizerInfo>>()
-	val indicesByAtom = IdentityHashMap<Atom,Int>()
-	val atomsByIndex = ArrayList<Atom>()
+	val atomIndex = AtomIndex()
 
 	// get the amber params for the combined molecules
 	val params = this
 		.flatMap { info ->
-			info.partitionWithoutSolvent
+			info.partition
 				.map { (moltype, mol) ->
 
 					// but keep track of the atom indices,
 					// so we can match the minimized coordinates back later
-					val indexRange = atomsByIndex.size until atomsByIndex.size + mol.atoms.size
+					val indexRange = atomIndex.size until atomIndex.size + mol.atoms.size
 					infosByAtomIndex.add(indexRange to info)
-
-					// and also so we can refer to specific atoms by index
-					for (atomB in mol.atoms) {
-						val atomA = info.atomMap.getAOrThrow(atomB)
-						indicesByAtom[atomA] = atomsByIndex.size
-						atomsByIndex.add(atomA)
+					for (atom in mol.atoms) {
+						atomIndex[atom] = atomIndex.size
 					}
 
-					val types = mol.calcTypesAmber(moltype)
-					val frcmod = mol.calcModsAmber(types)
-					AmberMolParams(mol, types, frcmod)
+					val types = mol.calcTypesAmber(moltype, atomIndex)
+					val frcmods = mol.calcModsAmber(types, atomIndex)
+						?.let { listOf(it) }
+						?: emptyList()
+					AmberMolParams(mol, atomIndex, types, frcmods)
 				}
 		}
 		.calcParamsAmber()
@@ -101,10 +101,18 @@ fun List<MinimizerInfo>.minimize(
 	}
 
 	// convert restrained atoms into a sander-style restraint mask
-	val restraintMask = if (restrainedAtoms.isNotEmpty()) {
-		"@"	+ restrainedAtoms
-			.map { indicesByAtom.getValue(it) + 1 } // atom indices in sander start with 1
-			.joinToString(",")
+	val restraintIndices = flatMap { info ->
+		info.restrainedAtoms.map { atomA ->
+
+			// map to the partitioned molecule
+			val atomB = info.atomMap.getBOrThrow(atomA)
+
+			// atom indices in sander start with 1
+			atomIndex.getOrThrow(atomB) + 1
+		}
+	}
+	val restraintMask = if (restraintIndices.isNotEmpty()) {
+		"@"	+ restraintIndices.joinToString(",")
 	} else {
 		null
 	}
