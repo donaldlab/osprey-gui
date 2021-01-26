@@ -72,9 +72,9 @@ class FixedAtoms(
 	 * Only return atoms from the assigned molecules.
 	 */
 	fun staticAtomsByMol(assignments: Assignments): List<List<Atom>> =
-		mols.indices.map { moli ->
+		mols.withIndex().map { (moli, csMol) ->
 			staticAtomsByMol[moli].map { atom ->
-				assignments.molInfos[moli].getAssignedAtomOrThrow(atom)
+				assignments.molInfoByConfSpaceMol(csMol).getAssignedAtomOrThrow(atom)
 			}
 		}
 

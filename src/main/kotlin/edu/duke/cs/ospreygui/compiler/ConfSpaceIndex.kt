@@ -234,7 +234,7 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 
 		// start with the wild-type atoms
 		for (moli in mols.indices) {
-			val molInfo = assignments.molInfos[moli]
+			val molInfo = assignments.molInfoByConfSpaceMol(mols[moli])
 			for (atom in molInfo.assignedMol.atoms) {
 				val csAtom = molInfo.getConfSpaceAtom(atom) ?: continue
 				atomIndices[moli][atom] = atomIndexWildType(moli).getOrThrow(csAtom)
