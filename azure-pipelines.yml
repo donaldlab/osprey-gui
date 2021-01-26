@@ -8,6 +8,10 @@ resources:
      type: github
      name: donaldlab/molscope
      endpoint: donaldlab
+   - repository: ospreyservice
+     type: github
+     name: donaldlab/osprey-service
+     endpoint: donaldlab
 
 trigger:
 - master
@@ -43,6 +47,8 @@ jobs:
   - checkout: osprey
     fetchDepth: 1
   - checkout: molscope
+    fetchDepth: 1
+  - checkout: ospreyservice
     fetchDepth: 1
   - checkout: self
     fetchDepth: 1
@@ -83,11 +89,13 @@ jobs:
         export JAVA_HOME=$(standardize_path "$(javaHome)")
         molscope_path=`standardize_path "$(Build.SourcesDirectory)/molscope"`
         osprey_path=`standardize_path "$(Build.SourcesDirectory)/OSPREY3"`
+        ospreyservice_path=`standardize_path "$(Build.SourcesDirectory)/osprey-service"`
         jpackage_home=`standardize_path "$(javaHome)"`
 
         ./$(gradleWrapper) \
             -Dmolscope.path=$molscope_path \
             -Dosprey.path=$osprey_path \
+            -Dospreyservice.path=$ospreyservice_path \
             -Djpackage.home=$jpackage_home \
             -PbuildId=$(Build.BuildId) \
             jpackage
@@ -95,6 +103,7 @@ jobs:
         version=`./$(gradleWrapper) \
             -Dmolscope.path=$molscope_path \
             -Dosprey.path=$osprey_path \
+            -Dospreyservice.path=$ospreyservice_path \
             -Djpackage.home=$jpackage_home \
             -PbuildId=$(Build.BuildId) \
             --quiet versionString | tr -d '\n'`
