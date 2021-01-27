@@ -19,7 +19,7 @@ object ForcefieldCalculator {
 	 *
 	 * Called by the conf space compiler, so it doesn't need to be ultra fast, but it also needs to not be ultra slow.
 	 */
-	fun calc(atomPairsParams: ForcefieldParams.AtomPairsParams, infos: List<MolInfo>): Double {
+	fun calc(atomPairsParams: ForcefieldParams.AtomPairsParams, infos: List<MolInfo>, unconnectedDistance: Int? = null): Double {
 
 		var energy = 0.0
 
@@ -33,7 +33,7 @@ object ForcefieldCalculator {
 
 		// add the atom pair energies
 		for (molPair in AtomPairer.molPairs(infos, infos)) {
-			molPair.forEach { info1, atomi1, info2, atomi2, distance ->
+			molPair.forEach(unconnectedDistance) { info1, atomi1, info2, atomi2, distance ->
 				atomPairsParams[info1.moli, atomi1, info2.moli, atomi2, distance]?.let { params ->
 					val atom1 = info1.atomIndex.getOrThrow(atomi1)
 					val atom2 = info2.atomIndex.getOrThrow(atomi2)

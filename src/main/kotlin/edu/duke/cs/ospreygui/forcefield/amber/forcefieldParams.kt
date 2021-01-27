@@ -23,6 +23,10 @@ class Amber14SBParams : AmberForcefieldParams(mapOf(
 
 abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,ForcefieldName>) : ForcefieldParams {
 
+	// Amber has special non-bonded parameters for 1-4 bonds
+	// anything farther is treated as generally non-bonded
+	override val unconnectedDistance = 5
+
 	/**
 	 * The dielectric constant of the environment (aka its relative permittivity),
 	 * which influences electrostatic calculations.

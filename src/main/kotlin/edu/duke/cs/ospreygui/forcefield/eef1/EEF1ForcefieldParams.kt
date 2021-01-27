@@ -26,6 +26,9 @@ class EEF1ForcefieldParams : ForcefieldParams {
 
 	override val forcefield = Forcefield.EEF1
 
+	// EEF1 treats all 1-4 and farther as non-bonded
+	override val unconnectedDistance = 4
+
 	/**
 	 * Scaling to apply to the solvent forcefield energy.
 	 *

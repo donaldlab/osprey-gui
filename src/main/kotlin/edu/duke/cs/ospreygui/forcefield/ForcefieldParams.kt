@@ -8,6 +8,12 @@ interface ForcefieldParams {
 	val forcefield: Forcefield
 
 	/**
+	 * What's the smallest bond distance where two atoms are treated the same as two totally unconnected atoms?
+	 * eg. 1-4 bonds should use 4, 1-5 bonds should use 5
+	 */
+	val unconnectedDistance: Int
+
+	/**
 	 * Any settings needed by the Osprey runtime to calculate this forcefield.
 	 */
 	fun settings(): Map<String,Any> = emptyMap()
@@ -61,6 +67,7 @@ interface ForcefieldParams {
 
 		/**
 		 * Return the forcefield parameters for this atom pair interaction, if any.
+		 * Dist, if null, indicates unconnected
 		 */
 		operator fun get(moli1: Int, atomi1: Int, moli2: Int, atomi2: Int, dist: Int?): AtomPairParams?
 	}
@@ -97,3 +104,10 @@ interface ForcefieldParams {
 	 */
 	fun combineAtomsParams(info1: AtomsInfo, info2: AtomsInfo): AtomsParams
 }
+
+
+fun List<ForcefieldParams>.unconnectedDistance(): Int =
+	this
+		.map { it.unconnectedDistance }
+		.max()
+		?: throw NoSuchElementException("no forcefield params to combine")

@@ -276,7 +276,8 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 						}),
 						staticUnaffectedAtomsByMol.mapIndexed { moli, atoms ->
 							ForcefieldCalculator.MolInfo(moli, confSpaceIndex.mols[moli], atoms, confSpaceIndex.atomIndexWildType(moli), params[ff, moli])
-						}
+						},
+						ff.unconnectedDistance
 					)
 					.also { staticEnergiesTask.increment() }
 				}
@@ -581,7 +582,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		// pos-self interactions
 		for (molPair in AtomPairer.molPairs(posMolInfos, posMolInfos)) {
-			molPair.forEach { info1, atomi1, info2, atomi2, distance ->
+			molPair.forEach(forcefields.unconnectedDistance()) { info1, atomi1, info2, atomi2, distance ->
 
 				// map the global atom indices to fragment-local atom indices
 				val atomiPos1 = posAtomIndex.getOrThrow(info1.atomIndex.getOrThrow(atomi1))
@@ -602,7 +603,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		// pos-static interactions
 		for (molPair in AtomPairer.molPairs(posMolInfos, staticMolInfos)) {
-			molPair.forEach { infoPos, atomiPos, infoStatic, atomiWildType, distance ->
+			molPair.forEach(forcefields.unconnectedDistance()) { infoPos, atomiPos, infoStatic, atomiWildType, distance ->
 
 				// map the global atom indices to fragment-local atom indices
 				val atomiFrag = posAtomIndex.getOrThrow(infoPos.atomIndex.getOrThrow(atomiPos))
@@ -698,7 +699,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		// for each atom pair ...
 		for (molPair in AtomPairer.molPairs(molInfos1, molInfos2)) {
-			molPair.forEach { info1, atomi1, info2, atomi2, distance ->
+			molPair.forEach(forcefields.unconnectedDistance()) { info1, atomi1, info2, atomi2, distance ->
 
 				// map the global atom indices to fragment-local atom indices
 				val atomiConf1 = confAtomIndex1.getOrThrow(info1.atomIndex.getOrThrow(atomi1))
@@ -755,7 +756,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		for ((molInfos1, molInfos2) in groups) {
 
 			for (molPair in AtomPairer.molPairs(molInfos1, molInfos2)) {
-				molPair.forEach { info1, atomi1, info2, atomi2, distance ->
+				molPair.forEach(forcefields.unconnectedDistance()) { info1, atomi1, info2, atomi2, distance ->
 
 					// map the static atom's index from the wild-type set to the static set
 					val atomiStatic1  = staticAtomsIndex.getStaticIOrThrow(atomi1)
