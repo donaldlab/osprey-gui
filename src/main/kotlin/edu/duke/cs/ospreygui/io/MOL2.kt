@@ -2,6 +2,8 @@ package edu.duke.cs.ospreygui.io
 
 import edu.duke.cs.molscope.molecule.*
 import org.joml.Vector3d
+import java.text.DecimalFormat
+import java.text.FieldPosition
 import java.util.*
 import kotlin.NoSuchElementException
 import kotlin.collections.ArrayList
@@ -36,7 +38,7 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 
 	val mol = this
 
-	val buf = StringBuilder()
+	val buf = StringBuffer()
 	fun write(str: String, vararg args: Any) = buf.append(String.format(str, *args))
 
 	// get the chains (either from the polymer, or if a small molecule, make a dummy chain)
@@ -117,49 +119,92 @@ fun Molecule.toMol2(metadata: Mol2Metadata? = null): String {
 			Mol2Metadata.defaultCharge
 		}
 
+	// write out atom coords with up to 6 digits of precision
+	val coordsFormat = DecimalFormat("#.000000")
+
+	// when this reflection voodoo actually works, use it to get to the fast versions of the Double->String functions
+	// tragically, an oversight in the DecimalFormat API prevents us from using the fast functions via normal means  T_T
+	// yes, profiling showed the original slow functions (String.format) was actually a noticeable performance bottleneck
+	val dontCareFieldPosition = try {
+		Class.forName("java.text.DontCareFieldPosition").run {
+			getDeclaredField("INSTANCE").run {
+				isAccessible = true
+				get(null) as FieldPosition
+			}
+		}
+	} catch (t: Throwable) {
+		null
+	}
+	fun StringBuffer.appendCoord(value: Double) =
+		if (dontCareFieldPosition != null) {
+			coordsFormat.format(value, this, dontCareFieldPosition)
+		} else {
+			append(coordsFormat.format(value))
+		}
+
 	// write the atom section
 	write("@<TRIPOS>ATOM\n")
 	for (atom in atoms) {
 		val res = atom.getResidue()
-		write("  %d %s %.6f %.6f %.6f %s %s %s %s\n".format(
-			indicesByAtom[atom],
-			atom.name,
-			atom.pos.x, atom.pos.y, atom.pos.z,
-			atom.getType(),
-			resIds[res],
-			res.type,
-			atom.getCharge()
-		))
+		buf.append(' ')
+		buf.append(' ')
+		buf.append(indicesByAtom[atom])
+		buf.append(' ')
+		buf.append(atom.name)
+		buf.append(' ')
+		buf.appendCoord(atom.pos.x)
+		buf.append(' ')
+		buf.appendCoord(atom.pos.y)
+		buf.append(' ')
+		buf.appendCoord(atom.pos.z)
+		buf.append(' ')
+		buf.append(atom.getType())
+		buf.append(' ')
+		buf.append(resIds[res])
+		buf.append(' ')
+		buf.append(res.type)
+		buf.append(' ')
+		buf.append(atom.getCharge())
+		buf.append('\n')
 	}
 
 	// write the bond section
 	write("@<TRIPOS>BOND\n")
 	bonds.forEachIndexed { i, bond ->
-		write("  %d %d %d %s\n".format(
-			i + 1,
-			indicesByAtom.getValue(bond.a),
-			indicesByAtom.getValue(bond.b),
-			metadata?.bondTypes?.getValue(bond) ?: Mol2Metadata.defaultBondType
-		))
+		buf.append(' ')
+		buf.append(' ')
+		buf.append(i + 1)
+		buf.append(' ')
+		buf.append(indicesByAtom.getValue(bond.a))
+		buf.append(' ')
+		buf.append(indicesByAtom.getValue(bond.b))
+		buf.append(' ')
+		buf.append(metadata?.bondTypes?.getValue(bond) ?: Mol2Metadata.defaultBondType)
+		buf.append('\n')
 	}
 
 	// write the substructure section
 	write("@<TRIPOS>SUBSTRUCTURE\n")
 	for (chain in chains) {
 		for (res in chain.residues) {
-			write("  %d %s %d %s %s %s %s\n".format(
-				resIds[res],
-				res.id,
-				indicesByAtom[res.atoms.first()],
-				"RESIDUE",
-				if (res == smallMoleculeRes) {
-					metadata?.smallMoleculeDictionaryType ?: Mol2Metadata.defaultSmallMoleculeDictionaryType
-				} else {
-					metadata?.dictionaryTypes?.getValue(res) ?: Mol2Metadata.defaultDictionaryType
-				},
-				chain.id,
-				res.type
-			))
+			buf.append(' ')
+			buf.append(' ')
+			buf.append(resIds[res])
+			buf.append(' ')
+			buf.append(res.id)
+			buf.append(' ')
+			buf.append(indicesByAtom[res.atoms.first()])
+			buf.append(" RESIDUE ")
+			buf.append(if (res == smallMoleculeRes) {
+				metadata?.smallMoleculeDictionaryType ?: Mol2Metadata.defaultSmallMoleculeDictionaryType
+			} else {
+				metadata?.dictionaryTypes?.getValue(res) ?: Mol2Metadata.defaultDictionaryType
+			})
+			buf.append(' ')
+			buf.append(chain.id)
+			buf.append(' ')
+			buf.append(res.type)
+			buf.append('\n')
 		}
 	}
 

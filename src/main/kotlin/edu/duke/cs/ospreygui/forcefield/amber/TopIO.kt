@@ -4,6 +4,7 @@ import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
+import edu.duke.cs.osprey.tools.FileTools
 import org.joml.Vector3d
 import java.util.*
 import kotlin.NoSuchElementException
@@ -19,42 +20,36 @@ object TopIO {
 	 */
 	fun read(content: String): AmberTopology {
 
-		val lines = content.lines()
+		val lines = FileTools.parseLines(content)
 
 		// pick out the flags we're interested in
 		val flags = HashMap<Flag,FlagInfo>()
-		var i = 0
-		fun peek() = lines[i]
-		fun next() = lines[i].also { i += 1 }
-		while (i < lines.size) {
+		while (lines.hasNext()) {
 
-			val line = next()
+			val line = lines.next()
 			if (line.startsWith("%FLAG ")) {
 
 				// is this a flag we recognize?
 				val flag = Flag[line.substring(6).trim()] ?: continue
 
 				// look ahead to the format line
-				val fmtline = next().trim()
+				val fmtline = lines.next().trim()
 				val fmt: Any = if (fmtline.startsWith("%FORMAT(")) {
 					val fmtspec = fmtline.substring(8, fmtline.length - 1)
-					if (fmtspec.contains('a')) {
-						StringFormat.of(fmtspec)
-					} else if (fmtspec.contains('E')) {
-						DoubleFormat.of(fmtspec)
-					} else if (fmtspec.contains('I')) {
-						IntFormat.of(fmtspec)
-					} else {
-						throw ParseException("unrecognized FORMAT: $fmtspec")
+					when {
+						fmtspec.contains('a') -> StringFormat.of(fmtspec)
+						fmtspec.contains('E') -> DoubleFormat.of(fmtspec)
+						fmtspec.contains('I') -> IntFormat.of(fmtspec)
+						else -> throw ParseException("unrecognized FORMAT: $fmtspec")
 					}
 				} else {
-					throw ParseException("expected FORMAT on line $i, but got: $fmtline")
+					throw ParseException("expected FORMAT on line ${lines.lineNumber()}, but got: $fmtline")
 				}
 
 				// grab the lines for this flag
 				val flagLines = ArrayList<String>()
-				while (i < lines.size && !peek().startsWith("%")) {
-					next()
+				while (lines.hasNext() && !lines.peek().startsWith("%")) {
+					lines.next()
 						.takeUnless { it.isBlank() }
 						?.let { flagLines.add(it) }
 				}
@@ -605,7 +600,10 @@ private data class DoubleFormat(
 	fun parseLine(line: String, into: MutableList<Double>) {
 		val num = min(line.length/size, numPerLine)
 		for (i in 0 until num) {
-			into.add(line.substring(i*size, (i+1)*size).trim().toDouble())
+			var start = i*size
+			val stop = (i+1)*size
+			start = line.advancePastWhitespace(start, stop)
+			into.add(line.substring(start, stop).trim().toDouble())
 		}
 	}
 
@@ -628,7 +626,10 @@ private data class IntFormat(
 	fun parseLine(line: String, into: MutableList<Int>) {
 		val num = min(line.length/size, numPerLine)
 		for (i in 0 until num) {
-			into.add(line.substring(i*size, (i+1)*size).trim().toInt())
+			var start = i*size
+			val stop = (i+1)*size
+			start = line.advancePastWhitespace(start, stop)
+			into.add(line.substring(start, stop).toInt())
 		}
 	}
 
@@ -671,3 +672,11 @@ private data class FlagInfo(
 
 
 class ParseException(msg: String) : RuntimeException(msg)
+
+private fun String.advancePastWhitespace(start: Int, stop: Int): Int {
+	var i = start
+	while (this[i] == ' ' && start <= stop) {
+		i += 1
+	}
+	return i
+}
