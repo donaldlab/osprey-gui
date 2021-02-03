@@ -25,6 +25,7 @@ import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.numerics.shouldBeGreaterThan
 import io.kotlintest.matchers.types.shouldBeTypeOf
 import io.kotlintest.shouldBe
+import kotlinx.coroutines.runBlocking
 
 
 class TestConfSpaceCompiler : SharedSpec({
@@ -49,40 +50,46 @@ class TestConfSpaceCompiler : SharedSpec({
 	/** Used to compute the expected energies for conformations */
 	@Suppress("unused")
 	fun Molecule.calcAmber96Energy(): Double {
+		val mol = this
+		return runBlocking {
 
-		// parameterize the molecule
-		val amberParams = Amber96Params()
-		val atomIndex = AtomIndex(this.atoms)
-		val atomsParams = amberParams.parameterizeAtoms(this, atomIndex, null)
-		val atomPairsParams = amberParams.parameterizeAtomPairs(listOf(
-			ForcefieldParams.MolInfo(0, this, atomsParams, atomIndex)
-		))
+			// parameterize the molecule
+			val amberParams = Amber96Params()
+			val atomIndex = AtomIndex(mol.atoms)
+			val atomsParams = amberParams.parameterizeAtoms(mol, atomIndex, null)
+			val atomPairsParams = amberParams.parameterizeAtomPairs(listOf(
+				ForcefieldParams.MolInfo(0, mol, atomsParams, atomIndex)
+			))
 
-		// calculate the energy
-		return ForcefieldCalculator.calc(atomPairsParams, listOf(
-			ForcefieldCalculator.MolInfo(0, this, this.atoms, atomIndex, atomsParams)
-		))
+			// calculate the energy
+			ForcefieldCalculator.calc(atomPairsParams, listOf(
+				ForcefieldCalculator.MolInfo(0, mol, mol.atoms, atomIndex, atomsParams)
+			))
+		}
 	}
 
 	/** Used to compute the expected energies for conformations */
 	@Suppress("unused")
 	fun Molecule.calcEEF1Energy(): Double {
+		val mol = this
+		return runBlocking {
 
-		// parameterize the molecule
-		val eef1Params = EEF1ForcefieldParams().apply {
-			// use the full scale for testing
-			scale = 1.0
+			// parameterize the molecule
+			val eef1Params = EEF1ForcefieldParams().apply {
+				// use the full scale for testing
+				scale = 1.0
+			}
+			val atomIndex = AtomIndex(mol.atoms)
+			val atomsParams = eef1Params.parameterizeAtoms(mol, atomIndex, null)
+			val atomPairsParams = eef1Params.parameterizeAtomPairs(listOf(
+				ForcefieldParams.MolInfo(0, mol, atomsParams, atomIndex)
+			))
+
+			// calculate the energy
+			ForcefieldCalculator.calc(atomPairsParams, listOf(
+				ForcefieldCalculator.MolInfo(0, mol, mol.atoms, atomIndex, atomsParams)
+			))
 		}
-		val atomIndex = AtomIndex(this.atoms)
-		val atomsParams = eef1Params.parameterizeAtoms(this, atomIndex, null)
-		val atomPairsParams = eef1Params.parameterizeAtomPairs(listOf(
-			ForcefieldParams.MolInfo(0, this, atomsParams, atomIndex)
-		))
-
-		// calculate the energy
-		return ForcefieldCalculator.calc(atomPairsParams, listOf(
-			ForcefieldCalculator.MolInfo(0, this, this.atoms, atomIndex, atomsParams)
-		))
 	}
 
 	/** Used to compute the expected energies for conformations */

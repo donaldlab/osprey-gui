@@ -63,7 +63,7 @@ class EEF1ForcefieldParams : ForcefieldParams {
 		override fun get(atomi: Int) = atomsParams[atomi]
 	}
 
-	override fun parameterizeAtoms(mol: Molecule, atomIndex: AtomIndex, netCharge: Int?) =
+	override suspend fun parameterizeAtoms(mol: Molecule, atomIndex: AtomIndex, netCharge: Int?) =
 		AtomsParams().apply {
 			for (atom in mol.atoms) {
 				val type = atom.atomTypeEEF1(mol) ?: continue
@@ -130,7 +130,7 @@ class EEF1ForcefieldParams : ForcefieldParams {
 		}
 	}
 
-	override fun parameterizeAtomPairs(infos: List<ForcefieldParams.MolInfo>) : AtomPairsParams {
+	override suspend fun parameterizeAtomPairs(infos: List<ForcefieldParams.MolInfo>) : AtomPairsParams {
 
 		return AtomPairsParams(ArrayMap<AtomsParams>().apply {
 			for (info in infos) {

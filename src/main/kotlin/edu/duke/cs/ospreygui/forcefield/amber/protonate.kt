@@ -61,7 +61,7 @@ fun Molecule.deprotonate() {
 /**
  * Adds hydrogens atoms to the atom in the supplied protonation state.
  */
-fun Molecule.protonate(atom: Atom, protonation: Protonation) {
+suspend fun Molecule.protonate(atom: Atom, protonation: Protonation) {
 
 	val mol = this
 
@@ -172,7 +172,7 @@ fun Molecule.protonate(atom: Atom, protonation: Protonation) {
  * Returns a list of heavy-hydrogen atom pairs based on inferred
  * forcefield atom and bond types.
  */
-fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
+suspend fun Molecule.inferProtonation(): List<Pair<Atom,Atom>> {
 
 	val dst = this
 	val dstAtoms = ArrayList<Pair<Atom,Atom>>()

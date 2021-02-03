@@ -11,14 +11,13 @@ import io.ktor.client.features.json.JsonFeature
 import io.ktor.client.features.json.JsonSerializer
 import io.ktor.client.features.json.serializer.KotlinxSerializer
 import io.ktor.client.request.HttpRequestBuilder
-import io.ktor.client.request.get
+import io.ktor.client.request.request
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.util.KtorExperimentalAPI
 import io.ktor.utils.io.core.Input
 import io.ktor.utils.io.core.readText
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ImplicitReflectionSerializer
 import kotlinx.serialization.serializer
 import org.joml.Vector3d
@@ -42,7 +41,6 @@ object OspreyService {
 	private fun HttpRequestBuilder.path(path: String) {
 		url {
 			val provider = UserSettings.serviceProvider
-				?: throw NoSuchElementException("no Osprey Service provider configured")
 			host = provider.hostname
 			port = provider.port
 			path(path)
@@ -65,75 +63,65 @@ object OspreyService {
 	// see: https://youtrack.jetbrains.com/issue/KT-34051
 	// maybe someday we can?
 
-	fun about() = runBlocking {
-		client.get<ServiceResponse<AboutResponse>> {
+	suspend fun about() =
+		client.request<ServiceResponse<AboutResponse>> {
 			get("about")
 		}
 		.responseOrThrow()
-	}
 
-	fun missingAtoms(request: MissingAtomsRequest) = runBlocking {
-		client.get<ServiceResponse<MissingAtomsResponse>> {
+	suspend fun missingAtoms(request: MissingAtomsRequest) =
+		client.request<ServiceResponse<MissingAtomsResponse>> {
 			post("missingAtoms", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun bonds(request: BondsRequest) = runBlocking {
-		client.get<ServiceResponse<BondsResponse>> {
+	suspend fun bonds(request: BondsRequest) =
+		client.request<ServiceResponse<BondsResponse>> {
 			post("bonds", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun protonation(request: ProtonationRequest) = runBlocking {
-		client.get<ServiceResponse<ProtonationResponse>> {
+	suspend fun protonation(request: ProtonationRequest) =
+		client.request<ServiceResponse<ProtonationResponse>> {
 			post("protonation", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun protonate(request: ProtonateRequest) = runBlocking {
-		client.get<ServiceResponse<ProtonateResponse>> {
+	suspend fun protonate(request: ProtonateRequest) =
+		client.request<ServiceResponse<ProtonateResponse>> {
 			post("protonate", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun types(request: TypesRequest) = runBlocking {
-		client.get<ServiceResponse<TypesResponse>> {
+	suspend fun types(request: TypesRequest) =
+		client.request<ServiceResponse<TypesResponse>> {
 			post("types", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun moleculeFFInfo(request: MoleculeFFInfoRequest) = runBlocking {
-		client.get<ServiceResponse<MoleculeFFInfoResponse>> {
+	suspend fun moleculeFFInfo(request: MoleculeFFInfoRequest) =
+		client.request<ServiceResponse<MoleculeFFInfoResponse>> {
 			post("moleculeFFInfo", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun forcefieldParams(request: ForcefieldParamsRequest) = runBlocking {
-		client.get<ServiceResponse<ForcefieldParamsResponse>> {
+	suspend fun forcefieldParams(request: ForcefieldParamsRequest) =
+		client.request<ServiceResponse<ForcefieldParamsResponse>> {
 			post("forcefieldParams", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun minimize(request: MinimizeRequest) = runBlocking {
-		client.get<ServiceResponse<MinimizeResponse>> {
+	suspend fun minimize(request: MinimizeRequest) =
+		client.request<ServiceResponse<MinimizeResponse>> {
 			post("minimize", request)
 		}
 		.responseOrThrow()
-	}
 
-	fun clashes(request: ClashesRequest) = runBlocking {
-		client.get<ServiceResponse<ClashesResponse>> {
+	suspend fun clashes(request: ClashesRequest) =
+		client.request<ServiceResponse<ClashesResponse>> {
 			post("clashes", request)
 		}
 		.responseOrThrow()
-	}
 }
 
 private class ServiceSerializer : JsonSerializer {

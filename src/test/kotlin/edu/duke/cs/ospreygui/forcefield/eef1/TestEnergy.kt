@@ -13,6 +13,7 @@ import edu.duke.cs.ospreygui.io.fromOMOL
 import edu.duke.cs.ospreygui.io.toOspreyMol
 import io.kotlintest.matchers.doubles.plusOrMinus
 import io.kotlintest.shouldBe
+import kotlinx.coroutines.runBlocking
 
 
 class TestEnergy : SharedSpec({
@@ -21,22 +22,25 @@ class TestEnergy : SharedSpec({
 	 * Calculate the molecule energy using the new parameterization system.
 	 */
 	fun Molecule.calcEnergyParameterized(): Double {
+		val mol = this
+		return runBlocking {
 
-		// parameterize the molecule
-		val eef1Params = EEF1ForcefieldParams().apply {
-			// use the full scale for testing
-			scale = 1.0
+			// parameterize the molecule
+			val eef1Params = EEF1ForcefieldParams().apply {
+				// use the full scale for testing
+				scale = 1.0
+			}
+			val atomIndex = AtomIndex(mol.atoms)
+			val atomsParams = eef1Params.parameterizeAtoms(mol, atomIndex, null)
+			val atomPairsParams = eef1Params.parameterizeAtomPairs(listOf(
+				ForcefieldParams.MolInfo(0, mol, atomsParams, atomIndex)
+			))
+
+			// calculate the energy
+			ForcefieldCalculator.calc(atomPairsParams, listOf(
+				ForcefieldCalculator.MolInfo(0, mol, mol.atoms, atomIndex, atomsParams)
+			))
 		}
-		val atomIndex = AtomIndex(this.atoms)
-		val atomsParams = eef1Params.parameterizeAtoms(this, atomIndex, null)
-		val atomPairsParams = eef1Params.parameterizeAtomPairs(listOf(
-			ForcefieldParams.MolInfo(0, this, atomsParams, atomIndex)
-		))
-
-		// calculate the energy
-		return ForcefieldCalculator.calc(atomPairsParams, listOf(
-			ForcefieldCalculator.MolInfo(0, this, this.atoms, atomIndex, atomsParams)
-		))
 	}
 
 	fun readMol(name: String) =

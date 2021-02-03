@@ -52,7 +52,7 @@ interface ForcefieldParams {
 	/**
 	 * Compute the forcefield parameters for a molecule.
 	 */
-	fun parameterizeAtoms(mol: Molecule, atomIndex: AtomIndex, netCharge: Int?): AtomsParams
+	suspend fun parameterizeAtoms(mol: Molecule, atomIndex: AtomIndex, netCharge: Int?): AtomsParams
 
 
 	interface AtomPairParams {
@@ -86,7 +86,7 @@ interface ForcefieldParams {
 	/**
 	 * Compute the forcefield parameters for a list of molecules.
 	 */
-	fun parameterizeAtomPairs(infos: List<MolInfo>): AtomPairsParams
+	suspend fun parameterizeAtomPairs(infos: List<MolInfo>): AtomPairsParams
 
 	data class AtomsInfo(
 		val atomsParams: AtomsParams,

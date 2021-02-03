@@ -62,7 +62,7 @@ class MinimizerInfo(
 	}
 }
 
-fun List<MinimizerInfo>.minimize(numSteps: Int) {
+suspend fun List<MinimizerInfo>.minimize(numSteps: Int) {
 
 	// capture the original coords
 	for (info in this) {

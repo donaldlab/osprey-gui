@@ -110,7 +110,7 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		}
 	}
 
-	override fun parameterizeAtoms(mol: Molecule, atomIndex: AtomIndex, netCharge: Int?): AtomsParams {
+	override suspend fun parameterizeAtoms(mol: Molecule, atomIndex: AtomIndex, netCharge: Int?): AtomsParams {
 
 		// find the forcefield name
 		val molType = mol.findTypeOrThrow()
@@ -345,7 +345,7 @@ abstract class AmberForcefieldParams(val ffnameOverrides: Map<MoleculeType,Force
 		}
 	}
 
-	override fun parameterizeAtomPairs(infos: List<ForcefieldParams.MolInfo>) : AtomPairsParams {
+	override suspend fun parameterizeAtomPairs(infos: List<ForcefieldParams.MolInfo>) : AtomPairsParams {
 
 		// make sure there are no duplicated molecules
 		val molis = infos.map { it.moli }

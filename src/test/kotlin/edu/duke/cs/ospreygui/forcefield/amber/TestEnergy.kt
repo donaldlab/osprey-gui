@@ -16,6 +16,7 @@ import edu.duke.cs.ospreygui.io.toOspreyMol
 import edu.duke.cs.ospreygui.io.withService
 import io.kotlintest.matchers.doubles.plusOrMinus
 import io.kotlintest.shouldBe
+import kotlinx.coroutines.runBlocking
 
 
 class TestEnergy : SharedSpec({
@@ -24,19 +25,22 @@ class TestEnergy : SharedSpec({
 	 * Calculate the molecule energy using the new parameterization system.
 	 */
 	fun Molecule.calcEnergyParameterized(): Double = withService {
+		val mol = this
+		return runBlocking {
 
-		// parameterize the molecule
-		val amberParams = Amber96Params()
-		val atomIndex = AtomIndex(this.atoms)
-		val atomsParams = amberParams.parameterizeAtoms(this, atomIndex, null)
-		val atomPairsParams = amberParams.parameterizeAtomPairs(listOf(
-			ForcefieldParams.MolInfo(0, this, atomsParams, atomIndex)
-		))
+			// parameterize the molecule
+			val amberParams = Amber96Params()
+			val atomIndex = AtomIndex(mol.atoms)
+			val atomsParams = amberParams.parameterizeAtoms(mol, atomIndex, null)
+			val atomPairsParams = amberParams.parameterizeAtomPairs(listOf(
+				ForcefieldParams.MolInfo(0, mol, atomsParams, atomIndex)
+			))
 
-		// calculate the energy
-		return ForcefieldCalculator.calc(atomPairsParams, listOf(
-			ForcefieldCalculator.MolInfo(0, this, this.atoms, atomIndex, atomsParams)
-		))
+			// calculate the energy
+			ForcefieldCalculator.calc(atomPairsParams, listOf(
+				ForcefieldCalculator.MolInfo(0, mol, mol.atoms, atomIndex, atomsParams)
+			))
+		}
 	}
 
 	fun readMol(name: String) =

@@ -158,7 +158,7 @@ data class AmberChargeGeneration(
  * Calculate Amber types for atoms and bonds.
  * Pass values to `chargeMethod` and `netCharge` to calculate partial charges for small molecules as well.
  */
-fun Molecule.calcTypesAmber(
+suspend fun Molecule.calcTypesAmber(
 	molType: MoleculeType,
 	atomIndex: AtomIndex,
 	ffname: ForcefieldName = molType.defaultForcefieldNameOrThrow,
@@ -264,7 +264,7 @@ fun Molecule.calcTypesAmber(
 }
 
 
-fun Molecule.calcModsAmber(types: AmberTypes, atomIndex: AtomIndex): String? {
+suspend fun Molecule.calcModsAmber(types: AmberTypes, atomIndex: AtomIndex): String? {
 	val mol2 = toMol2(types.toMol2Metadata(this, atomIndex))
 	return OspreyService.moleculeFFInfo(MoleculeFFInfoRequest(mol2, types.ffname.name)).ffinfo
 }
@@ -281,7 +281,7 @@ data class AmberParams(
 	val crd: String
 )
 
-fun List<AmberMolParams>.calcParamsAmber(): AmberParams {
+suspend fun List<AmberMolParams>.calcParamsAmber(): AmberParams {
 
 	val response = OspreyService.forcefieldParams(ForcefieldParamsRequest(
 		map {
@@ -296,5 +296,5 @@ fun List<AmberMolParams>.calcParamsAmber(): AmberParams {
 	return AmberParams(response.params, response.coords)
 }
 
-fun AmberMolParams.calcParamsAmber() =
+suspend fun AmberMolParams.calcParamsAmber() =
 	listOf(this).calcParamsAmber()

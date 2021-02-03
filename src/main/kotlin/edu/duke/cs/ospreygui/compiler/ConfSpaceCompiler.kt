@@ -2,12 +2,17 @@ package edu.duke.cs.ospreygui.compiler
 
 import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.molecule.*
+import edu.duke.cs.osprey.parallelism.Parallelism
 import edu.duke.cs.ospreygui.forcefield.*
+import edu.duke.cs.ospreygui.io.LaunchLimits
 import edu.duke.cs.ospreygui.motions.*
 import edu.duke.cs.ospreygui.prep.Assignments
 import edu.duke.cs.ospreygui.prep.ConfSpace
 import edu.duke.cs.ospreygui.tools.UnsupportedClassException
 import edu.duke.cs.ospreygui.tools.pairs
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import org.joml.Vector3d
 import java.util.*
 import kotlin.collections.ArrayList
@@ -83,7 +88,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		)
 		val atomPairsTask = CompilerProgress.Task(
 			"Calculate forcefield atom pairs",
-			numSingles + numPairs
+			1 /* static */ + numSingles + numPairs
 		)
 		val progress = CompilerProgress(
 			paramsTask, fixedAtomsTask, staticEnergiesTask, atomPairsTask,
@@ -115,6 +120,10 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
 		try {
 
+			// limit coroutine max concurrency so we don't run out of memory
+			// TODO: make configurable?
+			val launchLimits = LaunchLimits(Parallelism.getMaxNumCPUs())
+
 			// compile the forcefield metadata and settings
 			val forcefieldInfos = forcefields.map { ff ->
 				CompiledConfSpace.ForcefieldInfo(
@@ -131,38 +140,44 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			val params = ConfSpaceParams(confSpaceIndex)
 
 			// first, parameterize the molecule without any conformational changes
-			for ((moli, mol) in confSpaceIndex.mols.withIndex()) {
-				for (ff in forcefields) {
-					// TODO: parallelize this
-					try {
-						params[ff, moli] = ff.parameterizeAtoms(
-							mol,
-							confSpaceIndex.atomIndexWildType(moli),
-							netCharges[mol]?.netChargeOrThrow
-						)
-						paramsTask.increment()
-					} catch (t: Throwable) {
-						throw CompilerError("Can't parameterize wild-type molecule: $mol", cause = t)
+			runBlocking {
+				for ((moli, mol) in confSpaceIndex.mols.withIndex()) {
+					for (ff in forcefields) {
+						launchLimits.launch {
+							try {
+								params[ff, moli] = ff.parameterizeAtoms(
+									mol,
+									confSpaceIndex.atomIndexWildType(moli),
+									netCharges[mol]?.netChargeOrThrow
+								)
+								paramsTask.increment()
+							} catch (t: Throwable) {
+								throw CompilerError("Can't parameterize wild-type molecule: $mol", cause = t)
+							}
+						}
 					}
 				}
 			}
 
 			// then parameterize the molecule for each fragment at each design position
-			for ((moli, mol) in confSpaceIndex.mols.withIndex()) {
-				for (posInfo in confSpaceIndex.positions.filter { it.pos.mol === mol }) {
-					posInfo.forEachFrag { assignments, assignmentInfo, confInfo ->
-						val atomIndices = confSpaceIndex.matchAtoms(assignments)
-						for (ff in forcefields) {
-							// TODO: parallelize this
-							try {
-								params[ff, confInfo.fragInfo] = ff.parameterizeAtoms(
-									assignmentInfo.molInfo.assignedMol,
-									atomIndices[moli],
-									netCharges[mol]?.getOrThrow(posInfo.pos, confInfo.fragInfo.frag)
-								)
-								paramsTask.increment()
-							} catch (t: Throwable) {
-								throw CompilerError("Can't parameterize molecule: $mol with ${posInfo.pos.name} = ${confInfo.id}", cause = t)
+			runBlocking {
+				for ((moli, mol) in confSpaceIndex.mols.withIndex()) {
+					for (posInfo in confSpaceIndex.positions.filter { it.pos.mol === mol }) {
+						posInfo.forEachFrag { assignments, assignmentInfo, confInfo ->
+							val atomIndices = confSpaceIndex.matchAtoms(assignments)
+							for (ff in forcefields) {
+								launchLimits.launch {
+									try {
+										params[ff, confInfo.fragInfo] = ff.parameterizeAtoms(
+											assignmentInfo.molInfo.assignedMol,
+											atomIndices[moli],
+											netCharges[mol]?.getOrThrow(posInfo.pos, confInfo.fragInfo.frag)
+										)
+										paramsTask.increment()
+									} catch (t: Throwable) {
+										throw CompilerError("Can't parameterize molecule: $mol with ${posInfo.pos.name} = ${confInfo.id}", cause = t)
+									}
+								}
 							}
 						}
 					}
@@ -268,67 +283,86 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 				.mapIndexed { moli, atoms ->
 					atoms.filter { it !in staticAffectedAtomsByMol[moli] }
 				}
-			val staticEnergies = forcefields
-				.map { ff ->
-					ForcefieldCalculator.calc(
-						ff.parameterizeAtomPairs(staticUnaffectedAtomsByMol.mapIndexed { moli, _ ->
-							ForcefieldParams.MolInfo(moli, confSpaceIndex.mols[moli], params[ff, moli], confSpaceIndex.atomIndexWildType(moli))
-						}),
-						staticUnaffectedAtomsByMol.mapIndexed { moli, atoms ->
-							ForcefieldCalculator.MolInfo(moli, confSpaceIndex.mols[moli], atoms, confSpaceIndex.atomIndexWildType(moli), params[ff, moli])
-						},
-						ff.unconnectedDistance
-					)
-					.also { staticEnergiesTask.increment() }
-				}
+			val staticEnergies = runBlocking {
+				forcefields
+					.map { ff ->
+						async {
+							ForcefieldCalculator.calc(
+								ff.parameterizeAtomPairs(staticUnaffectedAtomsByMol.mapIndexed { moli, _ ->
+									ForcefieldParams.MolInfo(moli, confSpaceIndex.mols[moli], params[ff, moli], confSpaceIndex.atomIndexWildType(moli))
+								}),
+								staticUnaffectedAtomsByMol.mapIndexed { moli, atoms ->
+									ForcefieldCalculator.MolInfo(moli, confSpaceIndex.mols[moli], atoms, confSpaceIndex.atomIndexWildType(moli), params[ff, moli])
+								},
+								ff.unconnectedDistance
+							)
+							.also { staticEnergiesTask.increment() }
+						}
+					}
+					.awaitAll()
+			}
 
 			// compile the design positions
 			val posInfos = ArrayList<CompiledConfSpace.PosInfo>()
-			for (posInfo in confSpaceIndex.positions) {
+			runBlocking {
+				for (posInfo in confSpaceIndex.positions) {
 
-				// compile the fragments
-				val fragInfos = ArrayList<CompiledConfSpace.FragInfo>()
-				// TODO: parallelize this
-				posInfo.forEachFrag { assignments, assignmentInfo, confInfo ->
-					fragInfos.add(confInfo.fragInfo.compile(fixedAtoms, assignmentInfo))
+					// compile the fragments
+					val fragInfos = ArrayList<CompiledConfSpace.FragInfo>()
+					posInfo.forEachFrag { assignments, assignmentInfo, confInfo ->
+						launchLimits.launch {
+							fragInfos.add(confInfo.fragInfo.compile(fixedAtoms, assignmentInfo))
+						}
+					}
+
+					// compile the conformations
+					val confInfos = ArrayList<CompiledConfSpace.ConfInfo>()
+					posInfo.forEachConf { assignments, assignmentInfo, confInfo ->
+						launchLimits.launch {
+							confInfos.add(confInfo.compile(infoIndexer, assignments, assignmentInfo, confInfo, confSpaceIndex, fixedAtoms, params))
+						}
+					}
+
+					posInfos.add(CompiledConfSpace.PosInfo(
+						posInfo.pos.name,
+						posInfo.pos.type,
+						fragInfos,
+						confInfos
+					))
 				}
-
-				// compile the conformations
-				val confInfos = ArrayList<CompiledConfSpace.ConfInfo>()
-				// TODO: parallelize this
-				posInfo.forEachConf { assignments, assignmentInfo, confInfo ->
-					confInfos.add(confInfo.compile(infoIndexer, assignments, assignmentInfo, confInfo, confSpaceIndex, fixedAtoms, params))
-				}
-
-				posInfos.add(CompiledConfSpace.PosInfo(
-					posInfo.pos.name,
-					posInfo.pos.type,
-					fragInfos,
-					confInfos
-				))
 			}
 
 			// compile all the atom pairs for the forcefields
 			val atomPairs = forcefields
 				.map { AtomPairs(confSpaceIndex) }
-			val wildTypeAtomsIndices = confSpaceIndex.mols.indices.map { confSpaceIndex.atomIndexWildType(it) }
-			atomPairs.compileStatic(fixedAtoms, wildTypeAtomsIndices, staticAtomsIndex, staticAffectedAtomsByMol, staticUnaffectedAtomsByMol, params)
-			// TODO: parallelize this
-			for (posInfo1 in confSpaceIndex.positions) {
+			runBlocking {
 
-				posInfo1.forEachFrag { assignments, assignmentInfo1, confInfo1 ->
-
-					// compile the pos-self and pos-static atom pairs
-					atomPairs.compilePos(assignments, confInfo1, assignmentInfo1, confSpaceIndex, staticAtomsIndex, fixedAtoms, params)
+				// compile the static-self pairs
+				launchLimits.launch {
+					atomPairs.compileStatic(confSpaceIndex, staticAtomsIndex, fixedAtoms, staticAffectedAtomsByMol, staticUnaffectedAtomsByMol, params)
 					atomPairsTask.increment()
 				}
 
-				for (posInfo2 in confSpaceIndex.positions.subList(0, posInfo1.index)) {
-					confSpace.forEachFragIn(posInfo1, posInfo2) { assignments, assignmentInfo1, confInfo1, assignmentInfo2, confInfo2 ->
+				for (posInfo1 in confSpaceIndex.positions) {
 
-						// compile the pos-pos atom pairs
-						atomPairs.compilePosPos(assignments, confInfo1, assignmentInfo1, confInfo2, assignmentInfo2, confSpaceIndex, fixedAtoms, params)
-						atomPairsTask.increment()
+					posInfo1.forEachFrag { assignments, assignmentInfo1, confInfo1 ->
+
+						// compile the pos-self and pos-static atom pairs
+						launchLimits.launch {
+							atomPairs.compilePos(assignments, confInfo1, assignmentInfo1, confSpaceIndex, staticAtomsIndex, fixedAtoms, params)
+							atomPairsTask.increment()
+						}
+					}
+
+					for (posInfo2 in confSpaceIndex.positions.subList(0, posInfo1.index)) {
+						confSpace.forEachFragIn(posInfo1, posInfo2) { assignments, assignmentInfo1, confInfo1, assignmentInfo2, confInfo2 ->
+
+							// compile the pos-pos atom pairs
+							launchLimits.launch {
+								atomPairs.compilePosPos(assignments, confInfo1, assignmentInfo1, confInfo2, assignmentInfo2, confSpaceIndex, fixedAtoms, params)
+								atomPairsTask.increment()
+							}
+						}
 					}
 				}
 			}
@@ -540,7 +574,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compile atom pairs for pos-self and pos-static interactions.
 	 */
-	private fun List<AtomPairs>.compilePos(
+	private suspend fun List<AtomPairs>.compilePos(
 		assignments: Assignments,
 		confInfo: ConfSpaceIndex.ConfInfo,
 		assignmentInfo: Assignments.AssignmentInfo,
@@ -628,7 +662,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compile atom pairs for pos-pos interactions.
 	 */
-	private fun List<AtomPairs>.compilePosPos(
+	private suspend fun List<AtomPairs>.compilePosPos(
 		assignments: Assignments,
 		confInfo1: ConfSpaceIndex.ConfInfo,
 		assignmentInfo1: Assignments.AssignmentInfo,
@@ -724,19 +758,20 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 	/**
 	 * Compile atom pairs for static self-interactions
 	 */
-	private fun List<AtomPairs>.compileStatic(
-		fixedAtoms: FixedAtoms,
-		wildTypeAtomsIndicesByMol: List<AtomIndex>,
+	private suspend fun List<AtomPairs>.compileStatic(
+		confSpaceIndex: ConfSpaceIndex,
 		staticAtomsIndex: Map<Int,Int>,
+		fixedAtoms: FixedAtoms,
 		staticAffectedAtomsByMol: List<List<Atom>>,
 		staticUnaffectedAtomsByMol: List<List<Atom>>,
 		params: ConfSpaceParams
 	) {
+		val wildTypeAtomsIndices = confSpaceIndex.mols.indices.map { confSpaceIndex.atomIndexWildType(it) }
 		val affectedMolInfos = fixedAtoms.mols.mapIndexed { moli, mol ->
-			AtomPairer.MolInfo(moli, mol, staticAffectedAtomsByMol[moli], wildTypeAtomsIndicesByMol[moli])
+			AtomPairer.MolInfo(moli, mol, staticAffectedAtomsByMol[moli], wildTypeAtomsIndices[moli])
 		}
 		val unaffectedMolInfos = fixedAtoms.mols.mapIndexed { moli, mol ->
-			AtomPairer.MolInfo(moli, mol, staticUnaffectedAtomsByMol[moli], wildTypeAtomsIndicesByMol[moli])
+			AtomPairer.MolInfo(moli, mol, staticUnaffectedAtomsByMol[moli], wildTypeAtomsIndices[moli])
 		}
 
 		// do affected-self interactions, and affected-unaffected interactions
@@ -748,7 +783,7 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 		// OPTIMIZATION: this *should be* the slow part
 		val atomPairsParams = forcefields.map { ff ->
 			ff.parameterizeAtomPairs(fixedAtoms.mols.mapIndexed { moli, mol ->
-				ForcefieldParams.MolInfo(moli, mol, params[ff, moli], wildTypeAtomsIndicesByMol[moli])
+				ForcefieldParams.MolInfo(moli, mol, params[ff, moli], wildTypeAtomsIndices[moli])
 			})
 		}
 

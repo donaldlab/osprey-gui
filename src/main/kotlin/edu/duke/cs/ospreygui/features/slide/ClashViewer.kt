@@ -8,7 +8,6 @@ import edu.duke.cs.molscope.gui.SlideCommands
 import edu.duke.cs.molscope.gui.SlideFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
-import edu.duke.cs.molscope.molecule.combine
 import edu.duke.cs.molscope.molecule.filter
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.io.OspreyService
@@ -17,6 +16,7 @@ import edu.duke.cs.ospreygui.io.toPDB
 import edu.duke.cs.ospreygui.io.toVector3d
 import edu.duke.cs.ospreygui.view.ProbeView
 import edu.duke.cs.ospreyservice.services.ClashesRequest
+import kotlinx.coroutines.runBlocking
 
 
 class ClashViewer : SlideFeature {
@@ -107,7 +107,7 @@ class ClashViewer : SlideFeature {
 			.toPDB()
 
 		// run probe
-		val results = OspreyService.clashes(ClashesRequest(pdb))
+		val results = runBlocking { OspreyService.clashes(ClashesRequest(pdb)) }
 		view.groups = results.groups
 			.mapValues { (id, group) ->
 				ProbeView.Group(

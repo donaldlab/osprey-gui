@@ -19,6 +19,7 @@ import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.osprey.dof.DihedralRotation
 import edu.duke.cs.osprey.tools.Protractor
 import edu.duke.cs.ospreygui.forcefield.amber.*
+import kotlinx.coroutines.runBlocking
 import org.joml.Vector3d
 import java.util.*
 import kotlin.math.cos
@@ -196,7 +197,8 @@ class ProtonationEditor : SlideFeature {
 	private fun autoProtonate(views: List<MoleculeRenderView>) {
 		for (view in views) {
 			val mol = view.molStack.originalMol
-			for ((heavyAtom, hAtom) in mol.inferProtonation()) {
+			val protonation = runBlocking { mol.inferProtonation() }
+			for ((heavyAtom, hAtom) in protonation) {
 				mol.apply {
 					atoms.add(hAtom)
 					bonds.add(heavyAtom, hAtom)
@@ -345,7 +347,7 @@ class ProtonationEditor : SlideFeature {
 
 			// update the molecule
 			if (protonation != null) {
-				mol.protonate(atom, protonation)
+				runBlocking { mol.protonate(atom, protonation) }
 			} else {
 				mol.deprotonate(atom)
 			}

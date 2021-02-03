@@ -83,7 +83,7 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 		 * Iterates over the conformations in the position conf space,
 		 * returning assignments for each conformation in turn
 		 */
-		fun forEachConf(block: (Assignments, Assignments.AssignmentInfo, ConfInfo) -> Unit) {
+		inline fun forEachConf(block: (Assignments, Assignments.AssignmentInfo, ConfInfo) -> Unit) {
 
 			for (confInfo in confs) {
 
@@ -100,7 +100,7 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 		 * Iterates over the fragments in the position conf space,
 		 * returning assignments for an arbitrary conformation of each fragment in turn.
 		 */
-		fun forEachFrag(block: (Assignments, Assignments.AssignmentInfo, ConfInfo) -> Unit) {
+		inline fun forEachFrag(block: (Assignments, Assignments.AssignmentInfo, ConfInfo) -> Unit) {
 
 			for (fragInfo in fragments) {
 
@@ -256,7 +256,7 @@ class ConfSpaceIndex(val confSpace: ConfSpace) {
 }
 
 
-fun ConfSpace.forEachFragIn(posInfo1: ConfSpaceIndex.PosInfo, posInfo2: ConfSpaceIndex.PosInfo, block: (Assignments, Assignments.AssignmentInfo, ConfSpaceIndex.ConfInfo, Assignments.AssignmentInfo, ConfSpaceIndex.ConfInfo) -> Unit) {
+inline fun ConfSpace.forEachFragIn(posInfo1: ConfSpaceIndex.PosInfo, posInfo2: ConfSpaceIndex.PosInfo, block: (Assignments, Assignments.AssignmentInfo, ConfSpaceIndex.ConfInfo, Assignments.AssignmentInfo, ConfSpaceIndex.ConfInfo) -> Unit) {
 
 	for (fragInfo1 in posInfo1.fragments) {
 

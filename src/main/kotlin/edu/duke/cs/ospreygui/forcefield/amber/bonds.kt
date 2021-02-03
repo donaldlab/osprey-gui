@@ -12,7 +12,7 @@ import edu.duke.cs.ospreyservice.services.BondsRequest
  * Uses Amber forecfields to infer atom connectivity,
  * but not bond order.
  */
-fun Molecule.inferBondsAmber(): List<Pair<Atom,Atom>> {
+suspend fun Molecule.inferBondsAmber(): List<Pair<Atom,Atom>> {
 
 	val dst = this
 	val dstBonds = ArrayList<Pair<Atom,Atom>>()

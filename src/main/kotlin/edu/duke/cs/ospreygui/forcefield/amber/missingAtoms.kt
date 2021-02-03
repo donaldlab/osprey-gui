@@ -13,7 +13,7 @@ import edu.duke.cs.ospreyservice.services.MissingAtomsRequest
 /**
  * Uses Amber forecfields to infer missing heavy atoms and their positions.
  */
-fun Molecule.inferMissingAtomsAmber(): List<Pair<Atom,Polymer.Residue?>> {
+suspend fun Molecule.inferMissingAtomsAmber(): List<Pair<Atom,Polymer.Residue?>> {
 
 	val dst = this
 	val dstAtoms = ArrayList<Pair<Atom,Polymer.Residue?>>()
@@ -51,7 +51,7 @@ fun Molecule.inferMissingAtomsAmber(): List<Pair<Atom,Polymer.Residue?>> {
 }
 
 
-private fun runLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom,Polymer.Residue?>> {
+private suspend fun runLeap(mol: Molecule, ffname: ForcefieldName): List<Pair<Atom,Polymer.Residue?>> {
 
 	// run LEaP to infer all the missing atoms
 	val response = OspreyService.missingAtoms(MissingAtomsRequest(mol.toPDB(), ffname.name))

@@ -15,6 +15,7 @@ import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.view.MoleculeRenderView
 import edu.duke.cs.ospreygui.forcefield.amber.inferMissingAtomsAmber
+import kotlinx.coroutines.runBlocking
 
 class MissingAtomsEditor : SlideFeature {
 
@@ -133,7 +134,8 @@ class MissingAtomsEditor : SlideFeature {
 		for (view in views) {
 
 			val mol = view.molStack.originalMol
-			for ((atom, res) in mol.inferMissingAtomsAmber()) {
+			val missingAtoms = runBlocking { mol.inferMissingAtomsAmber() }
+			for ((atom, res) in missingAtoms) {
 
 				// add the atoms to the molecule
 				mol.atoms.add(atom)
