@@ -4,6 +4,8 @@ import cuchaz.kludge.imgui.Commands
 import edu.duke.cs.molscope.gui.WindowCommands
 import edu.duke.cs.molscope.gui.WindowFeature
 import edu.duke.cs.molscope.gui.features.FeatureId
+import edu.duke.cs.ospreygui.OspreyGui
+import edu.duke.cs.ospreygui.forcefield.amber.OperatingSystem
 import edu.duke.cs.ospreygui.io.UserSettings
 import edu.duke.cs.ospreyservice.OspreyService as Server
 import java.nio.file.Paths
@@ -36,6 +38,13 @@ object LocalServiceRunner : AutoCloseable {
 	private var service: Server.Instance? = null
 
 	val isRunning get() = service != null
+
+	init {
+		// if we're a linux developer, start a local service by default
+		if (OspreyGui.dev && OperatingSystem.get() == OperatingSystem.Linux) {
+			start()
+		}
+	}
 
 	fun start() {
 		if (service == null) {
