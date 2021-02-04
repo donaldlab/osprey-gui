@@ -3,12 +3,9 @@ package edu.duke.cs.ospreygui.features.slide
 import cuchaz.kludge.imgui.Commands
 import cuchaz.kludge.tools.*
 import edu.duke.cs.molscope.Slide
-import edu.duke.cs.molscope.gui.ClickTracker
-import edu.duke.cs.molscope.gui.SlideCommands
-import edu.duke.cs.molscope.gui.SlideFeature
+import edu.duke.cs.molscope.gui.*
 import edu.duke.cs.molscope.gui.features.FeatureId
 import edu.duke.cs.molscope.gui.features.WindowState
-import edu.duke.cs.molscope.gui.infoTip
 import edu.duke.cs.molscope.molecule.Atom
 import edu.duke.cs.molscope.molecule.Element
 import edu.duke.cs.molscope.molecule.Polymer
@@ -129,7 +126,7 @@ class ProtonationEditor : SlideFeature {
 						text("Protonation states:")
 
 						val numItems = selection.protonations.size + 1
-						if (listBoxHeader("", numItems)) {
+						listBox("", numItems) {
 
 							// always add an option for no hydrogens
 							if (selectable("0 H", selection.current == null)) {
@@ -138,11 +135,11 @@ class ProtonationEditor : SlideFeature {
 
 							for (protonation in selection.protonations) {
 								if (selectable("${protonation.numH} H, ${protonation.hybridization}", selection.current == protonation)) {
-									selection.set(protonation)
+									slidewin.showExceptions {
+										selection.set(protonation)
+									}
 								}
 							}
-
-							listBoxFooter()
 						}
 
 						// if hydrogens are rotatable, show a slider to pick the dihedral angle

@@ -33,7 +33,7 @@ class ConformationEditor(val confSpace: ConfSpace) : SlideFeature {
 		private fun describe() =
 			when (desc) {
 				is DihedralAngle.MolDescription -> {
-					val atomNames = listOf(desc.a, desc.b, desc.c, desc.c)
+					val atomNames = listOf(desc.a, desc.b, desc.c, desc.d)
 						.joinToString(", ") { it.name }
 					"Dihedral Angle @ ${desc.mol.name}: $atomNames"
 				}
