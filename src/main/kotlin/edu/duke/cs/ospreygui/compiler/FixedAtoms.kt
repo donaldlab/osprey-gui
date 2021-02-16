@@ -63,6 +63,9 @@ class FixedAtoms(
 	val statics: List<StaticInfo> get() = staticInfos
 	val staticAtomsByMol: List<List<Atom>> get() = _staticAtomsByMol
 
+	fun isStatic(atom: Atom): Boolean =
+		atom in staticLookup
+
 	fun getStatic(atom: Atom): StaticInfo =
 		staticLookup[atom] ?: throw NoSuchElementException("atom $atom is not a static atom")
 

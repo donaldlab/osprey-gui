@@ -2,6 +2,7 @@ package edu.duke.cs.ospreygui.io
 
 import cuchaz.kludge.tools.abs
 import cuchaz.kludge.tools.toDegrees
+import cuchaz.kludge.tools.toRadians
 import edu.duke.cs.molscope.molecule.Molecule
 import edu.duke.cs.molscope.molecule.Polymer
 import edu.duke.cs.molscope.tools.toIdentitySet
@@ -15,12 +16,15 @@ import edu.duke.cs.ospreygui.relatively
 import edu.duke.cs.osprey.confspace.compiled.ConfSpace as CompiledConfSpace
 import edu.duke.cs.osprey.confspace.compiled.AssignedCoords
 import edu.duke.cs.osprey.confspace.compiled.motions.DihedralAngle as CompiledDihedralAngle
+import edu.duke.cs.osprey.confspace.compiled.motions.TranslationRotation as CompiledTranslationRotation
 import edu.duke.cs.osprey.energy.compiled.CPUConfEnergyCalculator
 import edu.duke.cs.osprey.energy.compiled.PosInterGen
 import edu.duke.cs.ospreygui.compiler.ConfSpaceCompiler
 import edu.duke.cs.ospreygui.forcefield.*
 import edu.duke.cs.ospreygui.motions.DihedralAngle
+import edu.duke.cs.ospreygui.motions.TranslationRotation
 import edu.duke.cs.ospreygui.prep.*
+import io.kotlintest.matchers.collections.shouldContain
 import io.kotlintest.matchers.doubles.shouldBeLessThan
 import io.kotlintest.matchers.numerics.shouldBeGreaterThan
 import io.kotlintest.matchers.types.shouldBeTypeOf
@@ -485,5 +489,141 @@ class TestConfSpaceCompiler : SharedSpec({
 				}
 			}
 		}
-	}
+
+		group("no positions, molecule trans/rot") {
+
+			val mol = loadMol()
+
+			val confSpace = ConfSpace(listOf(MoleculeType.Protein to mol)).apply {
+
+				// make the translation/rotation motion
+				val motions = molMotions.getOrPut(mol) { ArrayList() }
+				motions.add(TranslationRotation.MolDescription(
+					mol,
+					2.0,
+					5.0
+				))
+			}
+			val compiledConfSpace = confSpace.compile()
+
+			testConf(compiledConfSpace) {
+
+				// make sure we got the right dofs
+				dofs.size shouldBe 6
+				for (i in 0 until 6) {
+					dofs[i].shouldBeTypeOf<CompiledTranslationRotation.Dof> { dof ->
+						listOf(2.0, 5.0.toRadians()).shouldContain(dof.max)
+						listOf(-2.0, (-5.0).toRadians()).shouldContain(dof.min)
+					}
+				}
+
+				// we should have static atom pairs too
+				getIndices(0).size() shouldBeGreaterThan 0
+
+				// check rigid/minimized energy
+				// (they're the same, rigid motions won't affect the energy of a single molecule)
+				(-2.908253272320646 + -47.75509989567506).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy().shouldBeEnergy(it)
+				}
+			}
+		}
+
+		group("no positions, molecule dihedral and trans/rot") {
+
+			val mol = loadMol()
+			val res72 = mol.findChainOrThrow("A").findResidueOrThrow("72")
+
+			val confSpace = ConfSpace(listOf(MoleculeType.Protein to mol)).apply {
+
+				val motions = molMotions.getOrPut(mol) { ArrayList() }
+
+				// make a dihedral on the N-terminal cap
+				motions.add(DihedralAngle.MolDescription.make(
+					mol,
+					res72.findAtomOrThrow("C"),
+					res72.findAtomOrThrow("CA"),
+					res72.findAtomOrThrow("N"),
+					res72.findAtomOrThrow("H1"),
+					9.0
+				))
+
+				// make the translation/rotation motion
+				motions.add(TranslationRotation.MolDescription(
+					mol,
+					2.0,
+					5.0
+				))
+			}
+			val compiledConfSpace = confSpace.compile()
+
+			testConf(compiledConfSpace) {
+
+				// check minimized energy
+				(-50.6633531679957).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy() shouldBeLessThan it
+				}
+			}
+		}
+
+		group("one continuous position, molecule trans/rot") {
+
+			val mol = loadMol()
+			val res73 = mol.findChainOrThrow("A").findResidueOrThrow("73")
+			val pos1 = Proteins.makeDesignPosition(mol, res73, "Pos1")
+
+			val confSpace = ConfSpace(listOf(MoleculeType.Protein to mol)).apply {
+
+				// make one design position for the dipeptide at the C terminus
+				designPositionsByMol[mol] = mutableListOf(pos1)
+
+				// configure pos 1
+				positionConfSpaces.getOrMake(pos1).run {
+
+					// add just one alanine mutation
+					val ala = conflib.fragments.getValue("ALA")
+					mutations.add(ala.type)
+
+					// add some confs
+					confs.addAll(ala)
+
+					// let the alanine methyl group rotate
+					for (space in confs.getByFragment(ala)) {
+						val settings = DihedralAngle.LibrarySettings(
+							radiusDegrees = 5.0,
+							includeHydroxyls = true,
+							includeNonHydroxylHGroups = true
+						)
+						space.motions.addAll(DihedralAngle.ConfDescription.makeFromLibrary(pos1, space.frag, space.conf, settings))
+					}
+				}
+
+				// make the translation/rotation motion
+				val motions = molMotions.getOrPut(mol) { ArrayList() }
+				motions.add(TranslationRotation.MolDescription(
+					mol,
+					2.0,
+					5.0
+				))
+			}
+			val compiledConfSpace = confSpace.compile()
+
+			testConf(compiledConfSpace, "ALA:ALA") {
+
+				// make sure we got the right dofs
+				dofs.size shouldBe 7
+
+				// check minimized energy
+				(-48.01726089618421).let {
+					(calcAmber96() + calcEEF1()).shouldBeEnergy(it)
+					calcEnergy().shouldBeEnergy(it)
+					minimizeEnergy() shouldBeLessThan it
+				}
+			}
+		}
+
+	} // glycine dipeptide
 })

@@ -42,4 +42,7 @@ class AtomIndex() {
 
 	operator fun contains(atom: Atom) = atomsToInts.containsKey(atom)
 	operator fun contains(atomi: Int) = intsToAtoms.containsKey(atomi)
+
+	override fun toString() =
+		intsToAtoms.toString()
 }

@@ -264,18 +264,26 @@ class ConfSpaceCompiler(val confSpace: ConfSpace) {
 			// collect the atoms affected by molecule motions
 			val staticAffectedAtomsByMol = confSpaceIndex.mols
 				.map { mol ->
-					ArrayList<Atom>().apply {
-						val movedAtoms = confSpace.molMotions[mol]
-							?.flatMap { it.getAffectedAtoms() }
-							?: emptyList()
-						val used = Atom.identitySet()
-						for (atom in movedAtoms) {
-							if (atom !in used) {
-								used.add(atom)
-								add(atom)
+					val used = Atom.identitySet()
+					confSpace.molMotions[mol]
+						?.flatMap { it.getAffectedAtoms() }
+						?.filter { atom ->
+
+							// intersect with the static atoms
+							// (some molecule motions can move dynamic atoms too)
+							if (!fixedAtoms.isStatic(atom)) {
+								return@filter false
 							}
+
+							// de-duplicate
+							if (atom in used) {
+								return@filter false
+							}
+							used.add(atom)
+
+							true
 						}
-					}
+						?: emptyList()
 				}
 
 			// calculate the internal energies for the static atoms that aren't affected by molecule motions
