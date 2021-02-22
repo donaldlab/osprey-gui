@@ -20,6 +20,7 @@ interface Forcefield {
 
 		override val ospreyImplementation = "amber"
 		override fun parameterizer() = Amber96Params()
+		override fun toString() = name
 
 		fun configure(block: Amber96Params.() -> Unit) =
 			Amber96Params().apply { block() }
@@ -32,6 +33,7 @@ interface Forcefield {
 
 		override val ospreyImplementation = "amber"
 		override fun parameterizer() = Amber14SBParams()
+		override fun toString() = name
 
 		fun configure(block: Amber14SBParams.() -> Unit) =
 			Amber14SBParams().apply { block() }
@@ -41,6 +43,7 @@ interface Forcefield {
 
 		override val ospreyImplementation = "eef1"
 		override fun parameterizer() = EEF1ForcefieldParams()
+		override fun toString() = name
 
 		fun configure(block: EEF1ForcefieldParams.() -> Unit) =
 			EEF1ForcefieldParams().apply { block() }
