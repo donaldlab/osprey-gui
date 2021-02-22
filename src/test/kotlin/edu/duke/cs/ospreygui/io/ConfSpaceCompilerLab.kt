@@ -24,13 +24,8 @@ fun main() {
 			forcefields.add(Forcefield.Amber96)
 			forcefields.add(Forcefield.EEF1)
 
-			// TODO: simplify this?
-			//   eg  netCharges[confSpace.getMol("ANP")] = 5
-			//   or better yet, bake the net charge into the mol definiton somehow?
 			// add necessary net charges
-			for ((type, mol) in confSpace.mols) {
-				netCharges[mol, type]?.netCharge = netChargesByMolName.getValue(mol.name)
-			}
+			netCharges[confSpace.findMol("ANP")]?.netCharge = -1
 
 			println("compiling ...")
 			val report = compile().run {

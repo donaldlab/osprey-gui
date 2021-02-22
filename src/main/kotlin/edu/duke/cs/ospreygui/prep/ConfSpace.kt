@@ -16,6 +16,10 @@ class ConfSpace(val mols: List<Pair<MoleculeType,Molecule>>) {
 
 	var name = "Conformation Space"
 
+	fun findMol(name: String): Molecule? =
+		mols.map { (_, mol) -> mol }
+			.find { it.name == name }
+
 	val designPositionsByMol: MutableMap<Molecule,MutableList<DesignPosition>> = IdentityHashMap()
 
 	/**

@@ -29,12 +29,21 @@ class NetCharges {
 
 	private val smallMolNetCharges: MutableMap<Molecule,MolNetCharges> = IdentityHashMap()
 
-	operator fun get(mol: Molecule, moltype: MoleculeType = mol.findTypeOrThrow()): MolNetCharges? =
-		if (required(moltype)) {
-			smallMolNetCharges.getOrPut(mol) { MolNetCharges(mol) }
-		} else {
-			null
+	operator fun get(mol: Molecule?, moltype: MoleculeType? = null): MolNetCharges? {
+
+		if (mol == null) {
+			return null
 		}
+
+		// skip if net charges aren't required for this molecule
+		@Suppress("NAME_SHADOWING")
+		val moltype = moltype ?: mol.findTypeOrThrow()
+		if (!required(moltype)) {
+			return null
+		}
+
+		return smallMolNetCharges.getOrPut(mol) { MolNetCharges(mol) }
+	}
 }
 
 /**
