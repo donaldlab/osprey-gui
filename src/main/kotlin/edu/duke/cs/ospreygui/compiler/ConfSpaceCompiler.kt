@@ -26,20 +26,7 @@ import kotlin.collections.ArrayList
  */
 class ConfSpaceCompiler(val confSpace: ConfSpace) {
 
-	private val _forcefields: MutableList<ForcefieldParams> = ArrayList()
-	val forcefields: List<ForcefieldParams> get() = _forcefields
-
-	fun addForcefield(ff: Forcefield): ForcefieldParams {
-
-		if (forcefields.any { it.forcefield === ff }) {
-			throw IllegalArgumentException("forcefield $ff alread added")
-		}
-
-		val parameterizer = ff.parameterizer()
-		_forcefields.add(parameterizer)
-		return parameterizer
-	}
-
+	val forcefields = ForcefieldSet()
 	val netCharges = NetCharges()
 
 	data class Report(

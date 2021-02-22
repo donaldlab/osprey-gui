@@ -138,13 +138,12 @@ class TestConfSpaceCompiler : SharedSpec({
 		// compile the conf space
 		val bytes = ConfSpaceCompiler(this).run {
 
-			addForcefield(Forcefield.Amber96)
+			forcefields.add(Forcefield.Amber96)
 
-			addForcefield(Forcefield.EEF1).run {
-				this as EEF1ForcefieldParams
+			forcefields.add(Forcefield.EEF1.configure {
 				// use the full scale for testing EEF1
 				scale = 1.0
-			}
+			})
 
 			compile().run {
 				waitForFinish()

@@ -42,8 +42,8 @@ fun main() = withService {
 				ConfSpaceCompiler(confSpace).run {
 
 					// use default setings
-					addForcefield(Forcefield.Amber96)
-					addForcefield(Forcefield.EEF1)
+					forcefields.add(Forcefield.Amber96)
+					forcefields.add(Forcefield.EEF1)
 
 					// add necessary net charges
 					for ((type, mol) in confSpace.mols) {

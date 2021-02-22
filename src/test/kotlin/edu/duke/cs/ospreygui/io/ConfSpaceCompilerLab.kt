@@ -21,8 +21,8 @@ fun main() {
 		ConfSpaceCompiler(confSpace).run {
 
 			// use default setings
-			addForcefield(Forcefield.Amber96)
-			addForcefield(Forcefield.EEF1)
+			forcefields.add(Forcefield.Amber96)
+			forcefields.add(Forcefield.EEF1)
 
 			// TODO: simplify this?
 			//   eg  netCharges[confSpace.getMol("ANP")] = 5

@@ -41,8 +41,8 @@ class CompileConfSpace(val confSpace: ConfSpace) : SlideFeature {
 
 	// make the compiler and configure the default settings
 	private val compiler = ConfSpaceCompiler(confSpace).apply {
-		addForcefield(Forcefield.Amber96)
-		addForcefield(Forcefield.EEF1)
+		forcefields.add(Forcefield.Amber96)
+		forcefields.add(Forcefield.EEF1)
 	}
 
 	private val bigIntFormatter = NumberFormat.getIntegerInstance()
